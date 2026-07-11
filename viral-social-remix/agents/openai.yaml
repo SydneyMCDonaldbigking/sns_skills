@@ -1,0 +1,4 @@
+interface:
+  display_name: "Viral Social Remix"
+  short_description: "Remix viral posts into branded social assets"
+  default_prompt: "Use $viral-social-remix to analyze this viral media and create a platform-ready branded remix."

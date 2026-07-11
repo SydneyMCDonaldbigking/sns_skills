@@ -17,6 +17,7 @@
 - `viral-social-remix/agents/openai.yaml`: UI-facing skill metadata.
 - `viral-social-remix/scripts/scan_media.py`: recursively discover and group supported local media.
 - `viral-social-remix/scripts/manifest.py`: create, load, update, and resume task manifests.
+- `viral-social-remix/scripts/create_run_dir.py`: create collision-safe output directories from current local system time.
 - `viral-social-remix/scripts/extract_keyframes.py`: probe videos, create candidate frames, and export nine selected timestamps.
 - `viral-social-remix/scripts/make_contact_sheet.py`: build carousel overviews and 3×3 storyboard sheets.
 - `viral-social-remix/scripts/validate_output.py`: validate dimensions, required files, text-review state, and completion.
@@ -255,6 +256,7 @@ git commit -m "feat: scan and group local social media"
 ## Task 3: Implement resumable manifests
 
 **Files:**
+- Create: `viral-social-remix/scripts/create_run_dir.py`
 - Create: `viral-social-remix/scripts/manifest.py`
 - Create: `tests/test_manifest.py`
 
@@ -266,6 +268,16 @@ from viral_social_test_loader import load_script
 
 
 manifest = load_script("manifest")
+run_dirs = load_script("create_run_dir")
+
+
+def test_run_directory_uses_local_system_timestamp_and_avoids_collision(tmp_path):
+    from datetime import datetime
+    fixed = datetime(2026, 7, 11, 14, 5, 9)
+    first = run_dirs.create(tmp_path, "summer-launch", now=fixed)
+    second = run_dirs.create(tmp_path, "summer-launch", now=fixed)
+    assert first.name == "20260711-140509-summer-launch"
+    assert second.name == "20260711-140509-summer-launch-02"
 
 
 def test_manifest_resumes_only_incomplete_assets(tmp_path):
@@ -296,6 +308,34 @@ Run: `python -m pytest tests/test_manifest.py -v`
 Expected: FAIL because `manifest.py` does not exist.
 
 - [ ] **Step 3: Implement atomic manifest operations**
+
+Create `create_run_dir.py` first:
+
+```python
+import re
+from datetime import datetime
+from pathlib import Path
+
+
+def _slug(value: str) -> str:
+    cleaned = re.sub(r"[^\w\u4e00-\u9fff-]+", "-", value.strip(), flags=re.UNICODE)
+    return cleaned.strip("-") or "task"
+
+
+def create(root: str | Path, task_name: str, now: datetime | None = None) -> Path:
+    base = Path(root)
+    timestamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    stem = f"{timestamp}-{_slug(task_name)}"
+    candidate = base / stem
+    suffix = 2
+    while candidate.exists():
+        candidate = base / f"{stem}-{suffix:02d}"
+        suffix += 1
+    candidate.mkdir(parents=True)
+    return candidate
+```
+
+Then implement atomic manifest operations:
 
 ```python
 import json
@@ -359,8 +399,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit manifest support**
 
 ```powershell
-git add viral-social-remix/scripts/manifest.py tests/test_manifest.py
-git commit -m "feat: add resumable generation manifest"
+git add viral-social-remix/scripts/create_run_dir.py viral-social-remix/scripts/manifest.py tests/test_manifest.py
+git commit -m "feat: add timestamped runs and resumable manifests"
 ```
 
 ## Task 4: Implement video probing and frame export
@@ -658,6 +698,8 @@ def validate_delivery(root: str | Path, platform: str) -> dict:
         base / "overview" / "contact-sheet.png",
         base / "qa" / "validation.json",
     ]
+    caption = "caption-zh.txt" if platform == "xiaohongshu" else "caption-en.txt"
+    required.append(base / "analysis" / caption)
     errors.extend(f"missing required file: {path}" for path in required if not path.is_file())
     if platform == "video" and len(generated) != 9:
         errors.append("exactly 9 generated frames")
@@ -709,7 +751,7 @@ def test_prompt_contract_requires_verbatim_text_and_consistency():
 
 def test_output_schema_names_every_delivery_file():
     text = (REF / "output-schema.md").read_text(encoding="utf-8")
-    for required in ["breakdown.md", "copy.md", "prompts.md", "manifest.json", "validation.json"]:
+    for required in ["breakdown.md", "copy.md", "caption-zh.txt", "caption-en.txt", "prompts.md", "manifest.json", "validation.json"]:
         assert required in text
 ```
 
@@ -755,7 +797,7 @@ Generate text directly in the image. After generation, visually verify brand nam
 
 - [ ] **Step 6: Write `output-schema.md`**
 
-Specify the exact delivery tree from the design, manifest schema version `1`, statuses from Task 3, source provenance, platform confidence, assumptions, per-asset prompt, output path, text-review state, validation errors, and retry count.
+Specify the exact delivery tree from the design, timestamped run-directory format `output/YYYYMMDD-HHmmss-<task>/`, collision suffixes, manifest schema version `1`, statuses from Task 3, source provenance, platform confidence, assumptions, per-asset prompt, output path, text-review state, validation errors, and retry count. Require `caption-zh.txt` for Xiaohongshu, `caption-en.txt` for Instagram/Facebook, and the target-platform file for video.
 
 - [ ] **Step 7: Run reference tests**
 
@@ -822,7 +864,7 @@ For image posts, preserve source page count and assign each page a role. For vid
 
 ## Generate
 
-Write `breakdown.md`, `copy.md`, `prompts.md`, and `manifest.json` before image generation. Load `references/prompt-patterns.md`. Call GPT Image 2 once per pending asset. Generate the exact Chinese or English text directly in the image. Preserve source composition, hierarchy, rhythm, and copy structure while replacing product, brand, and specific expression.
+Create a collision-safe run directory from current local system time with `scripts/create_run_dir.py`. Write `breakdown.md`, `copy.md`, `prompts.md`, and `manifest.json` before image generation. Also write `caption-zh.txt` for Xiaohongshu or `caption-en.txt` for Instagram/Facebook; for video, use the target platform language. Load `references/prompt-patterns.md`. Call GPT Image 2 once per pending asset. Generate the exact Chinese or English text directly in the image. Preserve source composition, hierarchy, rhythm, and copy structure while replacing product, brand, and specific expression.
 
 ## Validate and resume
 
@@ -889,7 +931,7 @@ def test_local_folder_to_validated_carousel_fixture(tmp_path: Path):
     delivery = tmp_path / "output" / "carousel"
     manifest_path = delivery / "analysis" / "manifest.json"
     manifest.create(manifest_path, "xiaohongshu", ["01", "02"])
-    for name in ["breakdown.md", "copy.md", "prompts.md"]:
+    for name in ["breakdown.md", "copy.md", "caption-zh.txt", "prompts.md"]:
         path = delivery / "analysis" / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("fixture", encoding="utf-8")
@@ -911,7 +953,7 @@ def test_delivery_rejects_incomplete_manifest(tmp_path: Path):
     delivery = tmp_path / "output" / "carousel"
     manifest_path = delivery / "analysis" / "manifest.json"
     manifest.create(manifest_path, "xiaohongshu", ["01"])
-    for name in ["breakdown.md", "copy.md", "prompts.md"]:
+    for name in ["breakdown.md", "copy.md", "caption-zh.txt", "prompts.md"]:
         path = delivery / "analysis" / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("fixture", encoding="utf-8")
