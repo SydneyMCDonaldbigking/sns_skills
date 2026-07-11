@@ -55,6 +55,15 @@ def validate_delivery(
     errors.extend(
         f"missing required file: {path}" for path in required if not path.is_file()
     )
+    if platform in DIMENSIONS:
+        expected = DIMENSIONS[platform]
+        for asset in generated:
+            with Image.open(asset) as image:
+                if image.size != expected:
+                    errors.append(
+                        f"{asset.name}: expected {expected[0]}x{expected[1]}, "
+                        f"got {image.width}x{image.height}"
+                    )
     if platform == "video" and len(generated) != 9:
         errors.append("exactly 9 generated frames")
 
