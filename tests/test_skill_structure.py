@@ -50,3 +50,13 @@ def test_skill_routes_xiaohongshu_real_talk_posts_to_template():
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     assert "xiaohongshu-real-talk-template.md" in text
     assert "real-talk" in text
+
+
+def test_skill_uses_editable_brand_profile_before_asking_questions():
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    profile = (SKILL / "brand-profile.md").read_text(encoding="utf-8")
+    assert "brand-profile.md" in text
+    assert "未填写" in text
+    assert "品牌名称：未填写" in profile
+    assert "产品名称：未填写" in profile
+    assert "不要重复询问" in profile

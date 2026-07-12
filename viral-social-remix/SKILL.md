@@ -9,6 +9,11 @@ Follow the workflow below. Load only the reference files required by the detecte
 
 ## Intake
 
+Read `brand-profile.md` before asking intake questions. Reuse every completed
+field. Ask for brand or product only when their values remain `未填写`; infer
+other missing fields and label the assumptions. Current-task user input always
+overrides the profile.
+
 Accept a public post URL, local file, or local folder. For a local folder, run
 `scripts/scan_media.py`, show the discovered task list, and process each valid
 group independently. Inspect every local image before analysis. Product and brand are mandatory. Infer audience, setting, benefits, and theme; label those
