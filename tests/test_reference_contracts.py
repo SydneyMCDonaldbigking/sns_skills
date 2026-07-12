@@ -25,3 +25,19 @@ def test_output_schema_names_every_delivery_file():
         "YYYYMMDD-HHmmss",
     ]:
         assert required in text
+
+
+def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():
+    text = (REF / "xiaohongshu-real-talk-template.md").read_text(encoding="utf-8")
+    for required in [
+        "刚从【对象】回来",
+        "攻略没提的大实话",
+        "路线或使用过程",
+        "最大翻车",
+        "费用或购买参考",
+        "旅行",
+        "探店",
+        "产品体验",
+        "不得复制原作者原句",
+    ]:
+        assert required in text

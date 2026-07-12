@@ -43,6 +43,12 @@ frames. Do not treat evenly spaced candidates as the final narrative selection.
 Preserve source composition, hierarchy, rhythm, and copy structure while
 replacing the product, brand, and specific expression.
 
+For a Xiaohongshu source whose hook is a first-person return report, hidden
+detail, candid warning, concrete mistake, or exact cost, classify it as
+`real-talk` and load `references/xiaohongshu-real-talk-template.md`. Apply its
+structure only when the source evidence supports it; never invent first-hand
+experience for the user.
+
 ## Prepare the run
 
 Run `scripts/create_run_dir.py` so each task writes to a new local-system-time

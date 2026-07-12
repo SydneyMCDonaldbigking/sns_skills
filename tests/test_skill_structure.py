@@ -44,3 +44,9 @@ def test_skill_requires_product_and_brand_only():
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     assert "Product and brand are mandatory" in text
     assert "Ask only for missing mandatory fields or low-confidence platform" in text
+
+
+def test_skill_routes_xiaohongshu_real_talk_posts_to_template():
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    assert "xiaohongshu-real-talk-template.md" in text
+    assert "real-talk" in text
