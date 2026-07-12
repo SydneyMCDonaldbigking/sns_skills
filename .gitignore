@@ -8,5 +8,4 @@ tmp/
 samples/
 .env
 .env.*
-!.env.example
 *.local.env
