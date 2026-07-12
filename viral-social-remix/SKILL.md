@@ -54,6 +54,12 @@ detail, candid warning, concrete mistake, or exact cost, classify it as
 structure only when the source evidence supports it; never invent first-hand
 experience for the user.
 
+For an Instagram/Facebook source whose hook is a ranked list, pantry essential,
+haul, restock, or "what to buy" post, classify it as `pantry-essentials` and
+load `references/instagram-pantry-essentials-template.md`. Preserve the
+education-first rhythm: one item per page, one practical use case, and one soft
+brand reason.
+
 ## Prepare the run
 
 Run `scripts/create_run_dir.py` so each task writes to a new local-system-time
@@ -75,11 +81,13 @@ English natural for Instagram/Facebook.
 
 ## Generate
 
-Load `references/prompt-patterns.md`. Call GPT Image 2 once per pending asset
-using the built-in image generation tool. Generate the exact Chinese or English
-text directly in the image; do not default to local text overlay. Use each source
-page or selected source frame as a structural reference while locking product,
-packaging, recurring people, palette, lighting, and typography across the group.
+Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
+the image provider with `scripts/image_provider.py`. Default to OpenRouter
+`openai/gpt-image-2` at medium quality when `OPENROUTER_API_KEY` is available.
+Generate the exact Chinese or English text directly in the image; do not default
+to local text overlay. Use each source page or selected source frame as a
+structural reference while locking product, packaging, recurring people, palette,
+lighting, and typography across the group.
 
 Save every project-bound generated asset into the run directory. Update
 `scripts/manifest.py` after prompting and after each generation.

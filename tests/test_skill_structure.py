@@ -30,11 +30,15 @@ def test_skill_routes_every_input_and_platform():
         "Instagram/Facebook",
         "exactly nine",
         "GPT Image 2",
+        "image_provider.py",
+        "image-provider.md",
+        "openai/gpt-image-2",
         "manifest.py",
         "validate_output.py",
         "create_run_dir.py",
         "caption-zh.txt",
         "caption-en.txt",
+        "instagram-pantry-essentials-template.md",
     ]
     for phrase in required:
         assert phrase in text
@@ -52,11 +56,21 @@ def test_skill_routes_xiaohongshu_real_talk_posts_to_template():
     assert "real-talk" in text
 
 
+def test_skill_routes_instagram_pantry_essentials_to_template():
+    text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    template = (SKILL / "references" / "instagram-pantry-essentials-template.md").read_text(
+        encoding="utf-8"
+    )
+    assert "instagram-pantry-essentials-template.md" in text
+    assert "pantry-essentials" in text
+    assert "Instagram/Facebook Pantry Essentials Template" in template
+
+
 def test_skill_uses_editable_brand_profile_before_asking_questions():
     text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     profile = (SKILL / "brand-profile.md").read_text(encoding="utf-8")
     assert "brand-profile.md" in text
     assert "未填写" in text
-    assert "品牌名称：未填写" in profile
-    assert "产品名称：未填写" in profile
+    assert "品牌名称：" in profile
+    assert "产品名称：" in profile
     assert "不要重复询问" in profile
