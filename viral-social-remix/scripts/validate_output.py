@@ -7,7 +7,7 @@ from PIL import Image
 
 
 DIMENSIONS = {
-    "xiaohongshu": (2048, 1152),
+    "xiaohongshu": (1152, 1536),
     "instagram-facebook": (1152, 1152),
     "video": (1920, 1080),
 }

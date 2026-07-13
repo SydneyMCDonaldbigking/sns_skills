@@ -44,7 +44,7 @@ def test_local_folder_to_validated_carousel_fixture(tmp_path: Path):
     generated = delivery / "generated"
     generated.mkdir()
     for asset_id in ["01", "02"]:
-        Image.new("RGB", (2048, 1152), "white").save(generated / f"{asset_id}.png")
+        Image.new("RGB", (1152, 1536), "white").save(generated / f"{asset_id}.png")
         manifest.mark(manifest_path, asset_id, "validated", output=f"generated/{asset_id}.png")
 
     assert validation.validate_delivery(delivery, "xiaohongshu")["valid"] is True
@@ -63,4 +63,4 @@ def test_delivery_rejects_wrong_generated_asset_dimensions(tmp_path: Path):
 
     result = validation.validate_delivery(delivery, "xiaohongshu")
 
-    assert any("expected 2048x1152" in error for error in result["errors"])
+    assert any("expected 1152x1536" in error for error in result["errors"])

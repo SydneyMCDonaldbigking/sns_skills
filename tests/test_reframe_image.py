@@ -24,3 +24,19 @@ def test_blur_pad_outputs_requested_story_size(tmp_path):
     reframe_image.reframe(source, output, (1080, 1920), mode="blur-pad")
 
     assert Image.open(output).size == (1080, 1920)
+
+
+def test_feather_pad_outputs_requested_xhs_size(tmp_path):
+    source = tmp_path / "square.png"
+    output = tmp_path / "xhs.png"
+    Image.new("RGB", (1024, 1024), "green").save(source)
+
+    reframe_image.reframe(
+        source,
+        output,
+        (1152, 1536),
+        mode="feather-pad",
+        center_size=(1152, 1152),
+    )
+
+    assert Image.open(output).size == (1152, 1536)

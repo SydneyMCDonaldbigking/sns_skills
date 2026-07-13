@@ -2,7 +2,7 @@
 
 | Profile | Language | Asset size | Asset count | Caption |
 |---|---|---:|---|---|
-| Xiaohongshu carousel | Chinese | 2048×1152 | Match source page count | `caption-zh.txt` |
+| Xiaohongshu carousel | Chinese | 1152×1536 | Match source page count | `caption-zh.txt` |
 | Instagram/Facebook carousel | Natural English | 1152×1152 | Match source page count | `caption-en.txt` |
 | Video storyboard | Target-market language | 1920×1080 | exactly 9 frames plus one 1920×1080 contact sheet | Target-platform caption |
 

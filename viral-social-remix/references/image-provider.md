@@ -6,9 +6,9 @@ Use this file when generating or retrying images for the remix workflow.
 
 - Provider: OpenRouter
 - API key variable: `OPENROUTER_API_KEY`
-- Model: `openai/gpt-image-2`
+- Model: `openai/gpt-5.4-image-2`
 - Quality: `medium`
-- Xiaohongshu size: `2048x1152`
+- Xiaohongshu size: `1152x1536`
 - Instagram/Facebook size: `1152x1152`
 - Video storyboard size: `1920x1080`
 

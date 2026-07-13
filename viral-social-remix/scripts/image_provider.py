@@ -13,7 +13,7 @@ LOCAL_ENV = ROOT.parent / ".env.local"
 
 DEFAULTS = {
     "provider": "openrouter",
-    "model": "openai/gpt-image-2",
+    "model": "openai/gpt-5.4-image-2",
     "quality": "medium",
     "endpoint": "",
 }

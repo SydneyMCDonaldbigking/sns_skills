@@ -11,7 +11,7 @@ def test_xiaohongshu_rejects_wrong_dimensions(tmp_path):
     Image.new("RGB", (1152, 1152)).save(path)
     result = validation.validate_asset(path, "xiaohongshu", text_review="passed")
     assert result["valid"] is False
-    assert "2048x1152" in result["errors"][0]
+    assert "1152x1536" in result["errors"][0]
 
 
 def test_instagram_asset_passes_with_text_review(tmp_path):

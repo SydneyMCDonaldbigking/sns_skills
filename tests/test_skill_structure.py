@@ -32,7 +32,7 @@ def test_skill_routes_every_input_and_platform():
         "GPT Image 2",
         "image_provider.py",
         "image-provider.md",
-        "openai/gpt-image-2",
+        "openai/gpt-5.4-image-2",
         "manifest.py",
         "validate_output.py",
         "create_run_dir.py",

@@ -6,7 +6,7 @@ REF = Path(__file__).parents[1] / "viral-social-remix" / "references"
 
 def test_platform_profiles_contain_exact_output_contracts():
     text = (REF / "platform-profiles.md").read_text(encoding="utf-8")
-    for required in ["2048×1152", "1152×1152", "1920×1080", "exactly 9"]:
+    for required in ["1152×1536", "1152×1152", "1920×1080", "exactly 9"]:
         assert required in text
 
 

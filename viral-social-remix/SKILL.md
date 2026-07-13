@@ -28,11 +28,12 @@ Infer platform from source domain, page metadata, media dimensions, language,
 UI traces, and folder naming. Load `references/platform-profiles.md`, then load
 the relevant fields from `references/breakdown-schema.md`.
 
-- Xiaohongshu: preserve source page count, use Chinese, output 2048×1152.
+- Xiaohongshu: preserve source page count, use Chinese, output 1152×1536
+  vertical assets by default; 1080×1440 is acceptable when explicitly requested.
 - Instagram/Facebook: preserve source page count, use natural English, output
   1152×1152.
 - Video: identify the target publishing platform and language, then produce a
-  1920×1080 storyboard.
+  1920×1080 storyboard and 16:9 contact sheet.
 
 ## Analyze
 
@@ -79,11 +80,15 @@ The caption must be ready to paste into the platform, including a hook, body,
 CTA, and relevant hashtags. Keep the Chinese natural for Xiaohongshu and the
 English natural for Instagram/Facebook.
 
+When visible packaged products matter, load
+`references/product-reference-cache.md` and use cached or official SKU images
+before image generation.
+
 ## Generate
 
 Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
 the image provider with `scripts/image_provider.py`. Default to OpenRouter
-`openai/gpt-image-2` at medium quality when `OPENROUTER_API_KEY` is available.
+`openai/gpt-5.4-image-2` at medium quality when `OPENROUTER_API_KEY` is available.
 Generate the exact Chinese or English text directly in the image; do not default
 to local text overlay. Use each source page or selected source frame as a
 structural reference while locking product, packaging, recurring people, palette,

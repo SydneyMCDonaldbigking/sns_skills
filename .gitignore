@@ -6,6 +6,7 @@ output/
 tmp/
 *.tmp
 samples/
+data/product-cache/
 .env
 .env.*
 *.local.env
