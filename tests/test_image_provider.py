@@ -24,6 +24,7 @@ def test_image_provider_defaults_are_redacted(monkeypatch):
     ]:
         monkeypatch.delenv(key, raising=False)
     module = load_module()
+    monkeypatch.setattr(module, "LOCAL_ENV", ROOT / "missing.env.local")
     config = module.resolve()
     assert config == {
         "provider": "openrouter",
