@@ -82,3 +82,56 @@ def summarize(path: str | Path = DEFAULT_INDEX) -> dict:
         "by_platform": by_platform,
         "by_type": by_type,
     }
+
+
+def searchable_text(record: dict) -> str:
+    values: list[str] = []
+    for key in [
+        "record_id",
+        "record_type",
+        "platform",
+        "source",
+        "kind",
+        "title",
+        "label",
+        "source_url",
+        "folder",
+        "content_path",
+        "caption_path",
+    ]:
+        value = record.get(key)
+        if value:
+            values.append(str(value))
+    for key in ["reasons", "image_paths"]:
+        value = record.get(key) or []
+        if isinstance(value, list):
+            values.extend(str(item) for item in value)
+    return " ".join(values).casefold()
+
+
+def search(
+    path: str | Path = DEFAULT_INDEX,
+    *,
+    query: str | None = None,
+    platform: str | None = None,
+    record_type: str | None = None,
+    kind: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    rows = load(path)
+    terms = [term.casefold() for term in (query or "").split() if term.strip()]
+    results = []
+    for row in rows:
+        if platform and row.get("platform") != platform:
+            continue
+        if record_type and row.get("record_type") != record_type:
+            continue
+        if kind and row.get("kind") != kind:
+            continue
+        haystack = searchable_text(row)
+        if terms and not all(term in haystack for term in terms):
+            continue
+        results.append(row)
+        if limit and len(results) >= limit:
+            break
+    return results

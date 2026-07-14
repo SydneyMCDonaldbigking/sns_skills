@@ -26,7 +26,9 @@ Before asking for examples or product visuals, check the local material index at
 `data/material-index.jsonl` when it exists. Use it as a memory of already
 collected Xiaohongshu posts, Instagram/Facebook posts, and official brand-site
 assets. If it is missing or stale, rebuild it from completed output folders with
-`scripts/collect_source_assets.py`.
+`scripts/collect_source_assets.py`. Search it with
+`scripts/query_material_index.py` by platform, keyword, record type, or asset
+kind before doing new browser/OCR collection.
 
 ## Route
 

@@ -31,6 +31,22 @@ python viral-social-remix/scripts/collect_source_assets.py --platform brand-site
 python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<run> --dry-run
 ```
 
+## 检索素材
+
+按关键词、平台、类型、素材 kind 检索：
+
+```bash
+python viral-social-remix/scripts/query_material_index.py 补贴 --platform rednote
+python viral-social-remix/scripts/query_material_index.py pantry --platform instagram_facebook --type post
+python viral-social-remix/scripts/query_material_index.py 大米 --platform brand_site --type asset --kind product_or_promo
+```
+
+默认输出 Markdown，适合直接复制进分析文档。需要程序读取时用 JSON：
+
+```bash
+python viral-social-remix/scripts/query_material_index.py 大米 --format json
+```
+
 ## 当前初始化结果
 
 2026-07-14 已把以下三批本地素材登记进索引：
