@@ -62,6 +62,55 @@ def test_collect_brand_site_assets_dry_run_does_not_write_index(tmp_path):
     assert not index.exists()
 
 
+def test_collect_brand_site_assets_uses_enriched_catalog_when_present(tmp_path):
+    run_dir = tmp_path / "brand-run"
+    run_dir.mkdir()
+    (run_dir / "assets_manifest.json").write_text(
+        json.dumps(
+            {
+                "assets": [
+                    {
+                        "status": "downloaded",
+                        "kind": "product_or_promo",
+                        "alt": "",
+                        "source_url": "https://www.umall.com.au/item-a.jpg",
+                        "file": "assets/item-a.jpg",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "brand_asset_catalog.json").write_text(
+        json.dumps(
+            {
+                "assets": [
+                    {
+                        "file": "assets/item-a.jpg",
+                        "title": "官方大米商品图",
+                        "source_name": "official rice",
+                        "tags": ["product_or_promo", "rice"],
+                        "use_case": "product-pack-reference",
+                        "quality": "medium",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    index = tmp_path / "material-index.jsonl"
+
+    result = run_collector("--platform", "brand-site", "--run-dir", run_dir, "--index", index)
+
+    assert result.returncode == 0, result.stderr
+    row = json.loads(index.read_text(encoding="utf-8").splitlines()[0])
+    assert row["title"] == "官方大米商品图"
+    assert row["tags"] == ["product_or_promo", "rice"]
+    assert row["metadata_path"].endswith("brand_asset_catalog.json")
+
+
 def test_collect_rednote_post_assets_writes_post_record(tmp_path):
     run_dir = tmp_path / "rednote-run"
     post_dir = run_dir / "posts" / "post-001-subsidy"

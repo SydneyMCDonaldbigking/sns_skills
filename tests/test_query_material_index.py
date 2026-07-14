@@ -30,7 +30,19 @@ def seed_index(path: Path):
                 "platform": "brand_site",
                 "kind": "product_or_promo",
                 "title": "东北大米官方商品图",
+                "tags": ["product_or_promo", "rice"],
+                "use_case": "product-pack-reference",
+                "quality": "medium",
                 "image_paths": ["output/brand/assets/rice.jpg"],
+            },
+            {
+                "record_id": "brand-002",
+                "record_type": "asset",
+                "platform": "brand_site",
+                "kind": "product_or_promo",
+                "title": "half price wagyu beef",
+                "tags": ["discount", "meat"],
+                "image_paths": ["output/brand/assets/wagyu.jpg"],
             },
             {
                 "record_id": "ig-001",
@@ -59,12 +71,24 @@ def test_material_index_search_filters_by_query_platform_type_and_kind(tmp_path)
     seed_index(index)
 
     assert [row["record_id"] for row in material_index.search(index, query="补贴")] == ["rednote-001"]
-    assert [row["record_id"] for row in material_index.search(index, platform="brand_site")] == ["brand-001"]
+    assert [row["record_id"] for row in material_index.search(index, platform="brand_site")] == [
+        "brand-001",
+        "brand-002",
+    ]
     assert [row["record_id"] for row in material_index.search(index, record_type="post")] == [
         "rednote-001",
         "ig-001",
     ]
-    assert [row["record_id"] for row in material_index.search(index, kind="product_or_promo")] == ["brand-001"]
+    assert [row["record_id"] for row in material_index.search(index, kind="product_or_promo")] == [
+        "brand-001",
+        "brand-002",
+    ]
+    assert [row["record_id"] for row in material_index.search(index, query="rice")] == ["brand-001"]
+    assert [row["record_id"] for row in material_index.search(index, query="price")] == ["brand-002"]
+    assert [row["record_id"] for row in material_index.search(index, quality="medium")] == ["brand-001"]
+    assert [row["record_id"] for row in material_index.search(index, use_case="product-pack-reference")] == [
+        "brand-001"
+    ]
 
 
 def test_query_material_index_cli_outputs_markdown_and_json(tmp_path):
@@ -77,12 +101,19 @@ def test_query_material_index_cli_outputs_markdown_and_json(tmp_path):
         index,
         "--platform",
         "brand_site",
+        "--quality",
+        "medium",
+        "--use-case",
+        "product-pack-reference",
         "--format",
         "md",
     )
     assert markdown.returncode == 0, markdown.stderr
     assert "# 本地素材索引检索结果" in markdown.stdout
     assert "东北大米官方商品图" in markdown.stdout
+    assert "tags: product_or_promo, rice" in markdown.stdout
+    assert "use_case: `product-pack-reference`" in markdown.stdout
+    assert "quality: `medium`" in markdown.stdout
 
     emoji = run_query("补贴", "--index", index, "--format", "md")
     assert emoji.returncode == 0, emoji.stderr

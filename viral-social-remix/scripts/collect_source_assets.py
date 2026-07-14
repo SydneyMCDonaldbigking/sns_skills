@@ -92,10 +92,16 @@ def records_from_instagram(run_dir: Path) -> list[dict]:
 
 def records_from_brand_assets(run_dir: Path) -> list[dict]:
     manifest = _load_json(run_dir / "assets_manifest.json")
+    catalog_path = run_dir / "brand_asset_catalog.json"
+    enriched_by_file = {}
+    if catalog_path.exists():
+        catalog = _load_json(catalog_path)
+        enriched_by_file = {asset.get("file"): asset for asset in catalog.get("assets", [])}
     records = []
     for asset in manifest.get("assets", []):
         if asset.get("status") != "downloaded":
             continue
+        enriched = enriched_by_file.get(asset.get("file"), {})
         records.append(
             {
                 "record_id": _record_id("brand_site", asset.get("source_url"), asset.get("file")),
@@ -104,11 +110,15 @@ def records_from_brand_assets(run_dir: Path) -> list[dict]:
                 "source": "umall_official_site",
                 "run_dir": _rel(run_dir),
                 "kind": asset.get("kind"),
-                "title": asset.get("alt") or asset.get("kind"),
+                "title": enriched.get("title") or asset.get("alt") or asset.get("kind"),
+                "source_name": enriched.get("source_name"),
+                "tags": enriched.get("tags", []),
+                "use_case": enriched.get("use_case"),
+                "quality": enriched.get("quality"),
                 "source_url": asset.get("source_url"),
                 "image_count": 1,
                 "image_paths": [_rel(run_dir / asset["file"])],
-                "metadata_path": _rel(run_dir / "assets_manifest.json"),
+                "metadata_path": _rel(catalog_path if catalog_path.exists() else run_dir / "assets_manifest.json"),
             }
         )
     return records

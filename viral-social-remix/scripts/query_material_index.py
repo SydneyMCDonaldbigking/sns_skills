@@ -39,6 +39,14 @@ def _format_markdown(records: list[dict], *, index: Path, query: str | None) -> 
             lines.append(f"- kind: `{record['kind']}`")
         if record.get("label"):
             lines.append(f"- label: {record['label']}")
+        if record.get("source_name"):
+            lines.append(f"- source_name: {record['source_name']}")
+        if record.get("tags"):
+            lines.append(f"- tags: {', '.join(record['tags'])}")
+        if record.get("use_case"):
+            lines.append(f"- use_case: `{record['use_case']}`")
+        if record.get("quality"):
+            lines.append(f"- quality: `{record['quality']}`")
         if record.get("source_url"):
             lines.append(f"- source: {record['source_url']}")
         if record.get("content_path"):
@@ -64,6 +72,8 @@ def main() -> int:
     parser.add_argument("--platform", choices=["rednote", "instagram_facebook", "brand_site"])
     parser.add_argument("--type", dest="record_type", choices=["post", "asset"])
     parser.add_argument("--kind")
+    parser.add_argument("--quality", choices=["high", "medium", "needs-review"])
+    parser.add_argument("--use-case")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--format", choices=["json", "md"], default="md")
     args = parser.parse_args()
@@ -74,6 +84,8 @@ def main() -> int:
         platform=args.platform,
         record_type=args.record_type,
         kind=args.kind,
+        quality=args.quality,
+        use_case=args.use_case,
         limit=args.limit,
     )
     if args.format == "json":

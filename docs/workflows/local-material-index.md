@@ -39,12 +39,50 @@ python viral-social-remix/scripts/collect_source_assets.py --platform brand-site
 python viral-social-remix/scripts/query_material_index.py 补贴 --platform rednote
 python viral-social-remix/scripts/query_material_index.py pantry --platform instagram_facebook --type post
 python viral-social-remix/scripts/query_material_index.py 大米 --platform brand_site --type asset --kind product_or_promo
+python viral-social-remix/scripts/query_material_index.py wagyu --platform brand_site --quality medium --use-case promotion-reference
 ```
 
 默认输出 Markdown，适合直接复制进分析文档。需要程序读取时用 JSON：
 
 ```bash
 python viral-social-remix/scripts/query_material_index.py 大米 --format json
+```
+
+## 精修官网素材
+
+官网抓取后先生成精修 catalog，再登记进本地索引：
+
+```bash
+python viral-social-remix/scripts/enrich_brand_assets.py --run-dir output/<brand-site-run>
+python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<brand-site-run>
+```
+
+精修 catalog 会从 alt、CDN 文件名和尺寸中推断：
+
+- `title`：更可读的商品/场景名称。
+- `tags`：如 `rice`、`meat`、`discount`、`category`。
+- `use_case`：如 `product-pack-reference`、`product-scene-reference`、`campaign-background`。
+- `quality`：`high`、`medium`、`needs-review`。
+
+## 生成复刻上下文包
+
+从本地索引里一次性取“源爆款候选 + 官网商品参考”，用于后续拆解和生成：
+
+```bash
+python viral-social-remix/scripts/build_remix_context.py \
+  --source-platform rednote \
+  --source-query 补贴 \
+  --product-query rice \
+  --output output/<run>/analysis/remix-context.md
+```
+
+IG/FB 示例：
+
+```bash
+python viral-social-remix/scripts/build_remix_context.py \
+  --source-platform instagram_facebook \
+  --source-query pantry \
+  --product-query wagyu
 ```
 
 ## 当前初始化结果

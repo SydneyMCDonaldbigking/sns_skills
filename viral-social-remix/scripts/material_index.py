@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -94,6 +95,9 @@ def searchable_text(record: dict) -> str:
         "kind",
         "title",
         "label",
+        "source_name",
+        "use_case",
+        "quality",
         "source_url",
         "folder",
         "content_path",
@@ -102,11 +106,35 @@ def searchable_text(record: dict) -> str:
         value = record.get(key)
         if value:
             values.append(str(value))
-    for key in ["reasons", "image_paths"]:
+    for key in ["reasons", "image_paths", "tags"]:
         value = record.get(key) or []
         if isinstance(value, list):
             values.extend(str(item) for item in value)
     return " ".join(values).casefold()
+
+
+def _contains_cjk(value: str) -> bool:
+    return bool(re.search(r"[\u3400-\u9fff]", value))
+
+
+def _ascii_tokens(value: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _matches_terms(haystack: str, terms: list[str]) -> bool:
+    tokens = _ascii_tokens(haystack)
+    for term in terms:
+        if _contains_cjk(term):
+            if term not in haystack:
+                return False
+            continue
+        term_tokens = _ascii_tokens(term)
+        if term_tokens:
+            if not term_tokens.issubset(tokens):
+                return False
+        elif term not in haystack:
+            return False
+    return True
 
 
 def search(
@@ -116,6 +144,8 @@ def search(
     platform: str | None = None,
     record_type: str | None = None,
     kind: str | None = None,
+    quality: str | None = None,
+    use_case: str | None = None,
     limit: int | None = None,
 ) -> list[dict]:
     rows = load(path)
@@ -128,8 +158,12 @@ def search(
             continue
         if kind and row.get("kind") != kind:
             continue
+        if quality and row.get("quality") != quality:
+            continue
+        if use_case and row.get("use_case") != use_case:
+            continue
         haystack = searchable_text(row)
-        if terms and not all(term in haystack for term in terms):
+        if terms and not _matches_terms(haystack, terms):
             continue
         results.append(row)
         if limit and len(results) >= limit:

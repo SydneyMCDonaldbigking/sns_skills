@@ -28,7 +28,9 @@ collected Xiaohongshu posts, Instagram/Facebook posts, and official brand-site
 assets. If it is missing or stale, rebuild it from completed output folders with
 `scripts/collect_source_assets.py`. Search it with
 `scripts/query_material_index.py` by platform, keyword, record type, or asset
-kind before doing new browser/OCR collection.
+kind before doing new browser/OCR collection. When preparing a remix, use
+`scripts/build_remix_context.py` to create a compact source-post plus
+brand-asset context pack before loading full source folders into context.
 
 ## Route
 
@@ -125,6 +127,12 @@ python viral-social-remix/scripts/collect_source_assets.py --platform rednote --
 python viral-social-remix/scripts/collect_source_assets.py --platform instagram --run-dir output/<run>
 python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<run>
 ```
+
+For official brand-site assets, run
+`scripts/enrich_brand_assets.py --run-dir output/<run>` before registering the
+run. This creates `brand_asset_catalog.json` with searchable `title`, `tags`,
+`use_case`, and `quality` fields, then `collect_source_assets.py` will ingest
+those enriched fields.
 
 Keep `data/material-index.jsonl` local and ignored by Git. Commit the collector
 script and workflow documentation, not downloaded media or private indexes. The
