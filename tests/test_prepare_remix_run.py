@@ -71,7 +71,17 @@ def test_prepare_remix_run_creates_standard_analysis_files(tmp_path):
     prompts = (run_dir / "analysis" / "prompts.md").read_text(encoding="utf-8")
     assert "Source image: `output/rednote/post/images/01.webp`" in prompts
     assert "product_refs: `output/brand/assets/rice.jpg`" in prompts
-    assert "标题：TODO" in (run_dir / "analysis" / "caption-zh.txt").read_text(encoding="utf-8")
+    assert "Source role: `hook`" in prompts
+    assert "不要生成假中文" in prompts
+    assert "TODO" not in prompts
+    breakdown = (run_dir / "analysis" / "breakdown.md").read_text(encoding="utf-8")
+    assert "- 01 `hook`" in breakdown
+    assert "- 04 `cta`" in breakdown
+    copy = (run_dir / "analysis" / "copy.md").read_text(encoding="utf-8")
+    assert "Umall 补贴囤货清单" in copy
+    caption = (run_dir / "analysis" / "caption-zh.txt").read_text(encoding="utf-8")
+    assert "标题：Umall补贴囤货" in caption
+    assert "TODO" not in caption
     assert (run_dir / "generated").is_dir()
     manifest = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["platform"] == "rednote"
@@ -115,3 +125,6 @@ def test_prepare_remix_run_cli_allows_explicit_asset_count(tmp_path):
     run_dir = Path(payload["run_dir"])
     manifest = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert list(manifest["assets"]) == ["01", "02"]
+    breakdown = (run_dir / "analysis" / "breakdown.md").read_text(encoding="utf-8")
+    assert "- 02 `proof`" in breakdown
+    assert "- 03" not in breakdown

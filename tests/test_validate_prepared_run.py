@@ -86,6 +86,17 @@ def test_validate_prepared_run_rejects_missing_prompt_section(tmp_path):
     assert "prompts missing section for: 02" in result["errors"]
 
 
+def test_validate_prepared_run_rejects_todo_in_generated_drafts(tmp_path):
+    run_dir = make_run(tmp_path)
+    prompts_path = run_dir / "analysis" / "prompts.md"
+    prompts_path.write_text(prompts_path.read_text(encoding="utf-8") + "\nTODO\n", encoding="utf-8")
+
+    result = validate_prepared_run.validate(run_dir)
+
+    assert result["valid"] is False
+    assert "prompts.md still contains TODO" in result["errors"]
+
+
 def test_validate_prepared_run_cli_returns_nonzero_on_invalid_run(tmp_path):
     run_dir = make_run(tmp_path)
     (run_dir / "analysis" / "selected-assets.json").write_text(

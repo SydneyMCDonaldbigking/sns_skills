@@ -35,7 +35,8 @@ new generation task, prefer `scripts/prepare_remix_run.py` to create the
 timestamped run directory, analysis skeleton, context pack, caption placeholder,
 selected asset mapping, and manifest before drafting prompts.
 Run `scripts/validate_prepared_run.py output/<run>` before image generation to
-catch missing analysis files or mismatched asset mappings.
+catch missing analysis files, mismatched asset mappings, or leftover `TODO`
+draft placeholders.
 
 ## Route
 

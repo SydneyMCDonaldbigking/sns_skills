@@ -117,6 +117,9 @@ python viral-social-remix/scripts/prepare_remix_run.py \
 python viral-social-remix/scripts/validate_prepared_run.py output/<run>
 ```
 
+校验会检查目录、manifest、selected-assets、prompt 分节、caption，并阻止
+`prompts.md` / `copy.md` / caption 中残留 `TODO`。
+
 ## 当前初始化结果
 
 2026-07-14 已把以下三批本地素材登记进索引：

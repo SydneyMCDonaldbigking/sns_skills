@@ -66,6 +66,13 @@ def validate(run_dir: str | Path) -> dict:
         for asset_id in asset_ids:
             if f"## {asset_id}" not in prompts:
                 errors.append(f"prompts missing section for: {asset_id}")
+        if "TODO" in prompts:
+            errors.append("prompts.md still contains TODO")
+
+    for name in ["copy.md", "caption-zh.txt", "caption-en.txt"]:
+        path = analysis / name
+        if path.is_file() and path.read_text(encoding="utf-8").strip() and "TODO" in path.read_text(encoding="utf-8"):
+            errors.append(f"{name} still contains TODO")
 
     return {
         "valid": not errors,
