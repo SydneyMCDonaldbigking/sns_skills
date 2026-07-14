@@ -22,6 +22,12 @@ assumptions. Ask only for missing mandatory fields or low-confidence platform.
 Do not ask again for values already supplied. A user's explicit platform always
 overrides automatic detection.
 
+Before asking for examples or product visuals, check the local material index at
+`data/material-index.jsonl` when it exists. Use it as a memory of already
+collected Xiaohongshu posts, Instagram/Facebook posts, and official brand-site
+assets. If it is missing or stale, rebuild it from completed output folders with
+`scripts/collect_source_assets.py`.
+
 ## Route
 
 Infer platform from source domain, page metadata, media dimensions, language,
@@ -108,6 +114,20 @@ fail.
 Build the carousel overview or exactly nine-frame storyboard with
 `scripts/make_contact_sheet.py`. On restart, read the manifest and skip assets
 already marked `validated`.
+
+After a successful source collection run, register the result into the local
+material index:
+
+```bash
+python viral-social-remix/scripts/collect_source_assets.py --platform rednote --run-dir output/<run>
+python viral-social-remix/scripts/collect_source_assets.py --platform instagram --run-dir output/<run>
+python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<run>
+```
+
+Keep `data/material-index.jsonl` local and ignored by Git. Commit the collector
+script and workflow documentation, not downloaded media or private indexes. The
+collector writes stable `record_id` values and skips duplicates when the same
+run is registered again.
 
 ## Boundaries and recovery
 

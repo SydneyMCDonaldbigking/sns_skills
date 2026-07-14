@@ -7,6 +7,7 @@ tmp/
 *.tmp
 samples/
 data/product-cache/
+data/material-index*.jsonl
 .env
 .env.*
 *.local.env
