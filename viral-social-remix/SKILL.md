@@ -30,7 +30,12 @@ assets. If it is missing or stale, rebuild it from completed output folders with
 `scripts/query_material_index.py` by platform, keyword, record type, or asset
 kind before doing new browser/OCR collection. When preparing a remix, use
 `scripts/build_remix_context.py` to create a compact source-post plus
-brand-asset context pack before loading full source folders into context.
+brand-asset context pack before loading full source folders into context. For a
+new generation task, prefer `scripts/prepare_remix_run.py` to create the
+timestamped run directory, analysis skeleton, context pack, caption placeholder,
+selected asset mapping, and manifest before drafting prompts.
+Run `scripts/validate_prepared_run.py output/<run>` before image generation to
+catch missing analysis files or mismatched asset mappings.
 
 ## Route
 
@@ -84,6 +89,9 @@ Before generation, write:
 - `analysis/manifest.json` using `scripts/manifest.py`
 - `analysis/caption-zh.txt` for Xiaohongshu
 - `analysis/caption-en.txt` for Instagram/Facebook
+
+Prefer using `scripts/prepare_remix_run.py` to create these files when the task
+starts from local indexed examples and brand assets.
 
 For video, write the caption file required by its target publishing platform.
 The caption must be ready to paste into the platform, including a hook, body,

@@ -85,6 +85,38 @@ python viral-social-remix/scripts/build_remix_context.py \
   --product-query wagyu
 ```
 
+## 准备一次复刻生成 run
+
+用本地索引直接创建标准输出目录和分析骨架：
+
+```bash
+python viral-social-remix/scripts/prepare_remix_run.py \
+  --task-name rednote-subsidy-rice \
+  --source-platform rednote \
+  --source-query 补贴 \
+  --product-query rice
+```
+
+它会创建：
+
+- `analysis/remix-context.md`
+- `analysis/selected-assets.json`
+- `analysis/selected-assets.md`
+- `analysis/breakdown.md`
+- `analysis/copy.md`
+- `analysis/prompts.md`
+- 平台对应 caption 文件
+- `analysis/manifest.json`
+
+默认按源爆款第一篇的图片数量创建 asset ids；需要固定页数时传
+`--asset-count`。
+
+生成前检查骨架：
+
+```bash
+python viral-social-remix/scripts/validate_prepared_run.py output/<run>
+```
+
 ## 当前初始化结果
 
 2026-07-14 已把以下三批本地素材登记进索引：
