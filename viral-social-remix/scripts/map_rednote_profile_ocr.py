@@ -8,11 +8,19 @@ import json
 import re
 from pathlib import Path
 
-from PIL import Image
-from rapidocr_onnxruntime import RapidOCR
-
 
 DEFAULT_PATTERNS = [r"补[贴帖]", r"百[万萬].{0,4}补[贴帖]"]
+
+
+def load_runtime():
+    try:
+        from PIL import Image
+        from rapidocr_onnxruntime import RapidOCR
+    except ImportError as exc:
+        raise SystemExit(
+            "Missing OCR dependencies. Install with: pip install '.[ocr]'"
+        ) from exc
+    return Image, RapidOCR()
 
 
 def box_center(box):
@@ -41,10 +49,10 @@ def main() -> int:
     parser.add_argument("--pattern", action="append", default=[])
     args = parser.parse_args()
 
+    Image, ocr = load_runtime()
     root = args.profile_run_dir
     scan = json.loads((root / args.scan_json).read_text(encoding="utf-8"))
     patterns = [re.compile(p) for p in (args.pattern or DEFAULT_PATTERNS)]
-    ocr = RapidOCR()
 
     screens_out = []
     candidates = {}

@@ -6,15 +6,21 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Iterable
-
-from rapidocr_onnxruntime import RapidOCR
+from typing import Any, Iterable
 
 
 DEFAULT_PATTERNS = [
     r"补[贴帖]",
     r"百[万萬].{0,4}补[贴帖]",
 ]
+
+
+def load_ocr_engine() -> Any:
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+    except ImportError as exc:
+        raise SystemExit("Missing OCR dependency. Install with: pip install '.[ocr]'") from exc
+    return RapidOCR()
 
 
 def iter_images(path: Path) -> Iterable[Path]:
@@ -30,7 +36,7 @@ def iter_images(path: Path) -> Iterable[Path]:
         )
 
 
-def ocr_image(ocr: RapidOCR, path: Path) -> dict:
+def ocr_image(ocr: Any, path: Path) -> dict:
     result, elapsed = ocr(str(path))
     lines = []
     if result:
@@ -81,7 +87,7 @@ def main() -> None:
     args = parser.parse_args()
 
     patterns = compile_patterns(args.pattern or DEFAULT_PATTERNS)
-    ocr = RapidOCR()
+    ocr = load_ocr_engine()
     results = [mark_hits(ocr_image(ocr, path), patterns) for path in iter_images(Path(args.path))]
     payload = {
         "patterns": [pattern.pattern for pattern in patterns],

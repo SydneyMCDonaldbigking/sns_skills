@@ -27,39 +27,19 @@ output/YYYYMMDD-HHMMSS-rednote-xxx/
 ## 推荐流程
 
 1. 用 Chrome 打开公司小红书主页，保留登录态。
-2. 对主页做滚动截图和卡片坐标采集：
-   - 每屏保存截图到 `screens/`
-   - 同时保存可见卡片的 `noteId`、标题、链接、坐标到 `raw/screen-scan.json`
-3. 先在本地对主页截图做 OCR 粗筛，不要一开始逐篇打开：
-   - 使用 `viral-social-remix/scripts/map_rednote_profile_ocr.py`
-   - 默认匹配 `补[贴帖]`、`百[万萬].{0,6}补[贴帖]`
-   - 输出 `raw/screen-ocr-map.json`
-4. 候选集合取并集：
-   - 主页标题命中
-   - 主页截图 OCR 命中
-   - 后续详情正文命中
-   - 后续详情原图 OCR 命中
-5. 只打开候选帖子详情页，提取：
-   - 标题
-   - 正文 / meta description
-   - 日期
-   - 图片 URL
-   - 可见互动信息（能取到就保存）
+2. 对主页做滚动截图和卡片坐标采集。
+3. 先在本地对主页截图做 OCR 粗筛，不要一开始逐篇打开。
+4. 候选集合取标题命中、主页截图 OCR 命中、详情正文命中、详情原图 OCR 命中的并集。
+5. 只打开候选帖子详情页，提取标题、正文、日期、图片 URL 和可见互动信息。
 6. 下载每篇帖子原图到 `posts/post-xxx/images/`。
 7. 对下载后的原图再次 OCR，确认图片内关键词命中。
-8. 每篇生成：
-   - `metadata.json`：结构化数据、来源、命中原因、图片列表、OCR 命中
-   - `content.md`：人工可读摘要、正文、图片清单
-9. 顶层生成：
-   - `index.md`
-   - `manifest.json`
+8. 每篇生成 `metadata.json` 和 `content.md`。
+9. 顶层生成 `index.md` 和 `manifest.json`。
 
 ## 已验证脚本
 
-- `viral-social-remix/scripts/map_rednote_profile_ocr.py`
-  - 把主页截图 OCR 命中映射回帖子卡片。
-- `viral-social-remix/scripts/export_rednote_subsidy_posts.py`
-  - 根据详情提取结果导出帖子文件夹、下载图片、跑原图 OCR、生成索引。
+- `viral-social-remix/scripts/map_rednote_profile_ocr.py`：把主页截图 OCR 命中映射回帖子卡片。
+- `viral-social-remix/scripts/export_rednote_subsidy_posts.py`：根据详情提取结果导出帖子文件夹、下载图片、跑原图 OCR、生成索引。
 
 ## 关键经验
 

@@ -29,51 +29,27 @@ output/YYYYMMDD-HHMMSS-ig-viral-selection-refined/
 
 ## 推荐流程
 
-1. 先确定筛选标准：
-   - 爆款信号：likes、comments、shares/reposts、发布时间
-   - 可复刻性：是否能转成 1152×1152 方图轮播
-   - Umall 贴合度：亚洲超市、grocery haul、pantry essentials、delivery/restock、discount/deals
-   - 保存价值：是否像“清单 / 教程 / 采购指南”，而不是普通广告
-2. 用 Chrome/登录态少量搜索候选，不要大范围爬：
-   - Google query 可用：`site:instagram.com/p asian grocery haul pantry essentials instagram`
-   - 补充角度：`grocery delivery haul`、`asian supermarket deals`、`pantry essentials`
-3. 每轮只进少数强候选详情页，提取：
-   - IG meta description
-   - 账号、caption、likes/comments
-   - 图片 URL / 视频信息
-   - 页面截图作为证据
-4. 先做候选评分，选出：
-   - 主选：爆款机制最强
-   - 执行模板：最适合直接复刻方图轮播
-   - 生活化备选：新鲜但互动较弱的现实场景
-   - 视频备选：后续走关键帧拆解
-5. 必须导出图片本体：
-   - 每个候选一个 `posts/post-xxx/`
-   - `images/` 放 IG 媒体图片本体，不放带网页侧栏的截图
-   - `caption.txt` 单独保存原帖文案
-   - `content.md` 写摘要、来源、互动、图片清单
-   - `metadata.json` 写结构化数据
-6. 最后生成：
-   - `posts_index.md`
-   - `posts_manifest.json`
-   - `analysis/selection.md`
-   - `analysis/remix-brief.md`
-   - `analysis/caption-en.txt`
+1. 先确定筛选标准：爆款信号、可复刻性、Umall 贴合度、保存价值。
+2. 用 Chrome/登录态少量搜索候选，不要大范围爬。
+3. 每轮只进少数强候选详情页，提取 IG meta description、账号、caption、互动数据、图片 URL、视频信息和页面截图证据。
+4. 先做候选评分，选出主选、执行模板、生活化备选和视频备选。
+5. 必须导出图片本体：每个候选一个 `posts/post-xxx/`，`images/` 放 IG 媒体图片本体，`caption.txt` 单独保存原帖文案。
+6. 最后生成 `posts_index.md`、`posts_manifest.json`、`analysis/selection.md`、`analysis/remix-brief.md` 和 `analysis/caption-en.txt`。
 
 ## 已验证判断模板
 
 主选机制可以来自 `_sam_low_` 类型：
 
-- 教用户“如何逛亚洲超市”
-- 知识型、保存型、系列感强
-- 可转成 Umall 的“线上亚洲超市不迷路”教育内容
+- 教用户“如何逛亚洲超市”。
+- 知识型、保存型、系列感强。
+- 可转成 Umall 的“线上亚洲超市不迷路”教育内容。
 
 执行模板可以来自 `littlebaoboy` 类型：
 
-- 手持商品 + 货架背景
-- 白色贴纸短文案
-- 一页一个品类 / 一句用法
-- 很适合 1152×1152 方图轮播
+- 手持商品 + 货架背景。
+- 白色贴纸短文案。
+- 一页一个品类 / 一句用法。
+- 很适合 1152×1152 方图轮播。
 
 ## IG/FB 推荐复刻方向
 

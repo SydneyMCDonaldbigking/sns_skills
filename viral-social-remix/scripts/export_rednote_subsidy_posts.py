@@ -11,13 +11,21 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-from PIL import Image
-from rapidocr_onnxruntime import RapidOCR
-
 
 KEYWORD_PATTERNS = [re.compile(r"补[贴帖]"), re.compile(r"百[万萬].{0,6}补[贴帖]")]
 REDNOTE_SUFFIX = re.compile(r"\s*-\s*rednote\s*$", re.I)
 DATE_RE = re.compile(r"(?:编辑于\s*)?(20\d{2}-\d{2}-\d{2})")
+
+
+def load_runtime():
+    try:
+        from PIL import Image
+        from rapidocr_onnxruntime import RapidOCR
+    except ImportError as exc:
+        raise SystemExit(
+            "Missing OCR dependencies. Install with: pip install '.[ocr]'"
+        ) from exc
+    return Image, RapidOCR()
 
 
 def safe_name(text: str, max_len: int = 40) -> str:
@@ -60,7 +68,7 @@ def ext_for(url: str) -> str:
     return ".webp"
 
 
-def run_ocr(engine: RapidOCR, image_path: Path):
+def run_ocr(engine, image_path: Path):
     result, _ = engine(str(image_path))
     rows = []
     for item in result or []:
@@ -75,11 +83,11 @@ def main() -> int:
     parser.add_argument("--detail-json", default="raw/detail-extract.json")
     args = parser.parse_args()
 
+    Image, ocr = load_runtime()
     root = args.run_dir
     details = json.loads((root / args.detail_json).read_text(encoding="utf-8"))["details"]
     posts_dir = root / "posts"
     posts_dir.mkdir(parents=True, exist_ok=True)
-    ocr = RapidOCR()
 
     manifest_posts = []
     for idx, item in enumerate(details, 1):
@@ -106,7 +114,7 @@ def main() -> int:
 
         image_records = []
         seen = set()
-        for img_idx, img in enumerate(data.get("images") or [], 1):
+        for img in data.get("images") or []:
             url = img.get("src") or ""
             key = url.split("?")[0]
             if not url or key in seen:
