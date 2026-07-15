@@ -1,9 +1,24 @@
 """Create visual overviews for generated assets."""
 
+import argparse
+import json
 from math import ceil
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+
+
+STORYBOARD_LABELS = [
+    "Hook",
+    "Setup",
+    "Pain",
+    "Product",
+    "Mechanism",
+    "Benefit",
+    "Proof",
+    "Result",
+    "CTA",
+]
 
 
 def _cover(image: Image.Image, size: tuple[int, int]) -> Image.Image:
@@ -56,3 +71,41 @@ def make_carousel(inputs, output, columns=4, thumb=(384, 384)) -> None:
         )
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Build a carousel overview or a nine-frame storyboard."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    carousel = subparsers.add_parser("carousel")
+    carousel.add_argument("inputs", type=Path, nargs="+")
+    carousel.add_argument("--output", type=Path, required=True)
+    carousel.add_argument("--columns", type=int, default=4)
+    carousel.add_argument("--thumb-width", type=int, default=384)
+    carousel.add_argument("--thumb-height", type=int, default=384)
+
+    storyboard = subparsers.add_parser("storyboard")
+    storyboard.add_argument("inputs", type=Path, nargs=9)
+    storyboard.add_argument("--output", type=Path, required=True)
+    storyboard.add_argument("--labels", nargs=9, default=STORYBOARD_LABELS)
+
+    args = parser.parse_args()
+    if args.command == "carousel":
+        if args.columns < 1 or args.thumb_width < 1 or args.thumb_height < 1:
+            parser.error("columns and thumbnail dimensions must be positive")
+        make_carousel(
+            args.inputs,
+            args.output,
+            columns=args.columns,
+            thumb=(args.thumb_width, args.thumb_height),
+        )
+    else:
+        make_storyboard(args.inputs, args.output, args.labels)
+    print(json.dumps({"output": str(args.output)}, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

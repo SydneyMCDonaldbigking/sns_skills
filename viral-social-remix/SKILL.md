@@ -120,13 +120,14 @@ Save every project-bound generated asset into the run directory. Update
 
 Visually review every generated image for product fidelity, brand spelling,
 product spelling, numbers, language, CTA, anatomy, perspective, and continuity.
-Run `scripts/validate_output.py` for deterministic checks. Retry only failed
-assets. Use local text overlay only after repeated targeted GPT Image 2 retries
-fail.
+Run `scripts/validate_output.py asset` for deterministic per-asset checks and
+retry only failed assets. Use local text overlay only after repeated targeted
+GPT Image 2 retries fail.
 
 Build the carousel overview or exactly nine-frame storyboard with
-`scripts/make_contact_sheet.py`. On restart, read the manifest and skip assets
-already marked `validated`.
+`scripts/make_contact_sheet.py`, then run `scripts/validate_output.py delivery`
+to write `qa/validation.json` and check the complete delivery contract. On
+restart, read the manifest and skip assets already marked `validated`.
 
 After a successful source collection run, register the result into the local
 material index:

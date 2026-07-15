@@ -1,5 +1,6 @@
 """Validate platform delivery contracts."""
 
+import argparse
 import json
 from pathlib import Path
 
@@ -50,7 +51,6 @@ def validate_delivery(
         base / "analysis" / "prompts.md",
         base / "analysis" / "manifest.json",
         base / "overview" / "contact-sheet.png",
-        base / "qa" / "validation.json",
     ]
     errors.extend(
         f"missing required file: {path}" for path in required if not path.is_file()
@@ -78,3 +78,56 @@ def validate_delivery(
         if incomplete:
             errors.append(f"manifest contains incomplete assets: {', '.join(incomplete)}")
     return {"valid": not errors, "errors": errors}
+
+
+def _write_report(path: Path, result: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate generated social assets.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    asset = subparsers.add_parser("asset", help="Validate one generated image.")
+    asset.add_argument("path", type=Path)
+    asset.add_argument("--platform", choices=sorted(DIMENSIONS), required=True)
+    asset.add_argument(
+        "--text-review", choices=["passed", "failed"], required=True
+    )
+    asset.add_argument("--report", type=Path)
+
+    delivery = subparsers.add_parser(
+        "delivery", help="Validate a complete timestamped run directory."
+    )
+    delivery.add_argument("run_dir", type=Path)
+    delivery.add_argument("--platform", choices=sorted(DIMENSIONS), required=True)
+    delivery.add_argument("--caption-language", choices=["zh", "en"])
+    delivery.add_argument(
+        "--report",
+        type=Path,
+        help="Defaults to <run_dir>/qa/validation.json.",
+    )
+
+    args = parser.parse_args()
+    if args.command == "asset":
+        result = validate_asset(args.path, args.platform, args.text_review)
+        if args.report:
+            _write_report(args.report, result)
+    else:
+        result = validate_delivery(
+            args.run_dir, args.platform, args.caption_language
+        )
+        _write_report(
+            args.report or args.run_dir / "qa" / "validation.json",
+            result,
+        )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["valid"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

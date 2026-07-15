@@ -1,5 +1,6 @@
 """Extract video candidates and selected keyframes with ffmpeg."""
 
+import argparse
 import json
 import subprocess
 from pathlib import Path
@@ -81,3 +82,36 @@ def export_selected(
     if len(timestamps) != 9:
         raise ValueError("Video storyboards require exactly 9 timestamps")
     return export(video, timestamps, output, "keyframe")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Export candidate or selected video keyframes with FFmpeg."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    candidates = subparsers.add_parser(
+        "candidates", help="Export evenly spaced frames for narrative review."
+    )
+    candidates.add_argument("video", type=Path)
+    candidates.add_argument("output", type=Path)
+    candidates.add_argument("--count", type=int, default=18)
+
+    selected = subparsers.add_parser(
+        "selected", help="Export exactly nine narratively selected timestamps."
+    )
+    selected.add_argument("video", type=Path)
+    selected.add_argument("output", type=Path)
+    selected.add_argument("--timestamps", type=float, nargs=9, required=True)
+
+    args = parser.parse_args()
+    if args.command == "candidates":
+        paths = export_candidates(args.video, args.output, args.count)
+    else:
+        paths = export_selected(args.video, args.timestamps, args.output)
+    print(json.dumps({"exported": paths}, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
