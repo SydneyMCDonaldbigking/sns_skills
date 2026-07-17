@@ -119,6 +119,22 @@ OPENROUTER_API_KEY=...
 python viral-social-remix/scripts/image_provider.py
 ```
 
+生成前预检请求 payload，不调用 API：
+
+```powershell
+python viral-social-remix/scripts/openrouter_image.py --prompt-file output/<run-dir>/analysis/prompts.md --out-dir output/<run-dir>/generated --size 1152x1536 --dry-run
+```
+
+真实生成时可以把失败写回 manifest。相同 OpenRouter HTTP 错误连续出现两次会停止重试：
+
+```powershell
+python viral-social-remix/scripts/openrouter_image.py --prompt-file output/<run-dir>/analysis/prompts.md --out-dir output/<run-dir>/generated --size 1152x1536 --manifest output/<run-dir>/analysis/manifest.json --asset-id 01 --max-attempts 2
+```
+
+真实请求发出前，该 asset 会被标记为 `prompted`，并记录 prompt 路径和脱敏 request payload。
+保存到图片后，该 asset 会被标记为 `generated`，并记录输出路径。若 OpenRouter 响应成功但没有返回任何图片，该 asset 会被标记为 `failed`。
+如果 manifest 中该 asset 已经是 `validated`，默认会跳过生成；需要重生时加 `--force`。
+
 如果没有 key，skill 仍然可以继续做素材扫描、拆解、文案、prompts、manifest 和 contact sheet；只应暂停真实图片生成。
 
 ## 常用脚本
