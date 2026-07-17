@@ -14,13 +14,68 @@ field. Ask for brand or product only when their values remain `未填写`; infer
 other missing fields and label the assumptions. Current-task user input always
 overrides the profile.
 
-Accept a public post URL, local file, or local folder. For a local folder, run
-`scripts/scan_media.py`, show the discovered task list, and process each valid
-group independently. Inspect every local image before analysis. Product and brand are mandatory. Infer audience, setting, benefits, and theme; label those
-assumptions. Ask only for missing mandatory fields or low-confidence platform.
+Accept a public post URL, logged-in browser tab, local file, or local folder.
+For a local folder, run `scripts/scan_media.py`, show the discovered task list,
+and process each valid group independently. Inspect every local image before
+analysis. Product and brand are mandatory. Infer audience, setting, benefits,
+and theme; label those assumptions. Ask only for missing mandatory fields or low-confidence platform.
 
 Do not ask again for values already supplied. A user's explicit platform always
 overrides automatic detection.
+
+## Source capture
+
+For Xiaohongshu, Instagram, or Facebook posts, treat a user-opened logged-in
+browser tab as the preferred source when the page is not publicly readable.
+This skill is browser-assisted, not an anonymous crawler. If the user says the
+post is open in a browser, claim that existing tab with the available Browser or
+Chrome control skill; do not open a duplicate URL, reload the page, or switch
+browsers unless the visible tab cannot be reached.
+
+Before analysis, materialize the source into a local source package, then
+continue through the normal local-folder path. The package must preserve enough
+evidence to resume without the live page:
+
+- `metadata.json` with platform, source URL, page title, author, captured time,
+  detected page count, and ordered media list.
+- `caption.txt` or platform-specific caption files with the visible source
+  copy, hashtags, and date/location when visible.
+- `source_urls.txt` for observed media URLs when available.
+- `images/01.*`, `images/02.*`, ... in source order for every carousel page or
+  video key source frame that can be exported.
+- `screenshot.png` or `screenshots/` as visual proof and fallback when original
+  media cannot be exported.
+
+For carousel posts, verify the visible page count indicator when present (for
+example `1/9`) and preserve that count. Use page assets, visible DOM media URLs,
+or authenticated browser context to export media. If originals are blocked,
+save ordered screenshots of each slide and record the limitation in
+`metadata.json`; do not pretend the original files were downloaded.
+
+For speed and repeatability, export the browser-observed source data to a JSON
+file and run `scripts/capture_source_package.py`. Prefer this shape for
+carousels so duplicate swiper slides cannot reorder the media:
+
+```json
+{
+  "platform": "xiaohongshu",
+  "sourceUrl": "https://...",
+  "title": "...",
+  "author": "...",
+  "description": "...",
+  "pageCount": 6,
+  "slides": [
+    {"indicator": "1/6", "url": "https://..."},
+    {"indicator": "2/6", "url": "https://..."}
+  ]
+}
+```
+
+Then run:
+
+```powershell
+python viral-social-remix/scripts/capture_source_package.py capture.json --output-dir samples/<source-slug>
+```
 
 ## Route
 
@@ -111,7 +166,10 @@ already marked `validated`.
 
 ## Boundaries and recovery
 
-Do not bypass login or anti-scraping restrictions. If a post URL cannot be read,
-ask for an upload or readable local folder. Continue past damaged files while
-recording their errors. Do not reproduce source watermarks, unauthorized logos,
-or a real person's identity. Keep final deliverables in the project workspace.
+Do not bypass login or anti-scraping restrictions. If a post URL cannot be read
+anonymously but the user can open it in a logged-in browser, use the source
+capture workflow above. If no readable browser tab, upload, or local folder is
+available, ask the user to open the post in a controllable browser or provide a
+local source package. Continue past damaged files while recording their errors.
+Do not reproduce source watermarks, unauthorized logos, or a real person's
+identity. Keep final deliverables in the project workspace.

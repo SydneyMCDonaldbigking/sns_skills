@@ -26,6 +26,7 @@ def test_skill_routes_every_input_and_platform():
         "local file",
         "local folder",
         "scan_media.py",
+        "capture_source_package.py",
         "Xiaohongshu",
         "Instagram/Facebook",
         "exactly nine",
