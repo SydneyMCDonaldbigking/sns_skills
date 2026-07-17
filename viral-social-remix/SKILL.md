@@ -56,10 +56,20 @@ For speed and repeatability, export the browser-observed source data to a JSON
 file and run `scripts/capture_source_package.py`. For Xiaohongshu profile,
 search, or home pages, use `scripts/xhs_browser_capture.mjs` from the browser
 control runtime to search from the Xiaohongshu home page or reuse an open
-profile/search page, find a post by title/query, open it, save `capture.json`,
-and record `observedImageUrls` after the carousel has loaded. This lets the
-package script replace preview URLs such as `nd_prv` with higher-quality
-`nd_dft` URLs when both are visible.
+profile/search page. Do not manually browse one post at a time to decide
+whether it is usable. First collect and rank visible `/explore/` cards in bulk:
+prefer reusable formats such as recommendations, lists, guides, reviews,
+recipes, tutorials, and "what to buy" posts; reject ads, livestreams, giveaways,
+recruiting, rentals, and obvious commerce-only cards. Open only the highest
+ranked candidate unless the user explicitly names a source. Then save
+`capture.json` and record `observedImageUrls` after the carousel has loaded.
+This lets the package script replace preview URLs such as `nd_prv` with
+higher-quality `nd_dft` URLs when both are visible.
+The helper should use the DOM-first carousel path: collect non-duplicate swiper
+slides in page order without clicking when all pages are present. Fall back to
+one right/left warm-up click when a preview URL needs a higher-quality observed
+match. Use full active-slide clicking only when DOM media is incomplete or the
+preview URL still cannot be upgraded from observed images.
 
 Prefer this JSON shape for carousels so duplicate swiper slides cannot reorder
 the media:
