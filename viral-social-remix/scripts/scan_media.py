@@ -1,5 +1,7 @@
 """Discover and group local social-media inputs."""
 
+import argparse
+import json
 from pathlib import Path
 
 
@@ -84,3 +86,15 @@ def scan(directory: str | Path) -> dict:
         "tasks": tasks,
         "ignored_count": len(all_files - accepted),
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("directory", help="Directory containing local media inputs.")
+    args = parser.parse_args()
+
+    print(json.dumps(scan(args.directory), ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

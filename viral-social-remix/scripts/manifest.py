@@ -15,14 +15,34 @@ def _write(path: Path, data: dict) -> None:
     temp.replace(path)
 
 
-def create(path: str | Path, platform: str, asset_ids: list[str]) -> dict:
+def create(
+    path: str | Path,
+    platform: str,
+    asset_ids: list[str],
+    *,
+    source: dict | None = None,
+    platform_confidence: float | None = None,
+    assumptions: list | None = None,
+    provider: dict | None = None,
+) -> dict:
     target = Path(path)
     data = {
         "schema_version": 1,
+        "source": source or {"kind": "unknown", "paths": [], "url": None},
         "platform": platform,
+        "platform_confidence": platform_confidence,
+        "assumptions": assumptions or [],
+        "provider": provider or {},
         "created_at": datetime.now(timezone.utc).isoformat(),
         "assets": {
-            asset_id: {"status": "pending", "attempts": 0}
+            asset_id: {
+                "status": "pending",
+                "prompt_path": None,
+                "output": None,
+                "text_review": "not_reviewed",
+                "validation_errors": [],
+                "attempts": 0,
+            }
             for asset_id in asset_ids
         },
     }
@@ -45,7 +65,7 @@ def mark(path: str | Path, asset_id: str, status: str, **fields) -> dict:
     item.update(fields)
     item["status"] = status
     if status in {"generated", "failed"}:
-        item["attempts"] += 1
+        item["attempts"] = int(item.get("attempts", 0)) + 1
     _write(target, data)
     return data
 
