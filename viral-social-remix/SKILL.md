@@ -53,8 +53,16 @@ save ordered screenshots of each slide and record the limitation in
 `metadata.json`; do not pretend the original files were downloaded.
 
 For speed and repeatability, export the browser-observed source data to a JSON
-file and run `scripts/capture_source_package.py`. Prefer this shape for
-carousels so duplicate swiper slides cannot reorder the media:
+file and run `scripts/capture_source_package.py`. For Xiaohongshu profile,
+search, or home pages, use `scripts/xhs_browser_capture.mjs` from the browser
+control runtime to search from the Xiaohongshu home page or reuse an open
+profile/search page, find a post by title/query, open it, save `capture.json`,
+and record `observedImageUrls` after the carousel has loaded. This lets the
+package script replace preview URLs such as `nd_prv` with higher-quality
+`nd_dft` URLs when both are visible.
+
+Prefer this JSON shape for carousels so duplicate swiper slides cannot reorder
+the media:
 
 ```json
 {

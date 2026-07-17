@@ -84,6 +84,23 @@ def _media_url(item: Any) -> str:
     return ""
 
 
+def _collect_urls(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, list):
+        urls: list[str] = []
+        for item in value:
+            urls.extend(_collect_urls(item))
+        return urls
+    if isinstance(value, dict):
+        url = _media_url(value)
+        urls = [url] if url else []
+        for item in value.values():
+            urls.extend(_collect_urls(item))
+        return urls
+    return []
+
+
 def _media_index(item: Any) -> int | None:
     if not isinstance(item, dict):
         return None
@@ -111,6 +128,69 @@ def _candidate_media(data: dict[str, Any]) -> list[Any]:
         if isinstance(value, list) and value:
             return value
     return []
+
+
+def _observed_media_urls(data: dict[str, Any]) -> list[str]:
+    urls: list[str] = []
+    for key in (
+        "observedImageUrls",
+        "observed_image_urls",
+        "allImageUrls",
+        "all_image_urls",
+        "resourceUrls",
+        "resource_urls",
+        "assets",
+        "resources",
+    ):
+        if key in data:
+            urls.extend(_collect_urls(data[key]))
+    urls.extend(_collect_urls(_candidate_media(data)))
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in urls:
+        if not url or url.startswith("data:") or url in seen:
+            continue
+        seen.add(url)
+        unique.append(url)
+    return unique
+
+
+def _xiaohongshu_media_key(url: str) -> str:
+    segment = Path(unquote(urlparse(url).path)).name
+    return segment.split("!", 1)[0]
+
+
+def _xiaohongshu_quality_rank(url: str) -> int:
+    if "!nd_dft" in url:
+        return 30
+    if "!nd_prv" in url:
+        return 10
+    if "sns-webpic" in url and "!" in url:
+        return 20
+    return 0
+
+
+def quality_upgrades(image_urls: list[str], observed_urls: list[str]) -> tuple[list[str], list[dict[str, str]]]:
+    """Prefer higher-quality observed Xiaohongshu URLs for the same media key."""
+
+    best_by_key: dict[str, str] = {}
+    for url in observed_urls:
+        key = _xiaohongshu_media_key(url)
+        if not key:
+            continue
+        current = best_by_key.get(key)
+        if current is None or _xiaohongshu_quality_rank(url) > _xiaohongshu_quality_rank(current):
+            best_by_key[key] = url
+
+    upgraded: list[str] = []
+    changes: list[dict[str, str]] = []
+    for url in image_urls:
+        replacement = best_by_key.get(_xiaohongshu_media_key(url), url)
+        upgraded.append(replacement)
+        if replacement != url:
+            changes.append({"from": url, "to": replacement})
+    return upgraded, changes
 
 
 def ordered_media_urls(data: dict[str, Any]) -> list[str]:
@@ -167,7 +247,7 @@ def _infer_page_count(data: dict[str, Any], media_count: int) -> int:
 
 
 def normalize_capture(data: dict[str, Any]) -> dict[str, Any]:
-    image_urls = ordered_media_urls(data)
+    image_urls, upgrades = quality_upgrades(ordered_media_urls(data), _observed_media_urls(data))
     source_url = _clean_text(_pick(data, "sourceUrl", "source_url", "url", default=""))
     title = _clean_text(_pick(data, "title", default="Untitled source post"))
     description = _clean_text(_pick(data, "description", "caption", "body", "text", default=""))
@@ -185,6 +265,7 @@ def normalize_capture(data: dict[str, Any]) -> dict[str, Any]:
         "hashtags": [_clean_text(tag) for tag in hashtags if _clean_text(tag)],
         "pageCount": _infer_page_count(data, len(image_urls)),
         "imageUrls": image_urls,
+        "imageUrlQualityUpgrades": upgrades,
         "capturedAt": _clean_text(_pick(data, "capturedAt", "captured_at", default="")),
         "sourcePackageCreatedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }

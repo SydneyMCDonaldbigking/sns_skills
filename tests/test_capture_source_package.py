@@ -40,6 +40,29 @@ def test_ordered_media_urls_falls_back_when_preferred_list_is_empty():
     ]
 
 
+def test_normalize_capture_upgrades_xhs_preview_url_to_default_quality():
+    preview = (
+        "https://sns-webpic-qc.xhscdn.com/202607171430/preview/"
+        "oss-sg/notes/1040abc!nd_prv_wlteh_webp_3"
+    )
+    default = (
+        "https://sns-webpic-qc.xhscdn.com/202607171430/default/"
+        "oss-sg/notes/1040abc!nd_dft_wlteh_webp_3"
+    )
+
+    metadata = capture_source_package.normalize_capture(
+        {
+            "platform": "xiaohongshu",
+            "title": "Quality upgrade",
+            "slides": [{"indicator": "1/1", "url": preview}],
+            "observedImageUrls": [preview, default],
+        }
+    )
+
+    assert metadata["imageUrls"] == [default]
+    assert metadata["imageUrlQualityUpgrades"] == [{"from": preview, "to": default}]
+
+
 def test_create_package_downloads_file_urls_and_writes_metadata(tmp_path: Path):
     media_dir = tmp_path / "media"
     media_dir.mkdir()
