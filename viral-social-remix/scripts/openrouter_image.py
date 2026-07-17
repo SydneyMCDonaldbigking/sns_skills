@@ -312,6 +312,112 @@ def redact_payload(payload: dict) -> dict:
     return redacted
 
 
+def resolve_generation_config(
+    *,
+    model: str | None = None,
+    quality: str | None = None,
+) -> dict:
+    load_env()
+    config = image_provider.resolve()
+    return {
+        "model": model or config["model"],
+        "quality": quality or config["quality"],
+        "endpoint": config["endpoint"] or ENDPOINT,
+        "api_key": os.environ.get("OPENROUTER_API_KEY"),
+    }
+
+
+def generate_image(
+    *,
+    prompt_file: str | Path,
+    out_dir: str | Path,
+    stem: str = "openrouter-image",
+    size: str = "1152x1152",
+    quality: str | None = None,
+    model: str | None = None,
+    references: list[str] | None = None,
+    raw_response: str | Path | None = None,
+    max_attempts: int = 2,
+    manifest_path: str | Path | None = None,
+    asset_id: str | None = None,
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict:
+    if bool(manifest_path) != bool(asset_id):
+        raise SystemExit("--manifest and --asset-id must be used together")
+
+    config = resolve_generation_config(model=model, quality=quality)
+    if not dry_run and should_skip_validated(
+        manifest_path,
+        asset_id,
+        force=force,
+    ):
+        return {
+            "skipped": True,
+            "reason": "asset already validated",
+            "asset_id": asset_id,
+            "status": "validated",
+        }
+
+    api_key = config["api_key"]
+    if not api_key and not dry_run:
+        raise SystemExit("OPENROUTER_API_KEY is not set")
+
+    prompt = Path(prompt_file).read_text(encoding="utf-8")
+    payload = build_payload(
+        prompt,
+        model=config["model"],
+        size=size,
+        quality=config["quality"],
+        references=references or [],
+    )
+    if dry_run:
+        return {
+            "endpoint": config["endpoint"],
+            "api_key_set": bool(api_key),
+            "payload": redact_payload(payload),
+        }
+
+    mark_manifest_prompted(
+        manifest_path,
+        asset_id,
+        prompt_path=prompt_file,
+        endpoint=config["endpoint"],
+        payload=payload,
+    )
+    try:
+        response = request_with_retries(
+            payload,
+            api_key,
+            endpoint=config["endpoint"],
+            max_attempts=max_attempts,
+        )
+    except OpenRouterHTTPError as exc:
+        mark_manifest_failed(manifest_path, asset_id, exc)
+        raise SystemExit(str(exc)) from exc
+
+    if raw_response:
+        raw_path = Path(raw_response)
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_text(
+            json.dumps(response, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    saved = save_images(response, Path(out_dir), stem)
+    if not saved:
+        error = OpenRouterImageError("OpenRouter response did not contain any images")
+        mark_manifest_failed(manifest_path, asset_id, error)
+        raise SystemExit(str(error))
+    mark_manifest_generated(
+        manifest_path,
+        asset_id,
+        saved,
+        prompt_path=prompt_file,
+    )
+    return {"saved": [str(path) for path in saved]}
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model")
@@ -336,93 +442,22 @@ def main(argv: list[str] | None = None) -> None:
         help="Print the redacted request payload without calling OpenRouter.",
     )
     args = parser.parse_args(argv)
-    if bool(args.manifest) != bool(args.asset_id):
-        raise SystemExit("--manifest and --asset-id must be used together")
-
-    load_env()
-    config = image_provider.resolve()
-    model = args.model or config["model"]
-    quality = args.quality or config["quality"]
-    endpoint = config["endpoint"] or ENDPOINT
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-
-    if not args.dry_run and should_skip_validated(
-        args.manifest,
-        args.asset_id,
-        force=args.force,
-    ):
-        print(
-            json.dumps(
-                {
-                    "skipped": True,
-                    "reason": "asset already validated",
-                    "asset_id": args.asset_id,
-                    "status": "validated",
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        return
-
-    if not api_key and not args.dry_run:
-        raise SystemExit("OPENROUTER_API_KEY is not set")
-
-    prompt = Path(args.prompt_file).read_text(encoding="utf-8")
-    payload = build_payload(
-        prompt,
-        model=model,
+    result = generate_image(
+        prompt_file=args.prompt_file,
+        out_dir=args.out_dir,
+        stem=args.stem,
         size=args.size,
-        quality=quality,
+        quality=args.quality,
+        model=args.model,
         references=args.reference,
+        raw_response=args.raw_response,
+        max_attempts=args.max_attempts,
+        manifest_path=args.manifest,
+        asset_id=args.asset_id,
+        force=args.force,
+        dry_run=args.dry_run,
     )
-    if args.dry_run:
-        print(
-            json.dumps(
-                {
-                    "endpoint": endpoint,
-                    "api_key_set": bool(api_key),
-                    "payload": redact_payload(payload),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-        return
-
-    mark_manifest_prompted(
-        args.manifest,
-        args.asset_id,
-        prompt_path=args.prompt_file,
-        endpoint=endpoint,
-        payload=payload,
-    )
-    try:
-        response = request_with_retries(
-            payload,
-            api_key,
-            endpoint=endpoint,
-            max_attempts=args.max_attempts,
-        )
-    except OpenRouterHTTPError as exc:
-        mark_manifest_failed(args.manifest, args.asset_id, exc)
-        raise SystemExit(str(exc)) from exc
-    if args.raw_response:
-        raw_path = Path(args.raw_response)
-        raw_path.parent.mkdir(parents=True, exist_ok=True)
-        raw_path.write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding="utf-8")
-    saved = save_images(response, Path(args.out_dir), args.stem)
-    if not saved:
-        error = OpenRouterImageError("OpenRouter response did not contain any images")
-        mark_manifest_failed(args.manifest, args.asset_id, error)
-        raise SystemExit(str(error))
-    mark_manifest_generated(
-        args.manifest,
-        args.asset_id,
-        saved,
-        prompt_path=args.prompt_file,
-    )
-    print(json.dumps({"saved": [str(path) for path in saved]}, ensure_ascii=False, indent=2))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

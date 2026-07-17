@@ -16,11 +16,17 @@ if str(SCRIPT_DIR) not in sys.path:
 import create_run_dir
 import image_provider
 import manifest
+import openrouter_image
 import scan_media
 import validate_output
 
 
 PLATFORMS = {"xiaohongshu", "instagram-facebook", "video"}
+DEFAULT_SIZES = {
+    "xiaohongshu": "1152x1536",
+    "instagram-facebook": "1152x1152",
+    "video": "1920x1080",
+}
 
 
 def _is_ignored(path: Path, root: Path) -> bool:
@@ -162,6 +168,44 @@ def validate_run(
     return result
 
 
+def pending_assets(manifest_path: str | Path) -> list[str]:
+    return manifest.pending(manifest_path)
+
+
+def generate_asset(
+    run_dir: str | Path,
+    asset_id: str,
+    *,
+    prompt_file: str | Path | None = None,
+    out_dir: str | Path | None = None,
+    size: str | None = None,
+    stem: str | None = None,
+    references: list[str] | None = None,
+    max_attempts: int = 2,
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict:
+    base = Path(run_dir)
+    manifest_path = base / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    platform = data["platform"]
+    if platform not in DEFAULT_SIZES and not size:
+        raise ValueError(f"No default size for platform: {platform}")
+
+    return openrouter_image.generate_image(
+        prompt_file=prompt_file or base / "analysis" / "prompts.md",
+        out_dir=out_dir or base / "generated",
+        stem=stem or asset_id,
+        size=size or DEFAULT_SIZES[platform],
+        references=references or [],
+        max_attempts=max_attempts,
+        manifest_path=manifest_path,
+        asset_id=asset_id,
+        force=force,
+        dry_run=dry_run,
+    )
+
+
 def cmd_scan(args: argparse.Namespace) -> int:
     print(json.dumps(scan_media.scan(args.directory), ensure_ascii=False, indent=2))
     return 0
@@ -189,6 +233,34 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0 if result["valid"] else 1
 
 
+def cmd_pending(args: argparse.Namespace) -> int:
+    print(
+        json.dumps(
+            {"pending": pending_assets(args.manifest)},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_generate(args: argparse.Namespace) -> int:
+    result = generate_asset(
+        args.run_dir,
+        args.asset_id,
+        prompt_file=args.prompt_file,
+        out_dir=args.out_dir,
+        size=args.size,
+        stem=args.stem,
+        references=args.reference,
+        max_attempts=args.max_attempts,
+        force=args.force,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -210,6 +282,23 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--platform", required=True, choices=sorted(PLATFORMS))
     validate.add_argument("--caption-language", choices=["zh", "en"])
     validate.set_defaults(func=cmd_validate)
+
+    pending = subparsers.add_parser("pending")
+    pending.add_argument("manifest")
+    pending.set_defaults(func=cmd_pending)
+
+    generate = subparsers.add_parser("generate")
+    generate.add_argument("run_dir")
+    generate.add_argument("--asset-id", required=True)
+    generate.add_argument("--prompt-file")
+    generate.add_argument("--out-dir")
+    generate.add_argument("--size")
+    generate.add_argument("--stem")
+    generate.add_argument("--reference", action="append", default=[])
+    generate.add_argument("--max-attempts", type=int, default=2)
+    generate.add_argument("--force", action="store_true")
+    generate.add_argument("--dry-run", action="store_true")
+    generate.set_defaults(func=cmd_generate)
 
     return parser
 

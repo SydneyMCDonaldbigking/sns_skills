@@ -58,10 +58,13 @@ python viral-social-remix/scripts/scan_media.py incoming
 ```powershell
 python viral-social-remix/scripts/run_pipeline.py scan incoming
 python viral-social-remix/scripts/run_pipeline.py prepare incoming/carousel-a --platform xiaohongshu
+python viral-social-remix/scripts/run_pipeline.py pending output/<run-dir>/analysis/manifest.json
+python viral-social-remix/scripts/run_pipeline.py generate output/<run-dir> --asset-id 01 --dry-run
 python viral-social-remix/scripts/run_pipeline.py validate output/<run-dir> --platform xiaohongshu
 ```
 
 `prepare` 只创建标准 run 目录、复制源素材、写入 analysis 占位文件并初始化 manifest；它不会自动分析内容，也不会调用图片生成 API。
+`pending` 会列出未 `validated` 的 asset ids。`generate` 会按 manifest 平台推断默认尺寸，默认读取 `analysis/prompts.md`、写入 `generated/`，并复用 OpenRouter 的 dry-run、retry、manifest 状态写回和 validated-skip 逻辑。
 
 ## 品牌资料
 
