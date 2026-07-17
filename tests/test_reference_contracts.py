@@ -32,6 +32,8 @@ def test_output_schema_documents_manifest_generation_state():
     for required in [
         "schema_version",
         "source",
+        "direct_url",
+        "content_type",
         "platform_confidence",
         "provider",
         "prompt_path",

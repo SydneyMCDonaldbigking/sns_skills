@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -27,6 +30,15 @@ DEFAULT_SIZES = {
     "instagram-facebook": "1152x1152",
     "video": "1920x1080",
 }
+CONTENT_TYPE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/heic": ".heic",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/webm": ".webm",
+}
 
 
 def _is_ignored(path: Path, root: Path) -> bool:
@@ -34,6 +46,74 @@ def _is_ignored(path: Path, root: Path) -> bool:
         part in scan_media.IGNORED_DIRS or part.startswith(".")
         for part in path.relative_to(root).parts
     )
+
+
+def is_url(value: str | Path) -> bool:
+    parsed = urlparse(str(value))
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def _clean_content_type(value: str | None) -> str:
+    return (value or "").split(";", 1)[0].strip().lower()
+
+
+def _safe_stem(value: str) -> str:
+    cleaned = re.sub(r"[^\w\u4e00-\u9fff.-]+", "-", value.strip(), flags=re.UNICODE)
+    return cleaned.strip(".-") or "remote-media"
+
+
+def _filename_for_url(url: str, content_type: str) -> str:
+    parsed = urlparse(url)
+    name = Path(unquote(parsed.path)).name
+    suffix = Path(name).suffix.lower()
+    extension = suffix if suffix in scan_media.SUPPORTED else CONTENT_TYPE_EXTENSIONS.get(content_type)
+    if not extension:
+        raise ValueError(
+            "URL did not resolve to a direct supported media file. "
+            "Download the post media locally or provide a readable media URL."
+        )
+    stem = _safe_stem(Path(name).stem if name else "remote-media")
+    return f"{stem}{extension}"
+
+
+def _unique_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    suffix = path.suffix
+    stem = path.stem
+    counter = 2
+    while True:
+        candidate = path.with_name(f"{stem}-{counter:02d}{suffix}")
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
+def download_direct_media_url(url: str, target_dir: str | Path, opener=urlopen) -> dict:
+    request = Request(url, headers={"User-Agent": "viral-social-remix/0.1"})
+    try:
+        with opener(request, timeout=60) as response:
+            content_type = _clean_content_type(response.headers.get("Content-Type"))
+            filename = _filename_for_url(url, content_type)
+            data = response.read()
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"Unable to download URL: {url}") from exc
+
+    if not data:
+        raise ValueError(f"URL returned no media bytes: {url}")
+
+    target = Path(target_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    output = _unique_path(target / filename)
+    output.write_bytes(data)
+    return {
+        "path": output.resolve(),
+        "content_type": content_type,
+        "bytes": len(data),
+        "url": url,
+    }
 
 
 def collect_media(path: str | Path) -> list[Path]:
@@ -98,23 +178,7 @@ def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[st
     return copied
 
 
-def prepare_run(
-    input_path: str | Path,
-    platform: str,
-    output_root: str | Path = "output",
-    task_name: str | None = None,
-    caption_language: str | None = None,
-) -> Path:
-    if platform not in PLATFORMS:
-        raise ValueError(f"Unsupported platform: {platform}")
-
-    source = Path(input_path).resolve()
-    files = collect_media(source)
-    _validate_media_for_platform(files, platform)
-
-    run_dir = create_run_dir.create(output_root, task_name or source.stem)
-    copied_sources = _copy_sources(source, files, run_dir)
-
+def _create_run_layout(run_dir: Path, platform: str, caption_language: str | None) -> None:
     for directory in [
         run_dir / "analysis",
         run_dir / "references" / "keyframes",
@@ -131,8 +195,76 @@ def prepare_run(
     _write_if_missing(analysis / "prompts.md", "# Prompts\n\nTODO\n")
     _write_if_missing(analysis / f"caption-{language}.txt", "TODO\n")
 
+
+def _task_name_for_url(url: str) -> str:
+    parsed = urlparse(url)
+    stem = Path(unquote(parsed.path)).stem
+    return _safe_stem(stem or parsed.netloc or "url-source")
+
+
+def prepare_url_run(
+    url: str,
+    platform: str,
+    output_root: str | Path = "output",
+    task_name: str | None = None,
+    caption_language: str | None = None,
+    opener=urlopen,
+) -> Path:
+    if platform not in PLATFORMS:
+        raise ValueError(f"Unsupported platform: {platform}")
+
+    run_dir = create_run_dir.create(output_root, task_name or _task_name_for_url(url))
+    media = download_direct_media_url(url, run_dir / "source", opener=opener)
+    files = [Path(media["path"])]
+    _validate_media_for_platform(files, platform)
+    _create_run_layout(run_dir, platform, caption_language)
+
+    copied_sources = [files[0].relative_to(run_dir).as_posix()]
     manifest.create(
-        analysis / "manifest.json",
+        run_dir / "analysis" / "manifest.json",
+        platform,
+        _asset_ids(platform, files),
+        source={
+            "kind": "direct_url",
+            "paths": copied_sources,
+            "url": url,
+            "content_type": media["content_type"],
+            "bytes": media["bytes"],
+        },
+        provider=image_provider.resolve(),
+    )
+    return run_dir
+
+
+def prepare_run(
+    input_path: str | Path,
+    platform: str,
+    output_root: str | Path = "output",
+    task_name: str | None = None,
+    caption_language: str | None = None,
+) -> Path:
+    if platform not in PLATFORMS:
+        raise ValueError(f"Unsupported platform: {platform}")
+
+    if is_url(input_path):
+        return prepare_url_run(
+            str(input_path),
+            platform,
+            output_root=output_root,
+            task_name=task_name,
+            caption_language=caption_language,
+        )
+
+    source = Path(input_path).resolve()
+    files = collect_media(source)
+    _validate_media_for_platform(files, platform)
+
+    run_dir = create_run_dir.create(output_root, task_name or source.stem)
+    copied_sources = _copy_sources(source, files, run_dir)
+    _create_run_layout(run_dir, platform, caption_language)
+
+    manifest.create(
+        run_dir / "analysis" / "manifest.json",
         platform,
         _asset_ids(platform, files),
         source={

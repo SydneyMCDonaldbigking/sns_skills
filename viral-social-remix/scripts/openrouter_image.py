@@ -38,7 +38,8 @@ class OpenRouterImageError(RuntimeError):
         super().__init__(message)
 
 
-def load_env(path: Path = LOCAL_ENV) -> None:
+def load_env(path: Path | None = None) -> None:
+    path = path or LOCAL_ENV
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():

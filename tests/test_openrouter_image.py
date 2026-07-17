@@ -1,5 +1,8 @@
 import json
 import base64
+import os
+
+import pytest
 
 from viral_social_test_loader import load_script
 
@@ -370,6 +373,43 @@ def test_force_regenerates_validated_asset(tmp_path, monkeypatch, capsys):
     assert calls == [openrouter_image.ENDPOINT]
     assert data["assets"]["01"]["status"] == "generated"
     assert data["assets"]["01"]["output"] == "generated/01-1-1.png"
+
+
+def test_live_openrouter_contract_generates_image(tmp_path):
+    if os.environ.get("VSR_RUN_LIVE_TESTS") != "1":
+        pytest.skip("set VSR_RUN_LIVE_TESTS=1 to run live OpenRouter contract test")
+
+    config = openrouter_image.resolve_generation_config()
+    if not config["api_key"]:
+        pytest.skip("OPENROUTER_API_KEY is not set")
+
+    prompt = tmp_path / "prompt.txt"
+    prompt.write_text(
+        (
+            "Contract test image. Create a simple clean square graphic with "
+            "the text VSR TEST. No brands, no people."
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "analysis" / "manifest.json"
+    manifest.create(manifest_path, "instagram-facebook", ["live"])
+
+    result = openrouter_image.generate_image(
+        prompt_file=prompt,
+        out_dir=tmp_path / "generated",
+        stem="live",
+        size="1152x1152",
+        manifest_path=manifest_path,
+        asset_id="live",
+        max_attempts=1,
+    )
+
+    assert result["saved"]
+    for saved in result["saved"]:
+        assert os.path.isfile(saved)
+    asset = manifest.load(manifest_path)["assets"]["live"]
+    assert asset["status"] == "generated"
+    assert asset["output"]
 
 
 def test_main_marks_manifest_failed_when_response_has_no_images(tmp_path, monkeypatch):

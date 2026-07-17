@@ -30,7 +30,9 @@ assumptions, provider configuration, and per-asset generation state.
 Top-level fields:
 
 - `schema_version`: currently `1`.
-- `source`: `{ "kind": ..., "paths": [...], "url": ... }`.
+- `source`: `{ "kind": ..., "paths": [...], "url": ... }`. `kind` may be
+  `local_file`, `local_folder`, `direct_url`, or `unknown`; direct URL inputs
+  record `content_type` and byte count when downloaded.
 - `platform`: `xiaohongshu`, `instagram-facebook`, or `video`.
 - `platform_confidence`: optional numeric confidence.
 - `assumptions`: inferred audience, setting, benefit, or theme notes.

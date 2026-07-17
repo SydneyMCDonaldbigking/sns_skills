@@ -12,6 +12,21 @@ manifest = load_script("manifest")
 pipeline = load_script("run_pipeline")
 
 
+class FakeResponse:
+    def __init__(self, data: bytes, content_type: str):
+        self._data = data
+        self.headers = {"Content-Type": content_type}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self) -> bytes:
+        return self._data
+
+
 def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
     incoming = tmp_path / "incoming" / "carousel"
     incoming.mkdir(parents=True)
@@ -38,6 +53,66 @@ def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
     assert data["source"]["kind"] == "local_folder"
     assert data["source"]["paths"] == ["source/01.jpg", "source/02.jpg"]
     assert list(data["assets"]) == ["01", "02"]
+
+
+def test_prepare_url_run_downloads_direct_media_url(tmp_path: Path):
+    requests = []
+
+    def fake_open(request, timeout):
+        requests.append((request.full_url, timeout, request.headers["User-agent"]))
+        return FakeResponse(b"image bytes", "image/png; charset=binary")
+
+    run_dir = pipeline.prepare_url_run(
+        "https://example.test/media/cover",
+        "instagram-facebook",
+        output_root=tmp_path / "output",
+        opener=fake_open,
+    )
+
+    source = run_dir / "source" / "cover.png"
+    assert requests == [("https://example.test/media/cover", 60, "viral-social-remix/0.1")]
+    assert source.read_bytes() == b"image bytes"
+
+    data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
+    assert data["source"]["kind"] == "direct_url"
+    assert data["source"]["url"] == "https://example.test/media/cover"
+    assert data["source"]["paths"] == ["source/cover.png"]
+    assert data["source"]["content_type"] == "image/png"
+    assert data["source"]["bytes"] == len(b"image bytes")
+
+
+def test_prepare_url_run_rejects_html_pages(tmp_path: Path):
+    def fake_open(request, timeout):
+        return FakeResponse(b"<html></html>", "text/html")
+
+    try:
+        pipeline.prepare_url_run(
+            "https://example.test/post/123",
+            "xiaohongshu",
+            output_root=tmp_path / "output",
+            opener=fake_open,
+        )
+    except ValueError as exc:
+        assert "direct supported media file" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_prepare_url_run_rejects_image_for_video_platform(tmp_path: Path):
+    def fake_open(request, timeout):
+        return FakeResponse(b"image bytes", "image/jpeg")
+
+    try:
+        pipeline.prepare_url_run(
+            "https://example.test/media/cover.jpg",
+            "video",
+            output_root=tmp_path / "output",
+            opener=fake_open,
+        )
+    except ValueError as exc:
+        assert "Video platform requires" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
 
 
 def test_validate_run_writes_validation_json_for_incomplete_delivery(tmp_path: Path):

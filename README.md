@@ -30,6 +30,14 @@ conda activate C:\Users\uryuu\Desktop\sns_skill\.venv
 python -m pytest
 ```
 
+Live OpenRouter contract test 默认跳过。确认 `.env.local` 中已设置
+`OPENROUTER_API_KEY` 后，可以显式运行一次：
+
+```powershell
+$env:VSR_RUN_LIVE_TESTS = "1"
+python -m pytest tests/test_openrouter_image.py -k live -s
+```
+
 ## 使用方式
 
 把待分析素材放在一个本地目录中。推荐结构：
@@ -65,6 +73,14 @@ python viral-social-remix/scripts/run_pipeline.py validate output/<run-dir> --pl
 
 `prepare` 只创建标准 run 目录、复制源素材、写入 analysis 占位文件并初始化 manifest；它不会自动分析内容，也不会调用图片生成 API。
 `pending` 会列出未 `validated` 的 asset ids。`generate` 会按 manifest 平台推断默认尺寸，默认读取 `analysis/prompts.md`、写入 `generated/`，并复用 OpenRouter 的 dry-run、retry、manifest 状态写回和 validated-skip 逻辑。
+
+`prepare` 也接受直接指向图片或视频文件的公开 URL：
+
+```powershell
+python viral-social-remix/scripts/run_pipeline.py prepare https://example.com/media/cover.jpg --platform instagram-facebook
+```
+
+URL 输入只支持直接媒体文件。HTML 社媒页面、登录页、反爬页面或无法识别的内容不会被解析；请先下载媒体或提供本地文件夹。
 
 ## 品牌资料
 
