@@ -114,6 +114,20 @@ For image posts, preserve source page count and assign each page a role. Record
 composition, subject, text hierarchy, palette, hook, transition, and replacement
 mapping.
 
+For each source image, preserve that image's own format. Do not force a format
+learned from a different page onto the current page. If the source page is an
+8-combo cover, localize it as one 8-combo cover. If it is an app-entry guide,
+localize it as an app-entry guide. If it is a ranked list, recipe step, product
+comparison, tutorial, quote card, or detail page, preserve that exact page role,
+count, layout logic, and copy rhythm.
+
+For the first creative draft, do not decompose one source poster into many
+separate generated sub-assets unless the user explicitly asks for that. Use the
+source page itself as the main structural reference and make one localized
+version of that page first. Only split into ingredient cutouts, product cards,
+or local overlays after the whole-page direction is accepted or when the user
+asks for a production-accuracy pass.
+
 For video, run `scripts/extract_keyframes.py` to export candidate frames. Inspect
 the candidates and select exactly nine timestamps mapped to Hook, setup, pain,
 product, mechanism, benefit, proof, result, and CTA. Export those selected
