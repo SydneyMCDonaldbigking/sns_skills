@@ -13,11 +13,19 @@ output/YYYYMMDD-HHmmss-<task>/
 │   ├── caption-zh.txt
 │   ├── caption-en.txt
 │   ├── prompts.md
+│   ├── page-prompts/
+│   │   ├── page-01.md
+│   │   └── page-02.md
 │   └── manifest.json
 ├── references/keyframes/
+├── raw/
+│   └── page-XX-response.json
 ├── generated/
+│   └── page-XX.png
 ├── overview/contact-sheet.png
-└── qa/validation.json
+└── qa/
+    ├── validation.json
+    └── openrouter-cost.json
 ```
 
 Only the platform-relevant caption is mandatory: `caption-zh.txt` for
@@ -56,3 +64,12 @@ Each asset records:
 
 On resume, assets already marked `validated` must be skipped by default.
 Regeneration requires an explicit force option.
+
+For API-only carousel runs, Codex writes one prompt file per generated page under
+`analysis/page-prompts/page-XX.md`. The local runner
+`scripts/run_openrouter_carousel.py` reads those files and the manifest, then
+writes `raw/page-XX-response.json`, `generated/page-XX.png`, and
+`qa/openrouter-cost.json`. Pages that already have a generated PNG at the
+platform's exact dimensions are skipped and marked resumable. Put per-page local
+reference assets in `assets[asset_id].reference_paths`; the runner also accepts
+the legacy `assets[asset_id].request.reference_images` field for existing runs.

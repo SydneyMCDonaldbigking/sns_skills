@@ -23,6 +23,33 @@ and theme; label those assumptions. Ask only for missing mandatory fields or low
 Do not ask again for values already supplied. A user's explicit platform always
 overrides automatic detection.
 
+## API handoff and autonomy
+
+Codex prepares the local source package, localized copy, page prompts, captions,
+and manifest. The image API still needs the relevant page prompts and local
+reference assets, but that upload must happen from the user's own terminal via
+the local runner, not directly from the Codex environment.
+
+For carousel image generation, hand off to the user's local terminal with
+`scripts/run_openrouter_carousel.py`. The local runner reads the prepared
+`run_dir/analysis/manifest.json`, `run_dir/analysis/page-prompts/page-XX.md`,
+and any manifest-listed local reference image paths, uploads them to OpenRouter
+page by page, and writes generated output back into the same run directory.
+Store page references under `assets[asset_id].reference_paths`; the runner also
+accepts legacy `assets[asset_id].request.reference_images`. Use `--api-only
+--concurrency 2` for production runs.
+
+If the Codex environment blocks upload or API access, do not bypass it. Finish
+the run preparation and output the exact local command for the user to run:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+```
+
+Only stop before handoff for a real blocker: missing mandatory brand/product
+data, inaccessible logged-in source page, unreadable local source files, or an
+incomplete run directory that cannot be fixed locally.
+
 ## Source capture
 
 For Xiaohongshu, Instagram, or Facebook posts, treat a user-opened logged-in
@@ -121,6 +148,14 @@ localize it as an app-entry guide. If it is a ranked list, recipe step, product
 comparison, tutorial, quote card, or detail page, preserve that exact page role,
 count, layout logic, and copy rhythm.
 
+For cross-platform localization, translate and rewrite the source post's own
+visible copy and caption into natural target-platform language. Do not invent a
+new marketing angle when the source copy already provides the angle. Keep the
+source meaning, claims, examples, warnings, and sequence; localize wording,
+brand, products, units, and platform tone only. If source text is unreadable or
+missing, mark the gap in `analysis/copy.md` and infer conservatively from the
+visible page, instead of writing unrelated promotional copy.
+
 For the first creative draft, do not decompose one source poster into many
 separate generated sub-assets unless the user explicitly asks for that. Use the
 source page itself as the main structural reference and make one localized
@@ -158,6 +193,7 @@ Before generation, write:
 - `analysis/breakdown.md`
 - `analysis/copy.md`
 - `analysis/prompts.md`
+- `analysis/page-prompts/page-XX.md` for every carousel page
 - `analysis/manifest.json` using `scripts/manifest.py`
 - `analysis/caption-zh.txt` for Xiaohongshu
 - `analysis/caption-en.txt` for Instagram/Facebook
@@ -174,27 +210,43 @@ before image generation.
 ## Generate
 
 Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
-the image provider with `scripts/image_provider.py`. Default to OpenRouter
-`openai/gpt-5.4-image-2` at medium quality when `OPENROUTER_API_KEY` is available.
+the redacted provider defaults with `scripts/image_provider.py`, but do not call
+OpenRouter directly from Codex for carousel generation. Default local runner
+configuration is OpenRouter `openai/gpt-5.4-image-2` at medium quality when
+`OPENROUTER_API_KEY` is available in the user's `.env.local` or environment.
+Treat this as the GPT Image 2 generation path for carousel assets.
+
+Write one complete prompt per page in `analysis/page-prompts/page-XX.md`.
 Generate the exact Chinese or English text directly in the image; do not default
 to local text overlay. Use each source page or selected source frame as a
 structural reference while locking product, packaging, recurring people, palette,
 lighting, and typography across the group.
 
-Save every project-bound generated asset into the run directory. Update
-`scripts/manifest.py` after prompting and after each generation.
+For carousel output, instruct the user to run the local API-only runner:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+```
+
+The runner saves `raw/page-XX-response.json`, `generated/page-XX.png`, and
+`qa/openrouter-cost.json`. It uses at most two concurrent requests, skips pages
+already generated at the correct platform size, updates `analysis/manifest.json`,
+and stops on the first missing-page API failure when `--api-only` is set. There
+is no local-composite fallback in API-only mode.
 
 ## Validate and resume
 
 Visually review every generated image for product fidelity, brand spelling,
 product spelling, numbers, language, CTA, anatomy, perspective, and continuity.
 Run `scripts/validate_output.py` for deterministic checks. Retry only failed
-assets. Use local text overlay only after repeated targeted GPT Image 2 retries
-fail.
+assets. For API-only carousel runs, do not use local text overlay as a fallback.
 
-Build the carousel overview or exactly nine-frame storyboard with
-`scripts/make_contact_sheet.py`. On restart, read the manifest and skip assets
-already marked `validated`.
+After successful local runner completion, ensure the carousel overview or
+exactly nine-frame storyboard exists via `scripts/make_contact_sheet.py`; the
+carousel runner builds `overview/contact-sheet.png` and writes
+`qa/validation.json` automatically. On restart, read the manifest and skip
+assets already marked `validated` or already present at the correct generated
+size.
 
 ## Boundaries and recovery
 

@@ -138,6 +138,13 @@ def request_with_retries(
             exc.attempts = attempt
             if same_error_count >= 2 or attempt == max_attempts:
                 raise
+        except json.JSONDecodeError as exc:
+            signature = ("json_decode", str(exc))
+            same_error_count = same_error_count + 1 if signature == last_signature else 1
+            last_signature = signature
+            exc.attempts = attempt
+            if same_error_count >= 2 or attempt == max_attempts:
+                raise
 
     raise RuntimeError("unreachable retry state")
 

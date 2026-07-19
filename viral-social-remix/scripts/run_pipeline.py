@@ -181,6 +181,7 @@ def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[st
 def _create_run_layout(run_dir: Path, platform: str, caption_language: str | None) -> None:
     for directory in [
         run_dir / "analysis",
+        run_dir / "analysis" / "page-prompts",
         run_dir / "references" / "keyframes",
         run_dir / "generated",
         run_dir / "overview",

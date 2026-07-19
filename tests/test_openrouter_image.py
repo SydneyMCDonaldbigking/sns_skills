@@ -157,6 +157,27 @@ def test_request_with_retries_stops_after_same_http_error_twice():
     assert calls == ["https://example.test", "https://example.test"]
 
 
+def test_request_with_retries_retries_json_decode_error():
+    calls = []
+
+    def flaky_request(payload, api_key, endpoint):
+        calls.append(endpoint)
+        if len(calls) == 1:
+            raise json.JSONDecodeError("empty response", "", 0)
+        return {"choices": []}
+
+    result = openrouter_image.request_with_retries(
+        {"messages": []},
+        "secret",
+        endpoint="https://example.test",
+        max_attempts=2,
+        request_fn=flaky_request,
+    )
+
+    assert result == {"choices": []}
+    assert calls == ["https://example.test", "https://example.test"]
+
+
 def test_main_marks_manifest_failed_after_repeated_http_error(tmp_path, monkeypatch):
     prompt = tmp_path / "prompt.txt"
     prompt.write_text("Render this.", encoding="utf-8")
