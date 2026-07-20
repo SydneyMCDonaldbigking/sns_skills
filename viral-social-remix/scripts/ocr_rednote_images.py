@@ -19,7 +19,10 @@ def load_ocr_engine() -> Any:
     try:
         from rapidocr_onnxruntime import RapidOCR
     except ImportError as exc:
-        raise SystemExit("Missing OCR dependency. Install with: pip install '.[ocr]'") from exc
+        raise SystemExit(
+            "rapidocr_onnxruntime is not installed. "
+            "Install the OCR extra with: pip install -e .[ocr]"
+        ) from exc
     return RapidOCR()
 
 
@@ -88,7 +91,10 @@ def main() -> None:
 
     patterns = compile_patterns(args.pattern or DEFAULT_PATTERNS)
     ocr = load_ocr_engine()
-    results = [mark_hits(ocr_image(ocr, path), patterns) for path in iter_images(Path(args.path))]
+    results = [
+        mark_hits(ocr_image(ocr, path), patterns)
+        for path in iter_images(Path(args.path))
+    ]
     payload = {
         "patterns": [pattern.pattern for pattern in patterns],
         "count": len(results),

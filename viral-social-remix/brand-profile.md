@@ -18,7 +18,7 @@
 ## 素材
 
 - 产品素材文件夹：未填写
-- Logo 文件：C:\Users\zzyyds\Desktop\sns_skill\viral-social-remix\umall_logo
+- Logo 文件：viral-social-remix/umall_logo
 - 品牌颜色：红色
 
 ## 默认发布设置

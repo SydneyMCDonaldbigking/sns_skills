@@ -8,6 +8,9 @@ tmp/
 samples/
 data/product-cache/
 data/material-index*.jsonl
+
+# Local API keys and machine-specific environment files
 .env
+.env.local
 .env.*
 *.local.env

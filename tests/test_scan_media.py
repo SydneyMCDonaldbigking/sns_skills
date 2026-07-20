@@ -1,4 +1,7 @@
 from pathlib import Path
+import json
+import subprocess
+import sys
 
 from viral_social_test_loader import load_script
 
@@ -32,3 +35,18 @@ def test_scan_rejects_missing_directory(tmp_path: Path):
         assert "readable directory" in str(exc)
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_scan_cli_outputs_json(tmp_path: Path):
+    (tmp_path / "root.jpg").write_bytes(b"image")
+    script = Path(__file__).parents[1] / "viral-social-remix" / "scripts" / "scan_media.py"
+
+    result = subprocess.run(
+        [sys.executable, str(script), str(tmp_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["tasks"][0]["name"] == "root"

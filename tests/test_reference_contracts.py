@@ -27,6 +27,27 @@ def test_output_schema_names_every_delivery_file():
         assert required in text
 
 
+def test_output_schema_documents_manifest_generation_state():
+    text = (REF / "output-schema.md").read_text(encoding="utf-8")
+    for required in [
+        "schema_version",
+        "source",
+        "direct_url",
+        "content_type",
+        "platform_confidence",
+        "provider",
+        "prompt_path",
+        "request",
+        "<redacted data URL>",
+        "outputs",
+        "last_error",
+        "attempts",
+        "validated",
+        "force",
+    ]:
+        assert required in text
+
+
 def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():
     text = (REF / "xiaohongshu-real-talk-template.md").read_text(encoding="utf-8")
     for required in [

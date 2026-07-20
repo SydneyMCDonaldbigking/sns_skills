@@ -29,6 +29,20 @@ If the API key is missing, stop image generation and ask the user to set
 `OPENROUTER_API_KEY`. Continue non-generation tasks such as analysis, prompts,
 captions, manifests, and contact sheets.
 
+For carousel production runs, Codex should prepare the run directory but should
+not upload company source media, brand assets, app screenshots, or prompts from
+the Codex environment. The OpenRouter upload still happens, but it happens from
+the user's local terminal through the runner:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+```
+
+The runner loads `OPENROUTER_API_KEY` only from `.env.local` or the local
+environment, caps concurrency at two requests, writes raw responses under
+`raw/`, generated PNGs under `generated/`, and cost metadata under
+`qa/openrouter-cost.json`.
+
 ## Request Defaults
 
 Send one image request per asset with the resolved model and quality. Preserve

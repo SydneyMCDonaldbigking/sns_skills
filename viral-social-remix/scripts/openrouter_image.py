@@ -7,6 +7,7 @@ import base64
 import json
 import mimetypes
 import os
+import sys
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -15,9 +16,30 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).parents[2]
 LOCAL_ENV = ROOT / ".env.local"
 ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import image_provider
+import manifest
 
 
-def load_env(path: Path = LOCAL_ENV) -> None:
+class OpenRouterHTTPError(RuntimeError):
+    def __init__(self, code: int, body: str, attempts: int = 1):
+        self.code = code
+        self.body = body
+        self.attempts = attempts
+        super().__init__(f"OpenRouter HTTP {code}: {body}")
+
+
+class OpenRouterImageError(RuntimeError):
+    def __init__(self, message: str, error_type: str = "openrouter_image"):
+        self.error_type = error_type
+        super().__init__(message)
+
+
+def load_env(path: Path | None = None) -> None:
+    path = path or LOCAL_ENV
     if not path.exists():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -34,9 +56,9 @@ def data_url(path: Path) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
-def post_json(payload: dict, api_key: str) -> dict:
+def post_json(payload: dict, api_key: str, endpoint: str = ENDPOINT) -> dict:
     request = Request(
-        ENDPOINT,
+        endpoint,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -51,7 +73,7 @@ def post_json(payload: dict, api_key: str) -> dict:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"OpenRouter HTTP {exc.code}: {body}") from exc
+        raise OpenRouterHTTPError(exc.code, body) from exc
 
 
 def save_images(response: dict, out_dir: Path, stem: str) -> list[Path]:
@@ -92,50 +114,358 @@ def save_images(response: dict, out_dir: Path, stem: str) -> list[Path]:
     return saved
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default=os.environ.get("VSR_IMAGE_MODEL", "openai/gpt-5.4-image-2"))
-    parser.add_argument("--prompt-file", required=True)
-    parser.add_argument("--out-dir", required=True)
-    parser.add_argument("--stem", default="openrouter-image")
-    parser.add_argument("--size", default="1152x1152")
-    parser.add_argument("--quality", default=os.environ.get("VSR_IMAGE_QUALITY", "medium"))
-    parser.add_argument("--reference", action="append", default=[])
-    parser.add_argument("--raw-response")
-    args = parser.parse_args()
+def request_with_retries(
+    payload: dict,
+    api_key: str,
+    *,
+    endpoint: str = ENDPOINT,
+    max_attempts: int = 2,
+    request_fn=None,
+) -> dict:
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
 
-    load_env()
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise SystemExit("OPENROUTER_API_KEY is not set")
+    request_fn = request_fn or post_json
+    last_signature = None
+    same_error_count = 0
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return request_fn(payload, api_key, endpoint=endpoint)
+        except OpenRouterHTTPError as exc:
+            signature = (exc.code, exc.body)
+            same_error_count = same_error_count + 1 if signature == last_signature else 1
+            last_signature = signature
+            exc.attempts = attempt
+            if same_error_count >= 2 or attempt == max_attempts:
+                raise
+        except json.JSONDecodeError as exc:
+            signature = ("json_decode", str(exc))
+            same_error_count = same_error_count + 1 if signature == last_signature else 1
+            last_signature = signature
+            exc.attempts = attempt
+            if same_error_count >= 2 or attempt == max_attempts:
+                raise
 
-    prompt = Path(args.prompt_file).read_text(encoding="utf-8")
+    raise RuntimeError("unreachable retry state")
+
+
+def mark_manifest_failed(
+    manifest_path: str | Path | None,
+    asset_id: str | None,
+    error: Exception,
+) -> None:
+    if not manifest_path or not asset_id:
+        return
+
+    path = Path(manifest_path)
+    data = manifest.load(path)
+    current_attempts = int(data["assets"][asset_id].get("attempts", 0))
+    attempts = getattr(error, "attempts", 1)
+    last_error = {
+        "type": getattr(error, "error_type", "openrouter_error"),
+        "message": str(error),
+        "attempts": attempts,
+    }
+    if isinstance(error, OpenRouterHTTPError):
+        last_error.update(
+            {
+                "type": "openrouter_http",
+                "code": error.code,
+                "body": error.body[:1000],
+            }
+        )
+    manifest.mark(
+        path,
+        asset_id,
+        "failed",
+        attempts=current_attempts + attempts - 1,
+        validation_errors=[str(error)],
+        last_error=last_error,
+    )
+
+
+def _manifest_root(manifest_path: str | Path) -> Path:
+    manifest_file = Path(manifest_path)
+    return (
+        manifest_file.parent.parent
+        if manifest_file.parent.name == "analysis"
+        else manifest_file.parent
+    ).resolve()
+
+
+def _relative_to_root(path: str | Path, root: Path) -> str:
+    target = Path(path).resolve()
+    try:
+        return target.relative_to(root).as_posix()
+    except ValueError:
+        return str(target)
+
+
+def mark_manifest_prompted(
+    manifest_path: str | Path | None,
+    asset_id: str | None,
+    *,
+    prompt_path: str | Path,
+    endpoint: str,
+    payload: dict,
+) -> None:
+    if not manifest_path or not asset_id:
+        return
+
+    root = _manifest_root(manifest_path)
+    manifest.mark(
+        manifest_path,
+        asset_id,
+        "prompted",
+        prompt_path=_relative_to_root(prompt_path, root),
+        request={
+            "endpoint": endpoint,
+            "payload": redact_payload(payload),
+        },
+        validation_errors=[],
+    )
+
+
+def mark_manifest_generated(
+    manifest_path: str | Path | None,
+    asset_id: str | None,
+    saved: list[Path],
+    *,
+    run_root: str | Path | None = None,
+    prompt_path: str | Path | None = None,
+) -> None:
+    if not manifest_path or not asset_id:
+        return
+
+    root = Path(run_root).resolve() if run_root else _manifest_root(manifest_path)
+    outputs = []
+    for path in saved:
+        outputs.append(_relative_to_root(path, root))
+
+    fields = {
+        "output": outputs[0] if len(outputs) == 1 else outputs,
+        "outputs": outputs,
+        "validation_errors": [],
+    }
+    if prompt_path:
+        fields["prompt_path"] = _relative_to_root(prompt_path, root)
+
+    manifest.mark(
+        manifest_path,
+        asset_id,
+        "generated",
+        **fields,
+    )
+
+
+def load_manifest_asset(
+    manifest_path: str | Path | None,
+    asset_id: str | None,
+) -> dict | None:
+    if not manifest_path or not asset_id:
+        return None
+    data = manifest.load(manifest_path)
+    return data["assets"][asset_id]
+
+
+def should_skip_validated(
+    manifest_path: str | Path | None,
+    asset_id: str | None,
+    *,
+    force: bool = False,
+) -> bool:
+    item = load_manifest_asset(manifest_path, asset_id)
+    return bool(item and item.get("status") == "validated" and not force)
+
+
+def build_payload(
+    prompt: str,
+    *,
+    model: str,
+    size: str,
+    quality: str,
+    references: list[str] | None = None,
+) -> dict:
     content = [
         {
             "type": "text",
             "text": (
-                f"{prompt}\n\nOutput requirements: generate one square image at "
-                f"{args.size}. Use medium quality. Return an image."
+                f"{prompt}\n\nOutput requirements: generate one image at "
+                f"{size}. Use {quality} quality. Return an image."
             ),
         }
     ]
-    for ref in args.reference:
+    for ref in references or []:
         content.append({"type": "image_url", "image_url": {"url": data_url(Path(ref))}})
 
-    payload = {
-        "model": args.model,
+    return {
+        "model": model,
         "modalities": ["image", "text"],
-        "size": args.size,
-        "quality": args.quality,
+        "size": size,
+        "quality": quality,
         "messages": [{"role": "user", "content": content}],
     }
-    response = post_json(payload, api_key)
-    if args.raw_response:
-        raw_path = Path(args.raw_response)
+
+
+def redact_payload(payload: dict) -> dict:
+    redacted = json.loads(json.dumps(payload))
+    for message in redacted.get("messages", []):
+        content = message.get("content", [])
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            image_url = item.get("image_url") if isinstance(item, dict) else None
+            if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
+                image_url["url"] = "<redacted data URL>"
+    return redacted
+
+
+def resolve_generation_config(
+    *,
+    model: str | None = None,
+    quality: str | None = None,
+) -> dict:
+    load_env()
+    config = image_provider.resolve()
+    return {
+        "model": model or config["model"],
+        "quality": quality or config["quality"],
+        "endpoint": config["endpoint"] or ENDPOINT,
+        "api_key": os.environ.get("OPENROUTER_API_KEY"),
+    }
+
+
+def generate_image(
+    *,
+    prompt_file: str | Path,
+    out_dir: str | Path,
+    stem: str = "openrouter-image",
+    size: str = "1152x1152",
+    quality: str | None = None,
+    model: str | None = None,
+    references: list[str] | None = None,
+    raw_response: str | Path | None = None,
+    max_attempts: int = 2,
+    manifest_path: str | Path | None = None,
+    asset_id: str | None = None,
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict:
+    if bool(manifest_path) != bool(asset_id):
+        raise SystemExit("--manifest and --asset-id must be used together")
+
+    config = resolve_generation_config(model=model, quality=quality)
+    if not dry_run and should_skip_validated(
+        manifest_path,
+        asset_id,
+        force=force,
+    ):
+        return {
+            "skipped": True,
+            "reason": "asset already validated",
+            "asset_id": asset_id,
+            "status": "validated",
+        }
+
+    api_key = config["api_key"]
+    if not api_key and not dry_run:
+        raise SystemExit("OPENROUTER_API_KEY is not set")
+
+    prompt = Path(prompt_file).read_text(encoding="utf-8")
+    payload = build_payload(
+        prompt,
+        model=config["model"],
+        size=size,
+        quality=config["quality"],
+        references=references or [],
+    )
+    if dry_run:
+        return {
+            "endpoint": config["endpoint"],
+            "api_key_set": bool(api_key),
+            "payload": redact_payload(payload),
+        }
+
+    mark_manifest_prompted(
+        manifest_path,
+        asset_id,
+        prompt_path=prompt_file,
+        endpoint=config["endpoint"],
+        payload=payload,
+    )
+    try:
+        response = request_with_retries(
+            payload,
+            api_key,
+            endpoint=config["endpoint"],
+            max_attempts=max_attempts,
+        )
+    except OpenRouterHTTPError as exc:
+        mark_manifest_failed(manifest_path, asset_id, exc)
+        raise SystemExit(str(exc)) from exc
+
+    if raw_response:
+        raw_path = Path(raw_response)
         raw_path.parent.mkdir(parents=True, exist_ok=True)
-        raw_path.write_text(json.dumps(response, ensure_ascii=False, indent=2), encoding="utf-8")
-    saved = save_images(response, Path(args.out_dir), args.stem)
-    print(json.dumps({"saved": [str(path) for path in saved]}, ensure_ascii=False, indent=2))
+        raw_path.write_text(
+            json.dumps(response, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    saved = save_images(response, Path(out_dir), stem)
+    if not saved:
+        error = OpenRouterImageError("OpenRouter response did not contain any images")
+        mark_manifest_failed(manifest_path, asset_id, error)
+        raise SystemExit(str(error))
+    mark_manifest_generated(
+        manifest_path,
+        asset_id,
+        saved,
+        prompt_path=prompt_file,
+    )
+    return {"saved": [str(path) for path in saved]}
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model")
+    parser.add_argument("--prompt-file", required=True)
+    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--stem", default="openrouter-image")
+    parser.add_argument("--size", default="1152x1152")
+    parser.add_argument("--quality")
+    parser.add_argument("--reference", action="append", default=[])
+    parser.add_argument("--raw-response")
+    parser.add_argument("--max-attempts", type=int, default=2)
+    parser.add_argument("--manifest", help="Optional manifest path to mark failed assets.")
+    parser.add_argument("--asset-id", help="Asset id to update when --manifest is used.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate even when the manifest asset is already validated.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the redacted request payload without calling OpenRouter.",
+    )
+    args = parser.parse_args(argv)
+    result = generate_image(
+        prompt_file=args.prompt_file,
+        out_dir=args.out_dir,
+        stem=args.stem,
+        size=args.size,
+        quality=args.quality,
+        model=args.model,
+        references=args.reference,
+        raw_response=args.raw_response,
+        max_attempts=args.max_attempts,
+        manifest_path=args.manifest,
+        asset_id=args.asset_id,
+        force=args.force,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
