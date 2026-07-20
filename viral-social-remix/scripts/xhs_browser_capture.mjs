@@ -128,6 +128,74 @@ function hasObservedUpgrade(url, observedUrls) {
   });
 }
 
+function xhsCarouselStem(key) {
+  const match = String(key || "").match(/^(.*?)[0-9a-z]{3}nv[0-9a-z]+$/i);
+  return match?.[1] || "";
+}
+
+function compareAscii(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function bestObservedUrlsByKey(urls) {
+  const best = new Map();
+  for (const url of urls || []) {
+    if (!url || !url.includes("sns-webpic")) continue;
+    const key = xhsMediaKey(url);
+    if (!key) continue;
+    const current = best.get(key);
+    if (!current || xhsQualityRank(url) > xhsQualityRank(current)) {
+      best.set(key, url);
+    }
+  }
+  return best;
+}
+
+export function recoverSlidesFromObserved(slides, pageCount, observedUrls) {
+  if (!pageCount || pageCount <= 1 || (slides || []).length >= pageCount) {
+    return null;
+  }
+
+  const seedKeys = Array.from(
+    new Set((slides || []).map((slide) => xhsMediaKey(slide.url)).filter(Boolean)),
+  );
+  if (seedKeys.length === 0) return null;
+
+  const bestByKey = bestObservedUrlsByKey([
+    ...(observedUrls || []),
+    ...(slides || []).map((slide) => slide.url),
+  ]);
+  const groups = new Map();
+  for (const [key, url] of bestByKey.entries()) {
+    const stem = xhsCarouselStem(key);
+    if (stem.length < 12) continue;
+    if (!groups.has(stem)) groups.set(stem, []);
+    groups.get(stem).push({ key, url });
+  }
+
+  let selected = null;
+  for (const [stem, items] of groups.entries()) {
+    const seedHits = seedKeys.filter((key) => key.startsWith(stem)).length;
+    if (seedHits === 0 || items.length !== pageCount) continue;
+    const score = seedHits * 1000 + stem.length;
+    if (!selected || score > selected.score) {
+      selected = { score, items };
+    }
+  }
+  if (!selected) return null;
+
+  return selected.items
+    .slice()
+    .sort((left, right) => compareAscii(left.key, right.key))
+    .map((item, index) => ({
+      indicator: `${index + 1}/${pageCount}`,
+      url: item.url,
+      source: "observed-recovered",
+    }));
+}
+
 async function evaluatePostCards(tab, query, options = {}) {
   const limit = options.limit ?? 12;
   const scanLimit = options.scanLimit ?? 80;
@@ -582,12 +650,23 @@ export async function captureCurrentXhsPost(tab, options = {}) {
       finalBasics = await readPostBasics(tab);
       captureMethod = "dom-warmed";
     } else {
-      slides = await collectSlides(tab, pageCount, clickDelayMs);
-      finalBasics = await readPostBasics(tab);
-      captureMethod = "click-fallback";
-      warmedObserved = Array.from(
-        new Set([...warmedObserved, ...(finalBasics.observedImageUrls || [])]),
-      );
+      const recoveredSlides = recoverSlidesFromObserved(domSlides, pageCount, warmedObserved);
+      if (recoveredSlides) {
+        slides = recoveredSlides;
+        captureMethod = "dom-observed-recovered";
+      } else {
+        slides = await collectSlides(tab, pageCount, clickDelayMs);
+        finalBasics = await readPostBasics(tab);
+        captureMethod = "click-fallback";
+        warmedObserved = Array.from(
+          new Set([...warmedObserved, ...(finalBasics.observedImageUrls || [])]),
+        );
+        const clickRecoveredSlides = recoverSlidesFromObserved(slides, pageCount, warmedObserved);
+        if (clickRecoveredSlides) {
+          slides = clickRecoveredSlides;
+          captureMethod = "click-fallback-observed-recovered";
+        }
+      }
     }
     finalBasics.observedImageUrls = Array.from(
       new Set([...(finalBasics.observedImageUrls || []), ...warmedObserved]),
