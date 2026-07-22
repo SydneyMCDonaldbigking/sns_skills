@@ -235,6 +235,10 @@ configuration is OpenRouter `openai/gpt-5.4-image-2` at medium quality when
 `OPENROUTER_API_KEY` is available in the user's `.env.local` or environment.
 Treat this as the GPT Image 2 generation path for carousel assets.
 
+When a generated scene includes an Umall warehouse or fulfilment background,
+load `references/fixed-brand-scenes.md` and use its warehouse image as the
+mandatory scene reference. Do not invent or substitute a different warehouse.
+
 Write one complete prompt per page in `analysis/page-prompts/page-XX.md`.
 Generate the exact Chinese or English text directly in the image; do not default
 to local text overlay. Use each source page or selected source frame as a

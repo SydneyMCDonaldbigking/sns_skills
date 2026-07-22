@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from PIL import Image
+
 
 REF = Path(__file__).parents[1] / "viral-social-remix" / "references"
 
@@ -46,6 +48,21 @@ def test_output_schema_documents_manifest_generation_state():
         "force",
     ]:
         assert required in text
+
+
+def test_fixed_brand_scene_reference_points_to_readable_asset():
+    text = (REF / "fixed-brand-scenes.md").read_text(encoding="utf-8")
+    relative_asset = "../assets/umall/umall-warehouse-fixed-reference.png"
+    assert relative_asset in text
+
+    asset = (REF / relative_asset).resolve()
+    assert asset.is_file()
+    with Image.open(asset) as image:
+        image.verify()
+    with Image.open(asset) as image:
+        assert image.format == "PNG"
+        assert image.size[0] >= 1000
+        assert image.size[1] >= 1000
 
 
 def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():

@@ -41,6 +41,7 @@ def test_skill_routes_every_input_and_platform():
         "caption-zh.txt",
         "caption-en.txt",
         "instagram-pantry-essentials-template.md",
+        "fixed-brand-scenes.md",
     ]
     for phrase in required:
         assert phrase in text
