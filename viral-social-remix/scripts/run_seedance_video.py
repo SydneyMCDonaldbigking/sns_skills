@@ -1,4 +1,4 @@
-"""Submit a prepared storyboard run to Seedance through Volcengine Ark.
+"""Submit a prepared storyboard run to Seedance through BytePlus ModelArk.
 
 This runner is meant for the user's local terminal. Codex prepares the run
 directory, storyboard frames, and Seedance prompt; the local runner reads the
@@ -35,13 +35,16 @@ import validate_output
 
 ROOT = Path(__file__).parents[2]
 LOCAL_ENV = ROOT / ".env.local"
-DEFAULT_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks"
-DEFAULT_MODEL = "doubao-seedance-1-0-pro-250528"
+DEFAULT_ENDPOINT = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks"
+DEFAULT_MODEL = "dreamina-seedance-2-0-260128"
 DEFAULT_RATIO = "9:16"
 DEFAULT_RATIOS = {
     "vertical-video": "9:16",
     "video": "16:9",
 }
+DEFAULT_RESOLUTION = "1080p"
+DEFAULT_GENERATE_AUDIO = True
+DEFAULT_WATERMARK = False
 NO_SUBTITLE_POLICY = (
     "No subtitles, captions, title cards, lower-thirds, burned-in text, "
     "or any on-screen text. Voiceover and natural cooking audio are allowed "
@@ -51,6 +54,15 @@ DEFAULT_DURATION = "5"
 DEFAULT_TIMEOUT = 1800
 DEFAULT_POLL_INTERVAL = 10
 TERMINAL_FAILURES = {"failed", "cancelled"}
+KEY_ENV_NAMES = [
+    "BYTEPLUS_ARK_API_KEY",
+    "BYTEPLUS_API_KEY",
+    "VSR_SEEDANCE_API_KEY",
+    "ARK_API_KEY",
+    "SEEDANCE_API_KEY",
+]
+TRUTHY = {"1", "true", "yes", "y", "on"}
+FALSY = {"0", "false", "no", "n", "off"}
 
 
 class SeedanceRunnerError(RuntimeError):
@@ -69,10 +81,11 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _load_env_file(path: Path = LOCAL_ENV) -> None:
-    if not path.exists():
+def _load_env_file(path: Path | None = None) -> None:
+    env_path = path or LOCAL_ENV
+    if not env_path.exists():
         return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -81,20 +94,77 @@ def _load_env_file(path: Path = LOCAL_ENV) -> None:
 
 
 def _api_key() -> str | None:
-    return (
-        os.environ.get("VSR_SEEDANCE_API_KEY")
-        or os.environ.get("ARK_API_KEY")
-        or os.environ.get("SEEDANCE_API_KEY")
-    )
+    for name in KEY_ENV_NAMES:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
+def _supports_seed(model: str) -> bool:
+    return "seedance-2-0" not in model.lower()
 
 
 def resolve_config(*, model: str | None = None, endpoint: str | None = None) -> dict[str, Any]:
     _load_env_file()
     return {
-        "provider": "volcengine-ark",
+        "provider": "byteplus-modelark",
         "model": model or os.environ.get("VSR_SEEDANCE_MODEL", DEFAULT_MODEL),
         "endpoint": endpoint or os.environ.get("VSR_SEEDANCE_ENDPOINT", DEFAULT_ENDPOINT),
         "api_key": _api_key(),
+    }
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    normalized = value.strip().lower()
+    if normalized in TRUTHY:
+        return True
+    if normalized in FALSY:
+        return False
+    raise SeedanceRunnerError(
+        f"{name} must be a boolean value such as true/false, 1/0, yes/no, or on/off"
+    )
+
+
+def resolve_generation_options(
+    *,
+    platform: str,
+    ratio: str | None = None,
+    duration: str | int | None = None,
+    resolution: str | None = None,
+    generate_audio: bool | None = None,
+    watermark: bool | None = None,
+) -> dict[str, Any]:
+    default_ratio = DEFAULT_RATIOS.get(platform, DEFAULT_RATIO)
+    duration_value = (
+        duration
+        if duration is not None
+        else os.environ.get("VSR_SEEDANCE_DURATION", DEFAULT_DURATION)
+    )
+    try:
+        parsed_duration = int(duration_value)
+    except (TypeError, ValueError) as exc:
+        raise SeedanceRunnerError("Seedance duration must be an integer number of seconds") from exc
+    if parsed_duration <= 0:
+        raise SeedanceRunnerError("Seedance duration must be greater than zero")
+
+    return {
+        "ratio": ratio or os.environ.get("VSR_SEEDANCE_RATIO", default_ratio),
+        "duration": parsed_duration,
+        "resolution": resolution or os.environ.get("VSR_SEEDANCE_RESOLUTION", DEFAULT_RESOLUTION),
+        "generate_audio": (
+            generate_audio
+            if generate_audio is not None
+            else _env_bool("VSR_SEEDANCE_GENERATE_AUDIO", DEFAULT_GENERATE_AUDIO)
+        ),
+        "watermark": (
+            watermark
+            if watermark is not None
+            else _env_bool("VSR_SEEDANCE_WATERMARK", DEFAULT_WATERMARK)
+        ),
     }
 
 
@@ -271,19 +341,6 @@ def compose_prompt(
 
     if platform == "vertical-video" and "no subtitles" not in prompt.lower():
         prompt = f"{prompt}\n\n{NO_SUBTITLE_POLICY}"
-
-    default_ratio = DEFAULT_RATIOS.get(platform, DEFAULT_RATIO)
-    ratio = ratio or os.environ.get("VSR_SEEDANCE_RATIO", default_ratio)
-    duration = duration or os.environ.get("VSR_SEEDANCE_DURATION", DEFAULT_DURATION)
-    flags: list[str] = []
-    if ratio and "--ratio" not in prompt:
-        flags.append(f"--ratio {ratio}")
-    if duration and "--dur" not in prompt and "--duration" not in prompt:
-        flags.append(f"--dur {duration}")
-    if seed is not None and "--seed" not in prompt:
-        flags.append(f"--seed {seed}")
-    if flags:
-        prompt = f"{prompt}\n\n{' '.join(flags)}"
     return prompt
 
 
@@ -347,6 +404,12 @@ def build_payload(
     *,
     model: str,
     image_urls: list[str],
+    ratio: str,
+    duration: int,
+    resolution: str,
+    generate_audio: bool,
+    watermark: bool,
+    seed: int | None = None,
     callback_url: str | None = None,
     return_last_frame: bool = False,
     image_role: str | None = None,
@@ -358,7 +421,22 @@ def build_payload(
             item["role"] = image_role
         content.append(item)
 
-    payload: dict[str, Any] = {"model": model, "content": content}
+    payload: dict[str, Any] = {
+        "model": model,
+        "content": content,
+        "ratio": ratio,
+        "duration": duration,
+        "resolution": resolution,
+        "generate_audio": generate_audio,
+        "watermark": watermark,
+    }
+    if seed is not None and not _supports_seed(model):
+        raise SeedanceRunnerError(
+            "Seedance 2.0 does not support --seed; remove --seed or override --model "
+            "to a Seedance model that supports seed"
+        )
+    if seed is not None:
+        payload["seed"] = seed
     if callback_url:
         payload["callback_url"] = callback_url
     if return_last_frame:
@@ -434,6 +512,9 @@ def run_seedance_video(
     endpoint: str | None = None,
     ratio: str | None = None,
     duration: str | None = None,
+    resolution: str | None = None,
+    generate_audio: bool | None = None,
+    watermark: bool | None = None,
     seed: int | None = None,
     callback_url: str | None = None,
     return_last_frame: bool = False,
@@ -457,6 +538,15 @@ def run_seedance_video(
     if not asset_ids:
         raise SeedanceRunnerError("Manifest does not contain storyboard assets")
 
+    config = resolve_config(model=model, endpoint=endpoint)
+    options = resolve_generation_options(
+        platform=platform,
+        ratio=ratio,
+        duration=duration,
+        resolution=resolution,
+        generate_audio=generate_audio,
+        watermark=watermark,
+    )
     base_prompt, prompt_path = load_prompt(run, prompt=prompt, prompt_file=prompt_file)
     final_prompt = compose_prompt(
         run,
@@ -466,7 +556,6 @@ def run_seedance_video(
         duration=duration,
         seed=seed,
     )
-    config = resolve_config(model=model, endpoint=endpoint)
     if not dry_run:
         _validate_storyboard_ready(run, data, platform, asset_ids)
     selected_urls = select_image_urls(
@@ -477,13 +566,22 @@ def run_seedance_video(
         include_all_frames=include_all_frames,
         allow_data_url=allow_data_url,
     )
+    effective_image_role = image_role
+    if effective_image_role is None and include_all_frames:
+        effective_image_role = "reference_image"
     payload = build_payload(
         final_prompt,
         model=config["model"],
         image_urls=selected_urls,
+        ratio=options["ratio"],
+        duration=options["duration"],
+        resolution=options["resolution"],
+        generate_audio=options["generate_audio"],
+        watermark=options["watermark"],
+        seed=seed,
         callback_url=callback_url,
         return_last_frame=return_last_frame,
-        image_role=image_role,
+        image_role=effective_image_role,
     )
     redacted_payload = _redact_payload(payload)
     if dry_run:
@@ -491,12 +589,16 @@ def run_seedance_video(
             "endpoint": config["endpoint"],
             "api_key_set": bool(config.get("api_key")),
             "image_count": len(selected_urls),
+            "generation": options,
             "payload": redacted_payload,
         }
 
     api_key = config.get("api_key")
     if not api_key:
-        raise SeedanceRunnerError("ARK_API_KEY or VSR_SEEDANCE_API_KEY is not set")
+        raise SeedanceRunnerError(
+            "Set BYTEPLUS_ARK_API_KEY, BYTEPLUS_API_KEY, VSR_SEEDANCE_API_KEY, "
+            "ARK_API_KEY, or SEEDANCE_API_KEY in .env.local or the local environment"
+        )
 
     raw_dir = run / "raw"
     qa_dir = run / "qa"
@@ -519,6 +621,7 @@ def run_seedance_video(
             "endpoint": config["endpoint"],
             "prompt_path": prompt_path,
             "image_count": len(selected_urls),
+            "generation": options,
         },
     )
 
@@ -562,6 +665,7 @@ def run_seedance_video(
         "status": "succeeded",
         "prompt_path": prompt_path,
         "image_count": len(selected_urls),
+        "generation": options,
         "video_url": url,
         "output": relative_output,
         "usage": final_response.get("usage", {}),
@@ -576,6 +680,7 @@ def run_seedance_video(
             "output": relative_output,
             "qa_path": "qa/seedance-video.json",
             "usage": final_response.get("usage", {}),
+            "generation": options,
         },
     )
     return ledger
@@ -608,6 +713,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--endpoint")
     parser.add_argument("--ratio")
     parser.add_argument("--duration")
+    parser.add_argument("--resolution")
+    audio = parser.add_mutually_exclusive_group()
+    audio.add_argument("--generate-audio", dest="generate_audio", action="store_true", default=None)
+    audio.add_argument("--no-generate-audio", dest="generate_audio", action="store_false")
+    watermark = parser.add_mutually_exclusive_group()
+    watermark.add_argument("--watermark", dest="watermark", action="store_true", default=None)
+    watermark.add_argument("--no-watermark", dest="watermark", action="store_false")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--callback-url")
     parser.add_argument("--return-last-frame", action="store_true")
@@ -633,6 +745,9 @@ def main(argv: list[str] | None = None) -> int:
             endpoint=args.endpoint,
             ratio=args.ratio,
             duration=args.duration,
+            resolution=args.resolution,
+            generate_audio=args.generate_audio,
+            watermark=args.watermark,
             seed=args.seed,
             callback_url=args.callback_url,
             return_last_frame=args.return_last_frame,

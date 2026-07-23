@@ -58,11 +58,15 @@ shot-list, GPT Image 2 page prompts, 1080x1920 vertical storyboard frames,
 Seedance prompt, and manifest. Seedance task creation must also happen from the user's local terminal
 via `scripts/run_seedance_video.py`, not directly from the Codex environment.
 Load `references/seedance-video.md` before composing the handoff. The runner
-uses Volcengine Ark by default, reads `ARK_API_KEY` or `VSR_SEEDANCE_API_KEY`
-from `.env.local` or the local environment, creates an async video task, polls
-it, downloads `content.video_url`, and writes `generated/seedance-video.mp4`.
+uses BytePlus ModelArk Seedance 2.0 by default, reads `BYTEPLUS_ARK_API_KEY`,
+`BYTEPLUS_API_KEY`, `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, or
+`SEEDANCE_API_KEY` from `.env.local` or the local environment, creates an async
+video task, polls it, downloads `content.video_url`, and writes
+`generated/seedance-video.mp4`.
 For this route, the required publishing ratio is vertical short-video `9:16`,
-and any script, platform caption, or voiceover plan should be natural English.
+the default request is `1080p` with `generate_audio: true` and
+`watermark: false`, and any script, platform caption, or voiceover plan should
+be natural English.
 Do not place subtitles, captions, title cards, lower-thirds, labels, or any
 on-screen text in the generated storyboard frames or final video; the rule is
 no visible text. Voiceover and natural
