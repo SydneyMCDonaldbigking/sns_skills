@@ -9,7 +9,7 @@ Follow the workflow below. Load only the reference files required by the detecte
 
 ## Intake
 
-Read `brand-profile.md` before asking intake questions. Reuse every completed
+Read `brand-profile.md` and `references/brand-region-assets.md` before asking intake questions. Reuse every completed
 field. Ask for brand or product only when their values remain `未填写`; infer
 other missing fields and label the assumptions. Current-task user input always
 overrides the profile.
@@ -75,6 +75,10 @@ Use the fixed cooking-video structure: ingredient/product close-ups, cooking
 process, then plated finished dish with company table sign, logo prop, or
 packaging. Company branding may appear only as a real physical prop in frame 01
 and frame 09, never as a screen subtitle, sticker, overlay, or ad banner.
+For English-region deliverables, that physical prop must use the `ASIAN GROCER
+ONLINE` lockup with small `powered by UMALL`, from
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`. Do not
+use the Chinese-region UMALL logo for English videos or English carousels.
 
 For a Seedance dry run:
 
@@ -302,7 +306,9 @@ lighting, and typography across the group.
 For `vertical-video`, override the general image-text rule: every storyboard
 prompt must say no visible text, no subtitles, no title cards, no lower-thirds,
 and no ingredient labels. Company logos/signage/packaging may appear only as
-real physical props in the scene.
+real physical props in the scene. For English-region output, use the `ASIAN
+GROCER ONLINE` physical prop with `powered by UMALL`; reserve the Chinese-region
+UMALL logo for Chinese-region or Chinese Xiaohongshu deliverables.
 
 For carousel output, instruct the user to run the local API-only runner:
 

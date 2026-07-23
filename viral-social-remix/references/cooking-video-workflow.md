@@ -44,6 +44,14 @@ scene: a table sign, printed logo prop, product packaging, apron patch, or
 similar physical item. Do not turn the logo into a screen subtitle, floating
 sticker, overlay, or ad banner.
 
+For English-region cooking videos, the physical brand prop must use the
+`ASIAN GROCER ONLINE` lockup with small `powered by UMALL`, from
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
+Do not use the Chinese-region UMALL logo in English-region videos. The logo's
+real printed lockup is allowed only as part of the physical prop; no added
+subtitles, ingredient labels, title cards, lower-thirds, stickers, or screen
+text are allowed.
+
 ## Storyboard Image Prompt Rules
 
 Each `analysis/page-prompts/page-XX.md` prompt should specify vertical
