@@ -24,12 +24,25 @@ import scan_media
 import validate_output
 
 
-PLATFORMS = {"xiaohongshu", "instagram-facebook", "video"}
+VIDEO_PLATFORMS = {"video", "vertical-video"}
+PLATFORMS = {"xiaohongshu", "instagram-facebook"} | VIDEO_PLATFORMS
 DEFAULT_SIZES = {
     "xiaohongshu": "1152x1536",
     "instagram-facebook": "1152x1152",
     "video": "1920x1080",
+    "vertical-video": "1080x1920",
 }
+FIXED_COOKING_SHOTS = [
+    "01 Ingredient, seasoning, and product close-up on a clean prep table; company logo/signage or packaging may appear only as a real physical prop.",
+    "02 Main ingredient prep or cutting.",
+    "03 Cookware, hot oil, and aromatics starting.",
+    "04 Main ingredient goes into the pan.",
+    "05 Core cooking action: stir-fry, sear, simmer, or boil.",
+    "06 Seasoning, sauce, or product is added to show the flavor mechanism.",
+    "07 Doneness and texture close-up proving the dish is appetizing.",
+    "08 Plating process.",
+    "09 Finished dish hero shot with company table sign, logo prop, or packaging beside it; no visible subtitles or on-screen text.",
+]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -140,16 +153,16 @@ def collect_media(path: str | Path) -> list[Path]:
 def _validate_media_for_platform(files: list[Path], platform: str) -> None:
     has_image = any(path.suffix.lower() in scan_media.IMAGE_EXTENSIONS for path in files)
     has_video = any(path.suffix.lower() in scan_media.VIDEO_EXTENSIONS for path in files)
-    if platform == "video" and not has_video:
+    if platform in VIDEO_PLATFORMS and not has_video:
         raise ValueError("Video platform requires at least one video file")
-    if platform != "video" and has_video:
+    if platform not in VIDEO_PLATFORMS and has_video:
         raise ValueError("Image carousel platforms do not accept video files")
-    if platform != "video" and not has_image:
+    if platform not in VIDEO_PLATFORMS and not has_image:
         raise ValueError("Image carousel platforms require image files")
 
 
 def _asset_ids(platform: str, files: list[Path]) -> list[str]:
-    count = 9 if platform == "video" else len(files)
+    count = 9 if platform in VIDEO_PLATFORMS else len(files)
     return [f"{index:02d}" for index in range(1, count + 1)]
 
 
@@ -162,6 +175,10 @@ def _caption_language(platform: str, value: str | None) -> str:
 def _write_if_missing(path: Path, text: str) -> None:
     if not path.exists():
         path.write_text(text, encoding="utf-8")
+
+
+def fixed_cooking_shot_list() -> str:
+    return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
 
 
 def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[str]:
@@ -195,6 +212,12 @@ def _create_run_layout(run_dir: Path, platform: str, caption_language: str | Non
     _write_if_missing(analysis / "copy.md", "# Copy\n\nTODO\n")
     _write_if_missing(analysis / "prompts.md", "# Prompts\n\nTODO\n")
     _write_if_missing(analysis / f"caption-{language}.txt", "TODO\n")
+    if platform == "vertical-video":
+        _write_if_missing(analysis / "shot-list.md", fixed_cooking_shot_list())
+        _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
+    elif platform in VIDEO_PLATFORMS:
+        _write_if_missing(analysis / "shot-list.md", "# Shot List\n\nTODO\n")
+        _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
 
 
 def _task_name_for_url(url: str) -> str:
@@ -272,6 +295,57 @@ def prepare_run(
             "kind": "local_folder" if source.is_dir() else "local_file",
             "paths": copied_sources,
             "url": None,
+        },
+        provider=image_provider.resolve(),
+    )
+    return run_dir
+
+
+def _read_brief(brief: str | None, brief_file: str | Path | None) -> tuple[str, str | None]:
+    if brief and brief_file:
+        raise ValueError("Use either --brief or --brief-file, not both")
+    if brief_file:
+        path = Path(brief_file)
+        if not path.is_file():
+            raise ValueError(f"Brief file does not exist: {path}")
+        text = path.read_text(encoding="utf-8").strip()
+        if not text:
+            raise ValueError(f"Brief file is empty: {path}")
+        return text, str(path.resolve())
+    if brief and brief.strip():
+        return brief.strip(), None
+    raise ValueError("Original video preparation requires --brief or --brief-file")
+
+
+def prepare_original_video_run(
+    *,
+    brief: str | None = None,
+    brief_file: str | Path | None = None,
+    platform: str = "vertical-video",
+    output_root: str | Path = "output",
+    task_name: str | None = None,
+    caption_language: str | None = None,
+) -> Path:
+    if platform not in VIDEO_PLATFORMS:
+        raise ValueError(f"Original video platform must be one of: {', '.join(sorted(VIDEO_PLATFORMS))}")
+    brief_text, brief_source = _read_brief(brief, brief_file)
+    name = task_name or _safe_stem(brief_text.splitlines()[0][:48])
+    run_dir = create_run_dir.create(output_root, name)
+    _create_run_layout(run_dir, platform, caption_language)
+
+    (run_dir / "analysis" / "brief.md").write_text(
+        f"# Brief\n\n{brief_text}\n",
+        encoding="utf-8",
+    )
+    manifest.create(
+        run_dir / "analysis" / "manifest.json",
+        platform,
+        _asset_ids(platform, []),
+        source={
+            "kind": "original_brief",
+            "paths": [brief_source] if brief_source else [],
+            "url": None,
+            "brief_path": "analysis/brief.md",
         },
         provider=image_provider.resolve(),
     )
@@ -356,6 +430,19 @@ def cmd_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prepare_original_video(args: argparse.Namespace) -> int:
+    run_dir = prepare_original_video_run(
+        brief=args.brief,
+        brief_file=args.brief_file,
+        platform=args.platform,
+        output_root=args.output_root,
+        task_name=args.task_name,
+        caption_language=args.caption_language,
+    )
+    print(json.dumps({"run_dir": str(run_dir)}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     result = validate_run(
         args.run_dir,
@@ -409,6 +496,15 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--task-name")
     prepare.add_argument("--caption-language", choices=["zh", "en"])
     prepare.set_defaults(func=cmd_prepare)
+
+    original = subparsers.add_parser("prepare-original-video")
+    original.add_argument("--brief")
+    original.add_argument("--brief-file")
+    original.add_argument("--platform", choices=sorted(VIDEO_PLATFORMS), default="vertical-video")
+    original.add_argument("--output-root", default="output")
+    original.add_argument("--task-name")
+    original.add_argument("--caption-language", choices=["zh", "en"])
+    original.set_defaults(func=cmd_prepare_original_video)
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("run_dir")

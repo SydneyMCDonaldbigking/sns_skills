@@ -1,4 +1,4 @@
-"""Run OpenRouter carousel generation from a prepared local run directory.
+"""Run OpenRouter carousel or storyboard generation from a prepared run directory.
 
 This runner is intended to be executed in the user's own terminal. Codex should
 prepare the source package, copy, page prompts, and manifest, then hand off the
@@ -33,8 +33,20 @@ import openrouter_image
 import validate_output
 
 
-CAROUSEL_PLATFORMS = {"xiaohongshu", "instagram-facebook"}
+STORYBOARD_PLATFORMS = {"video", "vertical-video"}
+SUPPORTED_PLATFORMS = {"xiaohongshu", "instagram-facebook"} | STORYBOARD_PLATFORMS
 MAX_CONCURRENCY = 2
+VIDEO_STORYBOARD_LABELS = [
+    "Hook",
+    "Setup",
+    "Pain",
+    "Product",
+    "Mechanism",
+    "Benefit",
+    "Proof",
+    "Result",
+    "CTA",
+]
 
 
 class CarouselRunnerError(RuntimeError):
@@ -60,10 +72,10 @@ def _resolve_run_path(run_dir: Path, value: str | Path) -> Path:
 
 
 def _expected_size(platform: str) -> tuple[int, int]:
-    if platform not in CAROUSEL_PLATFORMS:
+    if platform not in SUPPORTED_PLATFORMS:
         raise CarouselRunnerError(
-            f"run_openrouter_carousel.py supports only carousel platforms: "
-            f"{', '.join(sorted(CAROUSEL_PLATFORMS))}"
+            f"run_openrouter_carousel.py supports only: "
+            f"{', '.join(sorted(SUPPORTED_PLATFORMS))}"
         )
     return validate_output.DIMENSIONS[platform]
 
@@ -142,12 +154,24 @@ def _prompt_path(run_dir: Path, asset_id: str) -> Path:
     raise CarouselRunnerError(f"Missing page prompt for asset {asset_id}: {expected}")
 
 
+def _is_placeholder(text: str) -> bool:
+    cleaned = "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    ).strip()
+    return not cleaned or cleaned.upper() == "TODO"
+
+
 def _read_prompt(run_dir: Path, asset_id: str) -> tuple[Path, str]:
     path = _prompt_path(run_dir, asset_id)
     text = path.read_text(encoding="utf-8").strip()
-    if not text or text == "TODO":
+    if _is_placeholder(text):
         raise CarouselRunnerError(f"Page prompt is empty or TODO: {path}")
     return path, text
+
+
+def _preflight_storyboard_prompts(run_dir: Path, asset_ids: list[str]) -> None:
+    for asset_id in asset_ids:
+        _read_prompt(run_dir, asset_id)
 
 
 def _list_from_value(value: Any) -> list[str]:
@@ -388,13 +412,44 @@ def _generate_page(
         raise
 
 
-def _finalize_run(run_dir: Path, platform: str, asset_ids: list[str]) -> dict[str, Any]:
+def _storyboard_labels(data: dict[str, Any], asset_ids: list[str]) -> list[str]:
+    labels: list[str] = []
+    for index, asset_id in enumerate(asset_ids):
+        asset = data.get("assets", {}).get(asset_id, {})
+        default_label = (
+            VIDEO_STORYBOARD_LABELS[index]
+            if index < len(VIDEO_STORYBOARD_LABELS)
+            else asset_id
+        )
+        label = (
+            asset.get("narrative_role")
+            or asset.get("shot_role")
+            or asset.get("label")
+            or default_label
+        )
+        labels.append(str(label))
+    return labels
+
+
+def _finalize_run(
+    run_dir: Path,
+    platform: str,
+    asset_ids: list[str],
+    manifest_data: dict[str, Any],
+) -> dict[str, Any]:
     generated = [_generated_path(run_dir, asset_id) for asset_id in asset_ids]
     if all(path.is_file() for path in generated):
-        make_contact_sheet.make_carousel(
-            generated,
-            run_dir / "overview" / "contact-sheet.png",
-        )
+        if platform in STORYBOARD_PLATFORMS:
+            make_contact_sheet.make_storyboard(
+                generated,
+                run_dir / "overview" / "contact-sheet.png",
+                _storyboard_labels(manifest_data, asset_ids),
+            )
+        else:
+            make_contact_sheet.make_carousel(
+                generated,
+                run_dir / "overview" / "contact-sheet.png",
+            )
 
     validation_path = run_dir / "qa" / "validation.json"
     validation_path.parent.mkdir(parents=True, exist_ok=True)
@@ -455,6 +510,13 @@ def run_carousel(
     asset_ids = list(data.get("assets", {}).keys())
     if not asset_ids:
         raise CarouselRunnerError("Manifest does not contain carousel assets")
+    if platform in STORYBOARD_PLATFORMS and len(asset_ids) != 9:
+        raise CarouselRunnerError(
+            f"{platform} storyboard requires exactly 9 assets before API generation; "
+            f"found {len(asset_ids)}"
+        )
+    if platform in STORYBOARD_PLATFORMS:
+        _preflight_storyboard_prompts(run, asset_ids)
 
     config = openrouter_image.resolve_generation_config(model=model, quality=quality)
     ledger = _new_cost_ledger(run, config)
@@ -551,7 +613,7 @@ def run_carousel(
     if errors:
         raise CarouselRunnerError(f"Generation finished with {len(errors)} error(s)")
 
-    validation = _finalize_run(run, platform, asset_ids)
+    validation = _finalize_run(run, platform, asset_ids, manifest.load(manifest_path))
     ledger["validation"] = validation
     _write_json(cost_path, ledger)
     return {
@@ -573,7 +635,7 @@ def run_carousel(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a prepared viral-social-remix carousel via OpenRouter."
+        description="Generate a prepared viral-social-remix carousel/storyboard via OpenRouter."
     )
     parser.add_argument("--run", required=True, help="Prepared output run directory.")
     parser.add_argument(

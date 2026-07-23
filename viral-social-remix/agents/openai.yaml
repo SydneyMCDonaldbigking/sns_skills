@@ -1,4 +1,4 @@
 interface:
   display_name: "Viral Social Remix"
-  short_description: "Remix viral posts into branded social assets"
-  default_prompt: "Use $viral-social-remix to analyze this viral media and create a platform-ready branded remix."
+  short_description: "Remix viral posts and storyboard cooking videos"
+  default_prompt: "Use $viral-social-remix to analyze this viral media or create a branded cooking storyboard video."

@@ -20,10 +20,12 @@ def _cover(image: Image.Image, size: tuple[int, int]) -> Image.Image:
 def make_storyboard(inputs, output, labels) -> None:
     if len(inputs) != 9 or len(labels) != 9:
         raise ValueError("Storyboard requires exactly 9 images and 9 labels")
-    canvas = Image.new("RGB", (1920, 1080), "#111111")
+    with Image.open(inputs[0]) as first:
+        canvas_size = (1080, 1920) if first.height > first.width else (1920, 1080)
+    canvas = Image.new("RGB", canvas_size, "#111111")
     draw = ImageDraw.Draw(canvas)
     font = ImageFont.load_default(size=20)
-    cell_w, cell_h, label_h = 640, 360, 38
+    cell_w, cell_h, label_h = canvas.width // 3, canvas.height // 3, 38
     for index, (path, label) in enumerate(zip(inputs, labels)):
         x, y = (index % 3) * cell_w, (index // 3) * cell_h
         with Image.open(path) as source:

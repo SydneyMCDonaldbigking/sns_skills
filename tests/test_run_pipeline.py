@@ -55,6 +55,39 @@ def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
     assert list(data["assets"]) == ["01", "02"]
 
 
+def test_prepare_original_video_run_creates_storyboard_skeleton(tmp_path: Path):
+    run_dir = pipeline.prepare_original_video_run(
+        brief="Brand: UMall. Dish: quick tomato egg stir fry.",
+        output_root=tmp_path / "output",
+        task_name="tomato-egg",
+    )
+
+    assert (run_dir / "analysis" / "brief.md").is_file()
+    assert (run_dir / "analysis" / "shot-list.md").is_file()
+    assert (run_dir / "analysis" / "seedance-prompt.md").is_file()
+    assert (run_dir / "analysis" / "caption-en.txt").is_file()
+    shot_list = (run_dir / "analysis" / "shot-list.md").read_text(encoding="utf-8")
+    assert "TODO" not in shot_list
+    for phrase in [
+        "01 Ingredient, seasoning, and product close-up",
+        "02 Main ingredient prep or cutting",
+        "03 Cookware, hot oil, and aromatics starting",
+        "04 Main ingredient goes into the pan",
+        "05 Core cooking action",
+        "06 Seasoning, sauce, or product is added",
+        "07 Doneness and texture close-up",
+        "08 Plating process",
+        "09 Finished dish hero shot with company table sign",
+    ]:
+        assert phrase in shot_list
+
+    data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
+    assert data["platform"] == "vertical-video"
+    assert data["source"]["kind"] == "original_brief"
+    assert data["source"]["brief_path"] == "analysis/brief.md"
+    assert list(data["assets"]) == [f"{index:02d}" for index in range(1, 10)]
+
+
 def test_prepare_url_run_downloads_direct_media_url(tmp_path: Path):
     requests = []
 

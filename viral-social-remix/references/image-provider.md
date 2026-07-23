@@ -11,6 +11,7 @@ Use this file when generating or retrying images for the remix workflow.
 - Xiaohongshu size: `1152x1536`
 - Instagram/Facebook size: `1152x1152`
 - Video storyboard size: `1920x1080`
+- English vertical cooking video storyboard size: `1080x1920`
 
 Allow local overrides with these environment variables:
 
@@ -42,6 +43,15 @@ The runner loads `OPENROUTER_API_KEY` only from `.env.local` or the local
 environment, caps concurrency at two requests, writes raw responses under
 `raw/`, generated PNGs under `generated/`, and cost metadata under
 `qa/openrouter-cost.json`.
+
+For original English vertical cooking videos, use the same GPT Image 2 path to generate
+exactly nine `1080x1920` storyboard frames before any Seedance call. The
+prepared video run uses `analysis/page-prompts/page-01.md` through `page-09.md`;
+the local runner writes `generated/page-01.png` through `page-09.png` and a
+vertical 3x3 storyboard overview.
+
+Seedance is a separate video handoff. Load `references/seedance-video.md` before
+running or instructing `scripts/run_seedance_video.py`.
 
 ## Request Defaults
 

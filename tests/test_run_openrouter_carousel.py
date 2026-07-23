@@ -39,9 +39,16 @@ def _prepared_run(tmp_path: Path, platform: str, assets: list[str]) -> Path:
     analysis = run_dir / "analysis"
     page_prompts = analysis / "page-prompts"
     page_prompts.mkdir(parents=True)
-    caption = "caption-zh.txt" if platform == "xiaohongshu" else "caption-en.txt"
+    caption = (
+        "caption-zh.txt"
+        if platform == "xiaohongshu"
+        else "caption-en.txt"
+    )
     for name in ["breakdown.md", "copy.md", "prompts.md", caption]:
         (analysis / name).write_text("fixture", encoding="utf-8")
+    if platform == "vertical-video":
+        for name in ["brief.md", "shot-list.md", "seedance-prompt.md"]:
+            (analysis / name).write_text("fixture", encoding="utf-8")
     for asset_id in assets:
         (page_prompts / f"page-{asset_id}.md").write_text(
             f"Prompt for {asset_id}",
@@ -133,6 +140,49 @@ def test_run_openrouter_carousel_normalizes_square_api_size(tmp_path, monkeypatc
     assert result["validation"]["valid"] is True
 
 
+def test_run_openrouter_carousel_generates_video_storyboard(tmp_path, monkeypatch):
+    run_dir = _prepared_run(tmp_path, "video", [f"{index:02d}" for index in range(1, 10)])
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    result = runner.run_carousel(
+        run_dir,
+        api_only=True,
+        concurrency=2,
+        request_fn=lambda payload, api_key, endpoint: _response((1920, 1080), cost=0.01),
+    )
+
+    assert (run_dir / "generated" / "page-01.png").is_file()
+    assert (run_dir / "generated" / "page-09.png").is_file()
+    assert (run_dir / "overview" / "contact-sheet.png").is_file()
+    with Image.open(run_dir / "overview" / "contact-sheet.png") as image:
+        assert image.size == (1920, 1080)
+    assert result["validation"]["valid"] is True
+
+
+def test_run_openrouter_carousel_generates_english_vertical_storyboard(tmp_path, monkeypatch):
+    run_dir = _prepared_run(
+        tmp_path,
+        "vertical-video",
+        [f"{index:02d}" for index in range(1, 10)],
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    result = runner.run_carousel(
+        run_dir,
+        api_only=True,
+        concurrency=2,
+        request_fn=lambda payload, api_key, endpoint: _response((1080, 1920), cost=0.01),
+    )
+
+    assert (run_dir / "generated" / "page-01.png").is_file()
+    assert (run_dir / "generated" / "page-09.png").is_file()
+    with Image.open(run_dir / "generated" / "page-01.png") as image:
+        assert image.size == (1080, 1920)
+    with Image.open(run_dir / "overview" / "contact-sheet.png") as image:
+        assert image.size == (1080, 1920)
+    assert result["validation"]["valid"] is True
+
+
 def test_run_openrouter_carousel_skips_existing_correct_size_without_key(tmp_path, monkeypatch):
     run_dir = _prepared_run(tmp_path, "xiaohongshu", ["01"])
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -198,3 +248,52 @@ def test_run_openrouter_carousel_rejects_more_than_two_concurrent_requests(tmp_p
         assert "--concurrency must be 1 or 2" in str(exc)
     else:
         raise AssertionError("Expected concurrency validation error")
+
+
+def test_run_openrouter_storyboard_rejects_wrong_asset_count_before_request(
+    tmp_path,
+    monkeypatch,
+):
+    run_dir = _prepared_run(tmp_path, "vertical-video", ["01", "02"])
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    def fail_request(*args, **kwargs):
+        raise AssertionError("OpenRouter request should not run for invalid storyboard count")
+
+    try:
+        runner.run_carousel(run_dir, api_only=True, request_fn=fail_request)
+    except runner.CarouselRunnerError as exc:
+        assert "requires exactly 9 assets" in str(exc)
+    else:
+        raise AssertionError("Expected CarouselRunnerError")
+
+
+def test_run_openrouter_rejects_markdown_todo_prompt_before_request(
+    tmp_path,
+    monkeypatch,
+):
+    run_dir = _prepared_run(
+        tmp_path,
+        "vertical-video",
+        [f"{index:02d}" for index in range(1, 10)],
+    )
+    (run_dir / "analysis" / "page-prompts" / "page-01.md").write_text(
+        "# Prompt\n\nTODO\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    def fail_request(*args, **kwargs):
+        raise AssertionError("OpenRouter request should not run for TODO prompt")
+
+    try:
+        runner.run_carousel(
+            run_dir,
+            api_only=True,
+            concurrency=1,
+            request_fn=fail_request,
+        )
+    except runner.CarouselRunnerError as exc:
+        assert "Page prompt is empty or TODO" in str(exc)
+    else:
+        raise AssertionError("Expected CarouselRunnerError")

@@ -28,9 +28,10 @@ output/YYYYMMDD-HHmmss-<task>/
     └── openrouter-cost.json
 ```
 
-Only the platform-relevant caption is mandatory: `caption-zh.txt` for
-Xiaohongshu and `caption-en.txt` for Instagram/Facebook. Video uses the target
-publishing platform's caption language.
+Only the target-output caption is mandatory: `caption-en.txt` for Xiaohongshu
+source posts remixed into English, Instagram/Facebook, and English vertical
+videos; `caption-zh.txt` only for explicit Chinese Xiaohongshu target output.
+Video uses the target publishing platform's caption language.
 
 Manifest schema version `1` records source provenance, platform confidence,
 assumptions, provider configuration, and per-asset generation state.
@@ -41,7 +42,7 @@ Top-level fields:
 - `source`: `{ "kind": ..., "paths": [...], "url": ... }`. `kind` may be
   `local_file`, `local_folder`, `direct_url`, or `unknown`; direct URL inputs
   record `content_type` and byte count when downloaded.
-- `platform`: `xiaohongshu`, `instagram-facebook`, or `video`.
+- `platform`: `xiaohongshu`, `instagram-facebook`, `video`, or `vertical-video`.
 - `platform_confidence`: optional numeric confidence.
 - `assumptions`: inferred audience, setting, benefit, or theme notes.
 - `provider`: redacted provider metadata such as name, model, quality, endpoint,
@@ -73,3 +74,29 @@ writes `raw/page-XX-response.json`, `generated/page-XX.png`, and
 platform's exact dimensions are skipped and marked resumable. Put per-page local
 reference assets in `assets[asset_id].reference_paths`; the runner also accepts
 the legacy `assets[asset_id].request.reference_images` field for existing runs.
+
+For original English vertical cooking video runs, use platform `vertical-video`
+with exactly nine vertical assets. Additional video-prep files:
+
+- `analysis/brief.md`: user/product/recipe brief.
+- `analysis/shot-list.md`: the nine ordered cooking beats.
+- `analysis/seedance-prompt.md`: one final motion prompt for Seedance.
+- `analysis/caption-en.txt`: platform post caption only, not video subtitles.
+- `analysis/page-prompts/page-01.md` through `page-09.md`: GPT Image 2 storyboard prompts.
+- `generated/page-01.png` through `page-09.png`: `1080x1920` storyboard frames.
+- `overview/contact-sheet.png`: 3x3 storyboard overview.
+
+After Seedance handoff, store:
+
+- `raw/seedance-create-request.json`: redacted request payload.
+- `raw/seedance-create-response.json`: task creation response.
+- `raw/seedance-status.json`: latest task status response.
+- `generated/seedance-video.mp4`: downloaded generated video.
+- `qa/seedance-video.json`: task id, provider metadata, output path, usage, and final response.
+
+The manifest may include top-level `video_generation` with `status`, `task_id`,
+`model`, `endpoint`, `prompt_path`, `image_count`, `output`, `qa_path`, `usage`,
+and `last_error`. Store storyboard image URLs on per-asset `storyboard_url` when
+the Seedance runner should use URLs from the manifest instead of `--image-url`.
+The video itself must not contain subtitles or on-screen text; voiceover and
+natural cooking audio are allowed when supported.

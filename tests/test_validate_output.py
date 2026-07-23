@@ -29,3 +29,73 @@ def test_video_delivery_requires_nine_frames_and_english_caption(tmp_path):
     result = validation.validate_delivery(tmp_path, "video", caption_language="en")
     assert "exactly 9 generated frames" in result["errors"]
     assert any("caption-en.txt" in error for error in result["errors"])
+
+
+def test_vertical_video_delivery_uses_english_caption_and_vertical_dimensions(tmp_path):
+    generated = tmp_path / "generated"
+    analysis = tmp_path / "analysis"
+    page_prompts = analysis / "page-prompts"
+    overview = tmp_path / "overview"
+    qa = tmp_path / "qa"
+    generated.mkdir()
+    analysis.mkdir()
+    page_prompts.mkdir()
+    overview.mkdir()
+    qa.mkdir()
+    for name in [
+        "breakdown.md",
+        "copy.md",
+        "caption-en.txt",
+        "prompts.md",
+        "brief.md",
+        "shot-list.md",
+        "seedance-prompt.md",
+    ]:
+        (analysis / name).write_text("fixture", encoding="utf-8")
+    for index in range(1, 10):
+        (page_prompts / f"page-{index:02d}.md").write_text(
+            "fixture",
+            encoding="utf-8",
+        )
+    (analysis / "manifest.json").write_text(
+        '{"assets":{"01":{"status":"pending"}}}',
+        encoding="utf-8",
+    )
+    (overview / "contact-sheet.png").write_text("fixture", encoding="utf-8")
+    (qa / "validation.json").write_text("{}", encoding="utf-8")
+    for index in range(1, 10):
+        Image.new("RGB", (1080, 1920)).save(generated / f"page-{index:02d}.png")
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("manifest contains incomplete assets" in error for error in result["errors"])
+    assert not any("caption-zh.txt" in error for error in result["errors"])
+
+
+def test_vertical_video_delivery_requires_handoff_files(tmp_path):
+    generated = tmp_path / "generated"
+    analysis = tmp_path / "analysis"
+    overview = tmp_path / "overview"
+    qa = tmp_path / "qa"
+    generated.mkdir()
+    analysis.mkdir()
+    overview.mkdir()
+    qa.mkdir()
+    for name in ["breakdown.md", "copy.md", "caption-en.txt", "prompts.md"]:
+        (analysis / name).write_text("fixture", encoding="utf-8")
+    (analysis / "manifest.json").write_text(
+        '{"assets":{"01":{"status":"validated"}}}',
+        encoding="utf-8",
+    )
+    (overview / "contact-sheet.png").write_text("fixture", encoding="utf-8")
+    (qa / "validation.json").write_text("{}", encoding="utf-8")
+    for index in range(1, 10):
+        Image.new("RGB", (1080, 1920)).save(generated / f"page-{index:02d}.png")
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert any("brief.md" in error for error in result["errors"])
+    assert any("shot-list.md" in error for error in result["errors"])
+    assert any("seedance-prompt.md" in error for error in result["errors"])
+    assert any("page-prompts" in error for error in result["errors"])

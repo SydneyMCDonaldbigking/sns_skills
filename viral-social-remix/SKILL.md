@@ -1,6 +1,6 @@
 ---
 name: viral-social-remix
-description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or nine-frame video storyboard remix.
+description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or nine-frame video storyboard remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made from GPT Image 2 storyboard frames and a Seedance video API handoff.
 ---
 
 # Viral Social Remix
@@ -14,10 +14,13 @@ field. Ask for brand or product only when their values remain `未填写`; infer
 other missing fields and label the assumptions. Current-task user input always
 overrides the profile.
 
-Accept a public post URL, logged-in browser tab, local file, or local folder.
+Accept a public post URL, logged-in browser tab, local file, local folder, or
+original cooking/recipe brief.
 For a local folder, run `scripts/scan_media.py`, show the discovered task list,
 and process each valid group independently. Inspect every local image before
-analysis. Product and brand are mandatory. Infer audience, setting, benefits,
+analysis. Product and brand are mandatory. For original cooking videos, also
+infer or ask for the dish/recipe, core ingredient sequence, target platform,
+duration, and aspect ratio. Infer audience, setting, benefits,
 and theme; label those assumptions. Ask only for missing mandatory fields or low-confidence platform.
 
 Do not ask again for values already supplied. A user's explicit platform always
@@ -49,6 +52,37 @@ the run preparation and output the exact local command for the user to run:
 Only stop before handoff for a real blocker: missing mandatory brand/product
 data, inaccessible logged-in source page, unreadable local source files, or an
 incomplete run directory that cannot be fixed locally.
+
+For original English vertical cooking video generation, Codex prepares the recipe brief,
+shot-list, GPT Image 2 page prompts, 1080x1920 vertical storyboard frames,
+Seedance prompt, and manifest. Seedance task creation must also happen from the user's local terminal
+via `scripts/run_seedance_video.py`, not directly from the Codex environment.
+Load `references/seedance-video.md` before composing the handoff. The runner
+uses Volcengine Ark by default, reads `ARK_API_KEY` or `VSR_SEEDANCE_API_KEY`
+from `.env.local` or the local environment, creates an async video task, polls
+it, downloads `content.video_url`, and writes `generated/seedance-video.mp4`.
+For this route, the required publishing ratio is vertical short-video `9:16`,
+and any script, platform caption, or voiceover plan should be natural English.
+Do not place subtitles, captions, title cards, lower-thirds, labels, or any
+on-screen text in the generated storyboard frames or final video; the rule is
+no visible text. Voiceover and natural
+cooking audio are allowed when the selected Seedance model supports audio.
+Use the fixed cooking-video structure: ingredient/product close-ups, cooking
+process, then plated finished dish with company table sign, logo prop, or
+packaging. Company branding may appear only as a real physical prop in frame 01
+and frame 09, never as a screen subtitle, sticker, overlay, or ad banner.
+
+For a Seedance dry run:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --image-url https://example.com/storyboard-frame-01.png --dry-run
+```
+
+For production:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --image-url https://example.com/storyboard-frame-01.png
+```
 
 ## Source capture
 
@@ -124,16 +158,27 @@ python viral-social-remix/scripts/capture_source_package.py capture.json --outpu
 
 ## Route
 
-Infer platform from source domain, page metadata, media dimensions, language,
-UI traces, and folder naming. Load `references/platform-profiles.md`, then load
-the relevant fields from `references/breakdown-schema.md`.
+Infer source platform and target output platform separately. Source domain,
+page metadata, media dimensions, language, UI traces, and folder naming identify
+the capture workflow; they do not automatically decide the output language or
+publishing target. Load `references/platform-profiles.md`, then load the
+relevant fields from `references/breakdown-schema.md`.
 
-- Xiaohongshu: preserve source page count, use Chinese, output 1152×1536
-  vertical assets by default; 1080×1440 is acceptable when explicitly requested.
-- Instagram/Facebook: preserve source page count, use natural English, output
-  1152×1152.
+- Xiaohongshu source to English carousel: when the user says English, overseas,
+  搬运, translate, localize, Instagram, or Facebook, treat Xiaohongshu as the
+  source platform only. Preserve the source page count, use natural English,
+  output 1152x1152, and write `caption-en.txt`.
+- Xiaohongshu target carousel: use Chinese, 1152×1536, and `caption-zh.txt` only
+  when the user explicitly asks to publish on Xiaohongshu or produce Chinese
+  Xiaohongshu assets.
+- Instagram/Facebook target carousel: preserve source page count, use natural
+  English, output 1152×1152, and write `caption-en.txt`.
 - Video: identify the target publishing platform and language, then produce a
   1920×1080 storyboard and 16:9 contact sheet.
+
+- Original cooking video: load `references/cooking-video-workflow.md`, use
+  platform `vertical-video`, produce exactly nine 1080x1920 storyboard frames with GPT
+  Image 2, then hand off to Seedance with `analysis/seedance-prompt.md`.
 
 ## Analyze
 
@@ -168,6 +213,19 @@ the candidates and select exactly nine timestamps mapped to Hook, setup, pain,
 product, mechanism, benefit, proof, result, and CTA. Export those selected
 frames. Do not treat evenly spaced candidates as the final narrative selection.
 
+For original cooking videos, do not run keyframe extraction. Load
+`references/cooking-video-workflow.md`. Build exactly nine frames with this
+fixed structure: 01 ingredient/seasoning/product close-up on a clean prep table
+with optional physical company logo/signage/packaging prop; 02 main ingredient
+prep or cutting; 03 cookware, hot oil, and aromatics starting; 04 main
+ingredient into the pan; 05 core cooking action; 06 seasoning/sauce/product
+added for flavor mechanism; 07 doneness/texture close-up; 08 plating process;
+09 finished dish hero shot with company table sign, logo prop, or packaging
+beside it and no visible subtitles or on-screen text. Record cooking state,
+motion intent, continuity anchors, product/brand cue, voiceover/audio plan, and
+text policy for each frame. Keep the same kitchen, cookware, dish, lighting,
+product packaging, and hand model across the whole storyboard.
+
 Preserve source composition, hierarchy, rhythm, and copy structure while
 replacing the product, brand, and specific expression.
 
@@ -188,6 +246,12 @@ brand reason.
 Run `scripts/create_run_dir.py` so each task writes to a new local-system-time
 directory. Follow `references/output-schema.md`; never overwrite a previous run.
 
+For original cooking videos, use the no-source preparation path:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_pipeline.py prepare-original-video --brief "brand/product/dish brief" --task-name vertical-cooking-video
+```
+
 Before generation, write:
 
 - `analysis/breakdown.md`
@@ -202,6 +266,15 @@ For video, write the caption file required by its target publishing platform.
 The caption must be ready to paste into the platform, including a hook, body,
 CTA, and relevant hashtags. Keep the Chinese natural for Xiaohongshu and the
 English natural for Instagram/Facebook.
+
+For Xiaohongshu source posts remixed into English, write `caption-en.txt`; do
+not write or require `caption-zh.txt` unless the target output is explicitly
+Chinese Xiaohongshu.
+
+For original cooking videos, also write `analysis/brief.md`,
+`analysis/shot-list.md`, and `analysis/seedance-prompt.md`. Put one GPT Image 2
+storyboard prompt in each `analysis/page-prompts/page-01.md` through
+`page-09.md`.
 
 When visible packaged products matter, load
 `references/product-reference-cache.md` and use cached or official SKU images
@@ -222,6 +295,11 @@ to local text overlay. Use each source page or selected source frame as a
 structural reference while locking product, packaging, recurring people, palette,
 lighting, and typography across the group.
 
+For `vertical-video`, override the general image-text rule: every storyboard
+prompt must say no visible text, no subtitles, no title cards, no lower-thirds,
+and no ingredient labels. Company logos/signage/packaging may appear only as
+real physical props in the scene.
+
 For carousel output, instruct the user to run the local API-only runner:
 
 ```powershell
@@ -233,6 +311,17 @@ The runner saves `raw/page-XX-response.json`, `generated/page-XX.png`, and
 already generated at the correct platform size, updates `analysis/manifest.json`,
 and stops on the first missing-page API failure when `--api-only` is set. There
 is no local-composite fallback in API-only mode.
+
+For English vertical storyboard output, use the same local runner on a platform `vertical-video`
+manifest:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+```
+
+It saves `generated/page-01.png` through `page-09.png` at 1080x1920 and writes a
+vertical 3x3 `overview/contact-sheet.png`. After visual review, load
+`references/seedance-video.md` and hand off to `scripts/run_seedance_video.py`.
 
 ## Validate and resume
 
@@ -247,6 +336,12 @@ carousel runner builds `overview/contact-sheet.png` and writes
 `qa/validation.json` automatically. On restart, read the manifest and skip
 assets already marked `validated` or already present at the correct generated
 size.
+
+For Seedance output, check `qa/seedance-video.json`, confirm
+`generated/seedance-video.mp4` exists, and visually review cooking continuity,
+food state changes, product/brand fidelity, unsafe actions, absence of
+subtitles/on-screen text, duration, aspect ratio, and platform fit. Voiceover is
+acceptable; burned-in subtitles are not.
 
 ## Boundaries and recovery
 
