@@ -149,6 +149,38 @@ def test_openrouter_video_can_send_extra_input_references_when_requested(
     assert len(result["payload"]["input_references"]) == 8
 
 
+def test_openrouter_video_can_choose_manifest_asset_as_first_frame(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_openrouter_video_env(tmp_path, monkeypatch)
+    run_dir = _prepared_video_run(tmp_path)
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    for index in range(1, 10):
+        data["assets"][f"{index:02d}"]["storyboard_url"] = (
+            f"https://cdn.example/frame-{index:02d}.png"
+        )
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    result = runner.run_openrouter_video(
+        run_dir,
+        dry_run=True,
+        first_frame_asset_id="04",
+        include_all_frames=True,
+        include_reference_images=True,
+    )
+
+    assert result["payload"]["frame_images"][0]["image_url"]["url"] == (
+        "https://cdn.example/frame-04.png"
+    )
+    reference_urls = [
+        item["image_url"]["url"] for item in result["payload"]["input_references"]
+    ]
+    assert "https://cdn.example/frame-01.png" in reference_urls
+    assert "https://cdn.example/frame-04.png" not in reference_urls
+
+
 def test_openrouter_video_submits_polls_downloads_and_updates_manifest(
     tmp_path,
     monkeypatch,

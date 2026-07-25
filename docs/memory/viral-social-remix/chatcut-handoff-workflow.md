@@ -252,6 +252,55 @@ Verification results:
 Do not store import session tokens, editor boot tokens, signed render-frame URLs,
 OAuth URLs, or authorization codes in this note.
 
+## Honey Butter Chicken ChatCut Finishing: 30fps Export Pitfall
+
+On 2026-07-25, the Grok honey butter chicken stitched source was:
+
+```text
+C:\Users\uryuu\Desktop\sns_skill\output\20260725-171158-honeybutter-chicken-grok-remake\generated\grok-honeybutter-chicken-stitched-15s-1080x1920-noaudio.mp4
+```
+
+ChatCut project:
+
+```text
+https://app.chatcut.io/editor/9c12cd52-d065-4136-849c-35ae0d5e2cb1?chatcutLaunchClient=codex_app&chatcutLaunchSurface=ext_browser
+```
+
+Final local export:
+
+```text
+C:\Users\uryuu\Downloads\honey-butter-chicken-chatcut-audio-labels-15s.mp4
+```
+
+Finishing choices:
+
+- Kept the generated MP4 as the only V1 video source.
+- Generated one tasteful no-vocal ChatCut BGM track and trimmed it to the
+  final video.
+- Generated one subtle 15s cooking Foley bed instead of many separate SFX.
+- Added editable white centered English label Motion Graphics on V2.
+- Used `Poppins`, white fill, light black stroke/shadow, and no colored box.
+
+Important pitfall:
+
+- The imported Grok source was `1080x1920`, `24fps`, `15.125s`, and `363`
+  source frames.
+- Creating/placing it as `363` frames and exporting from ChatCut produced a
+  wrong `12.08s` file, because the renderer treated the timeline frame time as
+  `30fps`.
+- For this run, the correct 15s export used a `30fps` export and `453`
+  renderable frames. The video item was stretched to `453` frames with
+  `playbackRate: 0.8013245033112583`, and the 15s Foley item was stretched to
+  `450` frames with `playbackRate: 0.8`.
+- Always run `ffprobe` on the downloaded export. Confirm `1080x1920`, duration
+  around the intended video length, and an AAC audio track before reporting done.
+
+Do not deliver the earlier 12s export from this run:
+
+```text
+C:\Users\uryuu\Downloads\honey-butter-chicken-chatcut-audio-labels.mp4
+```
+
 ## Troubleshooting Only: Install/Auth Recipe
 
 Use this section only if ChatCut disappears from the machine or authentication

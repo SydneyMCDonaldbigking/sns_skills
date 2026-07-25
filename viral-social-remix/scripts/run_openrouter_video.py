@@ -396,6 +396,18 @@ def _manifest_storyboard_urls(data: dict[str, Any], asset_ids: list[str]) -> lis
     return [url for url in urls if url]
 
 
+def _ordered_asset_ids(asset_ids: list[str], first_frame_asset_id: str | None) -> list[str]:
+    if not first_frame_asset_id:
+        return asset_ids
+    if first_frame_asset_id not in asset_ids:
+        raise OpenRouterVideoRunnerError(
+            f"First-frame asset id {first_frame_asset_id} is not in the manifest"
+        )
+    return [first_frame_asset_id] + [
+        asset_id for asset_id in asset_ids if asset_id != first_frame_asset_id
+    ]
+
+
 def select_image_urls(
     run_dir: Path,
     data: dict[str, Any],
@@ -404,10 +416,12 @@ def select_image_urls(
     image_urls: list[str] | None = None,
     include_all_frames: bool = False,
     allow_data_url: bool = False,
+    first_frame_asset_id: str | None = None,
 ) -> list[str]:
+    ordered_asset_ids = _ordered_asset_ids(asset_ids, first_frame_asset_id)
     urls = [url for url in image_urls or [] if url]
     if not urls:
-        urls = _manifest_storyboard_urls(data, asset_ids)
+        urls = _manifest_storyboard_urls(data, ordered_asset_ids)
     if urls:
         return urls if include_all_frames else urls[:1]
 
@@ -418,7 +432,7 @@ def select_image_urls(
             "--allow-data-url only for an experimental test."
         )
 
-    selected = asset_ids if include_all_frames else asset_ids[:1]
+    selected = ordered_asset_ids if include_all_frames else ordered_asset_ids[:1]
     data_urls: list[str] = []
     for asset_id in selected:
         path = _generated_path(run_dir, asset_id)
@@ -525,6 +539,7 @@ def run_openrouter_video(
     prompt: str | None = None,
     prompt_file: str | Path | None = None,
     image_urls: list[str] | None = None,
+    first_frame_asset_id: str | None = None,
     include_all_frames: bool = False,
     include_reference_images: bool = False,
     allow_data_url: bool = False,
@@ -571,6 +586,7 @@ def run_openrouter_video(
         data,
         asset_ids,
         image_urls=image_urls,
+        first_frame_asset_id=first_frame_asset_id,
         include_all_frames=include_all_frames,
         allow_data_url=allow_data_url,
     )
@@ -707,6 +723,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public or provider-accepted storyboard image URL. Repeat for references.",
     )
     parser.add_argument(
+        "--first-frame-asset-id",
+        help="Use this manifest asset id as the local/storyboard first frame when image URLs are read from the manifest or --allow-data-url.",
+    )
+    parser.add_argument(
         "--include-all-frames",
         action="store_true",
         help="Collect all storyboard URLs/frames. Grok's first_frame support still anchors only the first frame unless --include-reference-images is also used.",
@@ -744,6 +764,7 @@ def main(argv: list[str] | None = None) -> int:
             prompt=args.prompt,
             prompt_file=args.prompt_file,
             image_urls=args.image_url,
+            first_frame_asset_id=args.first_frame_asset_id,
             include_all_frames=args.include_all_frames,
             include_reference_images=args.include_reference_images,
             allow_data_url=args.allow_data_url,
