@@ -18,6 +18,11 @@ The output should feel like a real social cooking clip, not a slideshow. Keep
 food physics, heat, steam, oil, sauce thickness, utensil movement, and ingredient
 state changes plausible.
 
+The final storyboard files must be Douyin/TikTok vertical frames at
+`1080x1920`. If the image API cannot directly produce `1080x1920`, use only the
+video runner's portrait intermediate path and locally reframe to `1080x1920`.
+Do not reuse square carousel sizing for this video route.
+
 ## Nine-Frame Shot Map
 
 Use exactly nine storyboard frames unless the user explicitly asks for another

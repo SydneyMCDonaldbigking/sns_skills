@@ -1,11 +1,24 @@
 ---
 name: viral-social-remix
-description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or nine-frame video storyboard remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made from GPT Image 2 storyboard frames and a Seedance video API handoff.
+description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or nine-frame video storyboard remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made from GPT Image 2 storyboard frames and a Seedance or OpenRouter Grok video API handoff.
 ---
 
 # Viral Social Remix
 
 Follow the workflow below. Load only the reference files required by the detected platform and media type.
+
+## Local memory
+
+This repository is also an Obsidian vault. Before each task, read
+`docs/memory/viral-social-remix/index.md` after this skill file, then read any
+route-specific memory linked from that index. Treat those notes as persistent
+operator memory, but let explicit current-task user instructions override them.
+
+After a successful run, write `output/<run>/qa/run-notes.md` from
+`docs/memory/viral-social-remix/run-notes-template.md`. Distill reusable lessons
+back into `docs/memory/viral-social-remix/` or run
+`scripts/distill_memory.py --write`. Never store API keys, raw vendor responses,
+base64 payloads, source images, or generated images in the Obsidian notes.
 
 ## Intake
 
@@ -92,6 +105,20 @@ For production:
 .\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --image-url https://example.com/storyboard-frame-01.png
 ```
 
+For low-cost Grok/OpenRouter vertical video tests, load
+`references/openrouter-video.md` and use `scripts/run_openrouter_video.py`
+instead of the Seedance runner. This route is still video-only and must not
+change the carousel or Xiaohongshu image workflow. It reads
+`GROK_OPENROUTER_API_KEY`, then `VSR_OPENROUTER_VIDEO_API_KEY`,
+`OPENROUTER_VIDEO_API_KEY`, or `OPENROUTER_API_KEY` from `.env.local` or the
+local environment. Default test settings are model `x-ai/grok-imagine-video`,
+`9:16`, `720p`, `duration: 5`, and `generate_audio: false`. Start with a
+one-second smoke test when spend matters:
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_video.py --run output/xxx --allow-data-url --duration 1 --resolution 720p --ratio 9:16 --no-generate-audio --output generated/openrouter-grok-1s-test-720p.mp4
+```
+
 ## Source capture
 
 For Xiaohongshu, Instagram, or Facebook posts, treat a user-opened logged-in
@@ -120,6 +147,16 @@ example `1/9`) and preserve that count. Use page assets, visible DOM media URLs,
 or authenticated browser context to export media. If originals are blocked,
 save ordered screenshots of each slide and record the limitation in
 `metadata.json`; do not pretend the original files were downloaded.
+
+For Chinese Xiaohongshu 搬运/remix tasks, guard against source drift before
+analysis. If the user says the original post is already open, use that live tab
+first and capture the ordered source carousel before writing prompts. When the
+user supplies a phone screenshot and says it is for the final page, treat it as
+the final CTA/search/app reference only; do not use it as the main source for
+cover or list pages. Build a source contact sheet, inspect it visually, and map
+each generated page to a specific source page before preparing copy. Do not
+judge Chinese text quality from PowerShell console mojibake; verify Chinese via
+UTF-8 file reads, browser text, OCR, or visual image inspection.
 
 For speed and repeatability, export the browser-observed source data to a JSON
 file and run `scripts/capture_source_package.py`. For Xiaohongshu profile,
@@ -293,9 +330,12 @@ before image generation.
 Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
 the redacted provider defaults with `scripts/image_provider.py`, but do not call
 OpenRouter directly from Codex for carousel generation. Default local runner
-configuration is OpenRouter `openai/gpt-5.4-image-2` at medium quality when
-`OPENROUTER_API_KEY` is available in the user's `.env.local` or environment.
-Treat this as the GPT Image 2 generation path for carousel assets.
+configuration is OpenRouter's dedicated Images API with `openai/gpt-image-2` at
+medium quality when `OPENROUTER_API_KEY` is available in the user's
+`.env.local` or environment. Treat this as the GPT Image 2 generation path for
+carousel assets. The legacy chat-completions image route is available only when
+explicitly requested with `--api-mode chat_completions --model
+openai/gpt-5.4-image-2`.
 
 Write one complete prompt per page in `analysis/page-prompts/page-XX.md`.
 Generate the exact Chinese or English text directly in the image; do not default
@@ -317,10 +357,12 @@ For carousel output, instruct the user to run the local API-only runner:
 ```
 
 The runner saves `raw/page-XX-response.json`, `generated/page-XX.png`, and
-`qa/openrouter-cost.json`. It uses at most two concurrent requests, skips pages
-already generated at the correct platform size, updates `analysis/manifest.json`,
-and stops on the first missing-page API failure when `--api-only` is set. There
-is no local-composite fallback in API-only mode.
+`qa/openrouter-cost.json`. It uses at most two concurrent requests, defaults
+carousel generation to OpenRouter's `/api/v1/images` endpoint with the target
+aspect ratio, skips pages already generated at the correct platform size,
+updates `analysis/manifest.json`, and stops on the first missing-page API
+failure when `--api-only` is set. There is no local-composite fallback in
+API-only mode.
 
 For English vertical storyboard output, use the same local runner on a platform `vertical-video`
 manifest:
@@ -329,9 +371,16 @@ manifest:
 .\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
 ```
 
-It saves `generated/page-01.png` through `page-09.png` at 1080x1920 and writes a
-vertical 3x3 `overview/contact-sheet.png`. After visual review, load
+For `vertical-video`, the runner uses OpenRouter's dedicated Image API with
+`openai/gpt-image-2` and a portrait intermediate size, then locally reframes the
+delivered storyboard files to final `1080x1920`. Do not reuse square carousel
+sizing for this video route. It saves `generated/page-01.png` through
+`page-09.png` at 1080x1920 and writes a vertical 3x3
+`overview/contact-sheet.png`. After visual review, load
 `references/seedance-video.md` and hand off to `scripts/run_seedance_video.py`.
+For cheaper Grok testing, load `references/openrouter-video.md` and hand off to
+`scripts/run_openrouter_video.py`; keep the storyboard image generation path
+unchanged.
 
 ## Validate and resume
 
@@ -352,6 +401,12 @@ For Seedance output, check `qa/seedance-video.json`, confirm
 food state changes, product/brand fidelity, unsafe actions, absence of
 subtitles/on-screen text, duration, aspect ratio, and platform fit. Voiceover is
 acceptable; burned-in subtitles are not.
+
+For OpenRouter Grok video output, check `qa/openrouter-video.json`, confirm the
+configured MP4 exists, and verify duration, 720x1280 or chosen resolution,
+9:16 framing, no subtitles/on-screen text, and enough cooking continuity for a
+cheap preview. Use the Grok path for quick smoke tests or draft previews; use
+Seedance when higher-fidelity 1080p food motion is required.
 
 ## Boundaries and recovery
 

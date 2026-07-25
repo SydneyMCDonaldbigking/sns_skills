@@ -6,17 +6,26 @@ Use this file when generating or retrying images for the remix workflow.
 
 - Provider: OpenRouter
 - API key variable: `OPENROUTER_API_KEY`
-- Model: `openai/gpt-5.4-image-2`
+- Model: `openai/gpt-image-2`
 - Quality: `medium`
 - Xiaohongshu size: `1152x1536`
 - Instagram/Facebook size: `1152x1152`
 - Video storyboard size: `1920x1080`
+- Carousel API route: OpenRouter Image API
+  `https://openrouter.ai/api/v1/images`, model `openai/gpt-image-2`, target
+  platform `aspect_ratio`
 - English vertical cooking video storyboard size: `1080x1920`
+- English vertical cooking video API route: OpenRouter Image API
+  `https://openrouter.ai/api/v1/images`, model `openai/gpt-image-2`, request
+  size `1024x1536`, then the local runner reframes only `vertical-video`
+  outputs to final `1080x1920`.
 
 Allow local overrides with these environment variables:
 
 - `VSR_IMAGE_PROVIDER`
 - `VSR_IMAGE_MODEL`
+- `VSR_IMAGE_API_MODEL`
+- `VSR_IMAGE_API_MODE`
 - `VSR_IMAGE_QUALITY`
 - `VSR_IMAGE_ENDPOINT`
 
@@ -42,7 +51,10 @@ the user's local terminal through the runner:
 The runner loads `OPENROUTER_API_KEY` only from `.env.local` or the local
 environment, caps concurrency at two requests, writes raw responses under
 `raw/`, generated PNGs under `generated/`, and cost metadata under
-`qa/openrouter-cost.json`.
+`qa/openrouter-cost.json`. Carousel production defaults to OpenRouter's
+dedicated `/api/v1/images` endpoint with `aspect_ratio` set from the target
+platform, because the chat-completions image route may return square images even
+when a portrait size is requested.
 
 For original English vertical cooking videos, use the same GPT Image 2 path to generate
 exactly nine `1080x1920` storyboard frames before any Seedance call. The
@@ -50,8 +62,25 @@ prepared video run uses `analysis/page-prompts/page-01.md` through `page-09.md`;
 the local runner writes `generated/page-01.png` through `page-09.png` and a
 vertical 3x3 storyboard overview.
 
-Seedance is a separate video handoff. Load `references/seedance-video.md` before
-running or instructing `scripts/run_seedance_video.py`.
+For `vertical-video`, use OpenRouter's dedicated Image API instead of the
+chat-completions image path. The request uses model
+`openai/gpt-image-2` and provider-supported portrait size `1024x1536`; the
+runner then stores the original under `generated-original-size/` and locally
+reframes the delivered storyboard PNG to `1080x1920`. Carousel sizes and
+horizontal video sizes are not changed by this rule. If the provider returns a
+square image for `vertical-video`, stop and retry with the dedicated Image API
+or a better vertical prompt instead of passing it to Seedance.
+
+Use these optional overrides only for `vertical-video`:
+
+- `VSR_VERTICAL_VIDEO_IMAGE_MODEL`
+- `VSR_VERTICAL_VIDEO_IMAGE_ENDPOINT`
+
+Seedance and OpenRouter Grok video are separate video handoffs. Load
+`references/seedance-video.md` before running or instructing
+`scripts/run_seedance_video.py`; load `references/openrouter-video.md` before
+running or instructing `scripts/run_openrouter_video.py`. Neither video runner
+changes carousel image generation.
 
 ## Request Defaults
 
