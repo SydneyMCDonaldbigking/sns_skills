@@ -1,9 +1,8 @@
-"""Submit a prepared storyboard run to Seedance through BytePlus ModelArk.
+"""Submit a prepared storyboard run to OpenRouter video generation.
 
-This runner is meant for the user's local terminal. Codex prepares the run
-directory, storyboard frames, and Seedance prompt; the local runner reads the
-ignored `.env.local` or environment for the API key, submits the async task,
-polls it, and downloads the returned video.
+This runner is separate from the BytePlus Seedance runner. It is intended for
+low-cost Grok video tests through OpenRouter's async `/api/v1/videos` API.
+Keys are loaded from the ignored `.env.local` or the local environment.
 """
 
 from __future__ import annotations
@@ -16,6 +15,8 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import sys
 import time
 from typing import Any
@@ -35,45 +36,44 @@ import validate_output
 
 ROOT = Path(__file__).parents[2]
 LOCAL_ENV = ROOT / ".env.local"
-DEFAULT_ENDPOINT = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks"
-DEFAULT_MODEL = "dreamina-seedance-2-0-260128"
+DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1/videos"
+DEFAULT_MODEL = "x-ai/grok-imagine-video"
 DEFAULT_RATIO = "9:16"
 DEFAULT_RATIOS = {
     "vertical-video": "9:16",
     "video": "16:9",
 }
-DEFAULT_RESOLUTION = "1080p"
-DEFAULT_GENERATE_AUDIO = True
-DEFAULT_WATERMARK = False
-NO_SUBTITLE_POLICY = (
-    "No subtitles, captions, title cards, lower-thirds, burned-in text, "
-    "or any on-screen text. Voiceover and natural cooking audio are allowed "
-    "if the selected model supports audio."
-)
+DEFAULT_RESOLUTION = "720p"
+DEFAULT_GENERATE_AUDIO = False
 DEFAULT_DURATION = "5"
 DEFAULT_TIMEOUT = 1800
-DEFAULT_POLL_INTERVAL = 10
-TERMINAL_FAILURES = {"failed", "cancelled"}
+DEFAULT_POLL_INTERVAL = 30
+TERMINAL_FAILURES = {"failed", "cancelled", "canceled", "expired"}
 KEY_ENV_NAMES = [
-    "BYTEPLUS_ARK_API_KEY",
-    "BYTEPLUS_API_KEY",
-    "VSR_SEEDANCE_API_KEY",
-    "ARK_API_KEY",
-    "SEEDANCE_API_KEY",
+    "GROK_OPENROUTER_API_KEY",
+    "VSR_OPENROUTER_VIDEO_API_KEY",
+    "OPENROUTER_VIDEO_API_KEY",
+    "OPENROUTER_API_KEY",
 ]
 TRUTHY = {"1", "true", "yes", "y", "on"}
 FALSY = {"0", "false", "no", "n", "off"}
+NO_SUBTITLE_POLICY = (
+    "No subtitles, captions, title cards, lower-thirds, burned-in text, "
+    "ingredient labels, floating graphics, sticker ads, or any screen overlay "
+    "text. If company branding appears, it must be a real physical prop already "
+    "present in the storyboard, never a generated overlay or caption."
+)
 
 
-class SeedanceRunnerError(RuntimeError):
-    """Raised when Seedance generation cannot complete."""
+class OpenRouterVideoRunnerError(RuntimeError):
+    """Raised when OpenRouter video generation cannot complete."""
 
 
-class SeedanceHTTPError(RuntimeError):
+class OpenRouterVideoHTTPError(RuntimeError):
     def __init__(self, code: int, body: str):
         self.code = code
         self.body = body
-        super().__init__(f"Seedance HTTP {code}: {body}")
+        super().__init__(f"OpenRouter video HTTP {code}: {body}")
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
@@ -101,20 +101,6 @@ def _api_key() -> str | None:
     return None
 
 
-def _supports_seed(model: str) -> bool:
-    return "seedance-2-0" not in model.lower()
-
-
-def resolve_config(*, model: str | None = None, endpoint: str | None = None) -> dict[str, Any]:
-    _load_env_file()
-    return {
-        "provider": "byteplus-modelark",
-        "model": model or os.environ.get("VSR_SEEDANCE_MODEL", DEFAULT_MODEL),
-        "endpoint": endpoint or os.environ.get("VSR_SEEDANCE_ENDPOINT", DEFAULT_ENDPOINT),
-        "api_key": _api_key(),
-    }
-
-
 def _env_bool(name: str, default: bool) -> bool:
     value = os.environ.get(name)
     if value is None or not value.strip():
@@ -124,9 +110,19 @@ def _env_bool(name: str, default: bool) -> bool:
         return True
     if normalized in FALSY:
         return False
-    raise SeedanceRunnerError(
+    raise OpenRouterVideoRunnerError(
         f"{name} must be a boolean value such as true/false, 1/0, yes/no, or on/off"
     )
+
+
+def resolve_config(*, model: str | None = None, endpoint: str | None = None) -> dict[str, Any]:
+    _load_env_file()
+    return {
+        "provider": "openrouter-video",
+        "model": model or os.environ.get("VSR_OPENROUTER_VIDEO_MODEL", DEFAULT_MODEL),
+        "endpoint": endpoint or os.environ.get("VSR_OPENROUTER_VIDEO_ENDPOINT", DEFAULT_ENDPOINT),
+        "api_key": _api_key(),
+    }
 
 
 def resolve_generation_options(
@@ -136,34 +132,33 @@ def resolve_generation_options(
     duration: str | int | None = None,
     resolution: str | None = None,
     generate_audio: bool | None = None,
-    watermark: bool | None = None,
 ) -> dict[str, Any]:
     default_ratio = DEFAULT_RATIOS.get(platform, DEFAULT_RATIO)
     duration_value = (
         duration
         if duration is not None
-        else os.environ.get("VSR_SEEDANCE_DURATION", DEFAULT_DURATION)
+        else os.environ.get("VSR_OPENROUTER_VIDEO_DURATION", DEFAULT_DURATION)
     )
     try:
         parsed_duration = int(duration_value)
     except (TypeError, ValueError) as exc:
-        raise SeedanceRunnerError("Seedance duration must be an integer number of seconds") from exc
-    if parsed_duration <= 0:
-        raise SeedanceRunnerError("Seedance duration must be greater than zero")
+        raise OpenRouterVideoRunnerError(
+            "OpenRouter video duration must be an integer number of seconds"
+        ) from exc
+    if parsed_duration < 1 or parsed_duration > 15:
+        raise OpenRouterVideoRunnerError(
+            "OpenRouter video duration must be between 1 and 15 seconds"
+        )
 
     return {
-        "ratio": ratio or os.environ.get("VSR_SEEDANCE_RATIO", default_ratio),
+        "aspect_ratio": ratio or os.environ.get("VSR_OPENROUTER_VIDEO_RATIO", default_ratio),
         "duration": parsed_duration,
-        "resolution": resolution or os.environ.get("VSR_SEEDANCE_RESOLUTION", DEFAULT_RESOLUTION),
+        "resolution": resolution
+        or os.environ.get("VSR_OPENROUTER_VIDEO_RESOLUTION", DEFAULT_RESOLUTION),
         "generate_audio": (
             generate_audio
             if generate_audio is not None
-            else _env_bool("VSR_SEEDANCE_GENERATE_AUDIO", DEFAULT_GENERATE_AUDIO)
-        ),
-        "watermark": (
-            watermark
-            if watermark is not None
-            else _env_bool("VSR_SEEDANCE_WATERMARK", DEFAULT_WATERMARK)
+            else _env_bool("VSR_OPENROUTER_VIDEO_GENERATE_AUDIO", DEFAULT_GENERATE_AUDIO)
         ),
     }
 
@@ -200,8 +195,8 @@ def _validate_storyboard_ready(
 ) -> None:
     expected_ids = _expected_storyboard_ids()
     if asset_ids != expected_ids:
-        raise SeedanceRunnerError(
-            "Seedance requires exactly 9 storyboard assets with ids 01 through 09 "
+        raise OpenRouterVideoRunnerError(
+            "OpenRouter video requires exactly 9 storyboard assets with ids 01 through 09 "
             f"before submission; found {', '.join(asset_ids) or 'none'}"
         )
 
@@ -227,8 +222,8 @@ def _validate_storyboard_ready(
             errors.append(f"{image_path.name}: unreadable image")
 
     if errors:
-        raise SeedanceRunnerError(
-            "Storyboard is not ready for Seedance submission: " + "; ".join(errors)
+        raise OpenRouterVideoRunnerError(
+            "Storyboard is not ready for OpenRouter video submission: " + "; ".join(errors)
         )
 
 
@@ -240,15 +235,22 @@ def _data_url(path: Path) -> str:
 
 def _redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
     redacted = json.loads(json.dumps(payload))
-    for item in redacted.get("content", []):
-        image_url = item.get("image_url") if isinstance(item, dict) else None
-        if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
-            image_url["url"] = "<redacted data URL>"
+    for key in ["frame_images", "input_references"]:
+        for item in redacted.get(key, []) or []:
+            image_url = item.get("image_url") if isinstance(item, dict) else None
+            if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
+                image_url["url"] = "<redacted data URL>"
     return redacted
 
 
-def _task_url(endpoint: str, task_id: str) -> str:
-    return f"{endpoint.rstrip('/')}/{task_id}"
+def _redact_response(response: dict[str, Any]) -> dict[str, Any]:
+    redacted = json.loads(json.dumps(response))
+    if "unsigned_urls" in redacted:
+        redacted["unsigned_urls"] = ["<redacted video URL>" for _ in redacted.get("unsigned_urls", [])]
+    for key in ["url", "video_url", "output_url"]:
+        if key in redacted:
+            redacted[key] = "<redacted video URL>"
+    return redacted
 
 
 def request_json(
@@ -272,13 +274,47 @@ def request_json(
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise SeedanceHTTPError(exc.code, body) from exc
+        raise OpenRouterVideoHTTPError(exc.code, body) from exc
 
 
-def download_video(url: str, output: Path) -> None:
+def download_video(job: dict[str, Any], api_key: str, output: Path, opener=urlopen) -> None:
+    urls = job.get("unsigned_urls") or []
+    video_url = urls[0] if urls else f"https://openrouter.ai/api/v1/videos/{job['id']}/content?index=0"
+    headers = {"Authorization": f"Bearer {api_key}"} if "openrouter.ai/api/" in video_url else {}
+    request = Request(video_url, headers=headers)
     output.parent.mkdir(parents=True, exist_ok=True)
-    with urlopen(url, timeout=300) as response:
+    with opener(request, timeout=300) as response:
         output.write_bytes(response.read())
+
+
+def strip_audio(output: Path, *, ffmpeg_path: str | None = None) -> bool:
+    ffmpeg = ffmpeg_path or shutil.which("ffmpeg")
+    if not ffmpeg or not output.is_file():
+        return False
+    temp = output.with_name(f"{output.stem}.noaudio.tmp{output.suffix}")
+    try:
+        subprocess.run(
+            [
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(output),
+                "-c",
+                "copy",
+                "-an",
+                str(temp),
+            ],
+            check=True,
+        )
+        temp.replace(output)
+        return True
+    except (OSError, subprocess.CalledProcessError):
+        if temp.exists():
+            temp.unlink()
+        return False
 
 
 def _is_placeholder(text: str) -> bool:
@@ -304,7 +340,7 @@ def load_prompt(
     prompt_file: str | Path | None = None,
 ) -> tuple[str, str | None]:
     if prompt and prompt_file:
-        raise SeedanceRunnerError("Use either --prompt or --prompt-file, not both")
+        raise OpenRouterVideoRunnerError("Use either --prompt or --prompt-file, not both")
     if prompt and prompt.strip():
         return prompt.strip(), None
     candidates = []
@@ -312,6 +348,7 @@ def load_prompt(
         candidates.append(Path(prompt_file))
     candidates.extend(
         [
+            run_dir / "analysis" / "openrouter-video-prompt.md",
             run_dir / "analysis" / "seedance-prompt.md",
             run_dir / "analysis" / "video-prompt.md",
         ]
@@ -320,25 +357,17 @@ def load_prompt(
         text = _read_usable_text(candidate)
         if text:
             return text, _relative_to_run(candidate, run_dir)
-    raise SeedanceRunnerError(
-        "Missing Seedance prompt. Write analysis/seedance-prompt.md or pass --prompt."
+    raise OpenRouterVideoRunnerError(
+        "Missing video prompt. Write analysis/openrouter-video-prompt.md, "
+        "analysis/seedance-prompt.md, or pass --prompt."
     )
 
 
-def compose_prompt(
-    run_dir: Path,
-    base_prompt: str,
-    *,
-    platform: str = "vertical-video",
-    ratio: str | None = None,
-    duration: str | None = None,
-    seed: int | None = None,
-) -> str:
+def compose_prompt(run_dir: Path, base_prompt: str, *, platform: str) -> str:
     prompt = base_prompt.strip()
     shot_list = _read_usable_text(run_dir / "analysis" / "shot-list.md")
     if shot_list and shot_list not in prompt:
         prompt = f"{prompt}\n\nStoryboard beats to follow:\n{shot_list}"
-
     if platform == "vertical-video" and "no subtitles" not in prompt.lower():
         prompt = f"{prompt}\n\n{NO_SUBTITLE_POLICY}"
     return prompt
@@ -367,6 +396,18 @@ def _manifest_storyboard_urls(data: dict[str, Any], asset_ids: list[str]) -> lis
     return [url for url in urls if url]
 
 
+def _ordered_asset_ids(asset_ids: list[str], first_frame_asset_id: str | None) -> list[str]:
+    if not first_frame_asset_id:
+        return asset_ids
+    if first_frame_asset_id not in asset_ids:
+        raise OpenRouterVideoRunnerError(
+            f"First-frame asset id {first_frame_asset_id} is not in the manifest"
+        )
+    return [first_frame_asset_id] + [
+        asset_id for asset_id in asset_ids if asset_id != first_frame_asset_id
+    ]
+
+
 def select_image_urls(
     run_dir: Path,
     data: dict[str, Any],
@@ -375,26 +416,28 @@ def select_image_urls(
     image_urls: list[str] | None = None,
     include_all_frames: bool = False,
     allow_data_url: bool = False,
+    first_frame_asset_id: str | None = None,
 ) -> list[str]:
+    ordered_asset_ids = _ordered_asset_ids(asset_ids, first_frame_asset_id)
     urls = [url for url in image_urls or [] if url]
     if not urls:
-        urls = _manifest_storyboard_urls(data, asset_ids)
+        urls = _manifest_storyboard_urls(data, ordered_asset_ids)
     if urls:
         return urls if include_all_frames else urls[:1]
 
     if not allow_data_url:
-        raise SeedanceRunnerError(
-            "Seedance needs at least one storyboard image URL. Pass --image-url, "
-            "store storyboard_url on manifest assets, or use --allow-data-url only "
-            "after confirming your provider accepts local data URLs."
+        raise OpenRouterVideoRunnerError(
+            "OpenRouter video needs a directly downloadable storyboard image URL. "
+            "Pass --image-url, store storyboard_url on manifest assets, or use "
+            "--allow-data-url only for an experimental test."
         )
 
-    selected = asset_ids if include_all_frames else asset_ids[:1]
+    selected = ordered_asset_ids if include_all_frames else ordered_asset_ids[:1]
     data_urls: list[str] = []
     for asset_id in selected:
         path = _generated_path(run_dir, asset_id)
         if not path.is_file():
-            raise SeedanceRunnerError(f"Missing generated storyboard frame: {path}")
+            raise OpenRouterVideoRunnerError(f"Missing generated storyboard frame: {path}")
         data_urls.append(_data_url(path))
     return data_urls
 
@@ -404,63 +447,48 @@ def build_payload(
     *,
     model: str,
     image_urls: list[str],
-    ratio: str,
+    aspect_ratio: str,
     duration: int,
     resolution: str,
     generate_audio: bool,
-    watermark: bool,
-    seed: int | None = None,
-    callback_url: str | None = None,
-    return_last_frame: bool = False,
-    image_role: str | None = None,
+    include_reference_images: bool = False,
 ) -> dict[str, Any]:
-    content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-    for url in image_urls:
-        item: dict[str, Any] = {"type": "image_url", "image_url": {"url": url}}
-        if image_role:
-            item["role"] = image_role
-        content.append(item)
-
     payload: dict[str, Any] = {
         "model": model,
-        "content": content,
-        "ratio": ratio,
+        "prompt": prompt,
         "duration": duration,
         "resolution": resolution,
+        "aspect_ratio": aspect_ratio,
         "generate_audio": generate_audio,
-        "watermark": watermark,
     }
-    if seed is not None and not _supports_seed(model):
-        raise SeedanceRunnerError(
-            "Seedance 2.0 does not support --seed; remove --seed or override --model "
-            "to a Seedance model that supports seed"
-        )
-    if seed is not None:
-        payload["seed"] = seed
-    if callback_url:
-        payload["callback_url"] = callback_url
-    if return_last_frame:
-        payload["return_last_frame"] = True
+    if image_urls:
+        payload["frame_images"] = [
+            {
+                "type": "image_url",
+                "image_url": {"url": image_urls[0]},
+                "frame_type": "first_frame",
+            }
+        ]
+    if include_reference_images and len(image_urls) > 1:
+        payload["input_references"] = [
+            {"type": "image_url", "image_url": {"url": url}}
+            for url in image_urls[1:]
+        ]
     return payload
 
 
 def _task_id(response: dict[str, Any]) -> str:
     task_id = response.get("id") or response.get("task_id")
     if not task_id:
-        raise SeedanceRunnerError("Seedance create response did not include a task id")
+        raise OpenRouterVideoRunnerError("OpenRouter create response did not include a job id")
     return str(task_id)
 
 
-def _video_url(response: dict[str, Any]) -> str:
-    content = response.get("content")
-    if isinstance(content, dict):
-        value = content.get("video_url") or content.get("url")
-        if value:
-            return str(value)
-    value = response.get("video_url") or response.get("url")
+def _polling_url(endpoint: str, job: dict[str, Any]) -> str:
+    value = job.get("polling_url")
     if value:
-        return str(value)
-    raise SeedanceRunnerError("Seedance succeeded but did not return a video URL")
+        return str(value) if str(value).startswith("http") else f"https://openrouter.ai{value}"
+    return f"{endpoint.rstrip('/')}/{_task_id(job)}"
 
 
 def _update_manifest_video(run_dir: Path, fields: dict[str, Any]) -> None:
@@ -468,14 +496,14 @@ def _update_manifest_video(run_dir: Path, fields: dict[str, Any]) -> None:
     if not manifest_path.is_file():
         return
     data = manifest.load(manifest_path)
-    current = data.get("video_generation", {})
+    current = data.get("openrouter_video_generation", {})
     current.update(fields)
-    data["video_generation"] = current
+    data["openrouter_video_generation"] = current
     _write_json(manifest_path, data)
 
 
 def poll_task(
-    task_id: str,
+    job: dict[str, Any],
     *,
     api_key: str,
     endpoint: str,
@@ -485,28 +513,35 @@ def poll_task(
     on_status=None,
 ) -> dict[str, Any]:
     request_fn = request_fn or request_json
+    current = job
     deadline = time.monotonic() + timeout_seconds
     while True:
-        response = request_fn("GET", _task_url(endpoint, task_id), api_key, None)
+        status = str(current.get("status", "")).lower()
         if on_status:
-            on_status(response)
-        status = str(response.get("status", "")).lower()
-        if status == "succeeded":
-            return response
+            on_status(current)
+        if status in {"completed", "succeeded"}:
+            return current
         if status in TERMINAL_FAILURES:
-            raise SeedanceRunnerError(f"Seedance task {task_id} ended as {status}: {response}")
+            raise OpenRouterVideoRunnerError(
+                f"OpenRouter video job {_task_id(current)} ended as {status}: {current}"
+            )
         if time.monotonic() >= deadline:
-            raise SeedanceRunnerError(f"Timed out waiting for Seedance task {task_id}")
+            raise OpenRouterVideoRunnerError(
+                f"Timed out waiting for OpenRouter video job {_task_id(current)}"
+            )
         time.sleep(max(0, poll_interval))
+        current = request_fn("GET", _polling_url(endpoint, current), api_key, None)
 
 
-def run_seedance_video(
+def run_openrouter_video(
     run_dir: str | Path,
     *,
     prompt: str | None = None,
     prompt_file: str | Path | None = None,
     image_urls: list[str] | None = None,
+    first_frame_asset_id: str | None = None,
     include_all_frames: bool = False,
+    include_reference_images: bool = False,
     allow_data_url: bool = False,
     model: str | None = None,
     endpoint: str | None = None,
@@ -514,29 +549,25 @@ def run_seedance_video(
     duration: str | None = None,
     resolution: str | None = None,
     generate_audio: bool | None = None,
-    watermark: bool | None = None,
-    seed: int | None = None,
-    callback_url: str | None = None,
-    return_last_frame: bool = False,
-    image_role: str | None = None,
     output: str | Path | None = None,
     dry_run: bool = False,
     timeout_seconds: float = DEFAULT_TIMEOUT,
     poll_interval: float = DEFAULT_POLL_INTERVAL,
     request_fn=None,
     download_fn=None,
+    strip_audio_fn=None,
 ) -> dict[str, Any]:
     run = Path(run_dir).resolve()
     manifest_path = run / "analysis" / "manifest.json"
     if not manifest_path.is_file():
-        raise SeedanceRunnerError(f"Missing manifest: {manifest_path}")
+        raise OpenRouterVideoRunnerError(f"Missing manifest: {manifest_path}")
     data = manifest.load(manifest_path)
     platform = data.get("platform")
     if platform not in DEFAULT_RATIOS:
-        raise SeedanceRunnerError("Seedance video runner requires a video storyboard run")
+        raise OpenRouterVideoRunnerError("OpenRouter video runner requires a video storyboard run")
     asset_ids = list(data.get("assets", {}).keys())
     if not asset_ids:
-        raise SeedanceRunnerError("Manifest does not contain storyboard assets")
+        raise OpenRouterVideoRunnerError("Manifest does not contain storyboard assets")
 
     config = resolve_config(model=model, endpoint=endpoint)
     options = resolve_generation_options(
@@ -545,17 +576,9 @@ def run_seedance_video(
         duration=duration,
         resolution=resolution,
         generate_audio=generate_audio,
-        watermark=watermark,
     )
     base_prompt, prompt_path = load_prompt(run, prompt=prompt, prompt_file=prompt_file)
-    final_prompt = compose_prompt(
-        run,
-        base_prompt,
-        platform=platform,
-        ratio=ratio,
-        duration=duration,
-        seed=seed,
-    )
+    final_prompt = compose_prompt(run, base_prompt, platform=platform)
     if not dry_run:
         _validate_storyboard_ready(run, data, platform, asset_ids)
     selected_urls = select_image_urls(
@@ -563,25 +586,19 @@ def run_seedance_video(
         data,
         asset_ids,
         image_urls=image_urls,
+        first_frame_asset_id=first_frame_asset_id,
         include_all_frames=include_all_frames,
         allow_data_url=allow_data_url,
     )
-    effective_image_role = image_role
-    if effective_image_role is None and include_all_frames:
-        effective_image_role = "reference_image"
     payload = build_payload(
         final_prompt,
         model=config["model"],
         image_urls=selected_urls,
-        ratio=options["ratio"],
+        aspect_ratio=options["aspect_ratio"],
         duration=options["duration"],
         resolution=options["resolution"],
         generate_audio=options["generate_audio"],
-        watermark=options["watermark"],
-        seed=seed,
-        callback_url=callback_url,
-        return_last_frame=return_last_frame,
-        image_role=effective_image_role,
+        include_reference_images=include_reference_images,
     )
     redacted_payload = _redact_payload(payload)
     if dry_run:
@@ -595,23 +612,25 @@ def run_seedance_video(
 
     api_key = config.get("api_key")
     if not api_key:
-        raise SeedanceRunnerError(
-            "Set BYTEPLUS_ARK_API_KEY, BYTEPLUS_API_KEY, VSR_SEEDANCE_API_KEY, "
-            "ARK_API_KEY, or SEEDANCE_API_KEY in .env.local or the local environment"
+        raise OpenRouterVideoRunnerError(
+            "Set GROK_OPENROUTER_API_KEY, VSR_OPENROUTER_VIDEO_API_KEY, "
+            "OPENROUTER_VIDEO_API_KEY, or OPENROUTER_API_KEY in .env.local "
+            "or the local environment"
         )
 
     raw_dir = run / "raw"
     qa_dir = run / "qa"
     request_fn = request_fn or request_json
     download_fn = download_fn or download_video
-    output_path = Path(output) if output else run / "generated" / "seedance-video.mp4"
+    strip_audio_fn = strip_audio_fn or strip_audio
+    output_path = Path(output) if output else run / "generated" / "openrouter-video.mp4"
     if not output_path.is_absolute():
         output_path = run / output_path
 
-    _write_json(raw_dir / "seedance-create-request.json", redacted_payload)
+    _write_json(raw_dir / "openrouter-video-create-request.json", redacted_payload)
     create_response = request_fn("POST", config["endpoint"], api_key, payload)
-    _write_json(raw_dir / "seedance-create-response.json", create_response)
     task_id = _task_id(create_response)
+    _write_json(raw_dir / "openrouter-video-create-response.json", _redact_response(create_response))
     _update_manifest_video(
         run,
         {
@@ -626,11 +645,11 @@ def run_seedance_video(
     )
 
     def on_status(response: dict[str, Any]) -> None:
-        _write_json(raw_dir / "seedance-status.json", response)
+        _write_json(raw_dir / "openrouter-video-status.json", _redact_response(response))
 
     try:
         final_response = poll_task(
-            task_id,
+            create_response,
             api_key=api_key,
             endpoint=config["endpoint"],
             timeout_seconds=timeout_seconds,
@@ -638,8 +657,10 @@ def run_seedance_video(
             request_fn=request_fn,
             on_status=on_status,
         )
-        url = _video_url(final_response)
-        download_fn(url, output_path)
+        download_fn(final_response, api_key, output_path)
+        postprocess = {}
+        if not options["generate_audio"]:
+            postprocess["audio_stripped"] = strip_audio_fn(output_path)
     except Exception as exc:
         _update_manifest_video(
             run,
@@ -666,21 +687,23 @@ def run_seedance_video(
         "prompt_path": prompt_path,
         "image_count": len(selected_urls),
         "generation": options,
-        "video_url": url,
         "output": relative_output,
         "usage": final_response.get("usage", {}),
-        "final_response": final_response,
+        "final_response": _redact_response(final_response),
     }
-    _write_json(qa_dir / "seedance-video.json", ledger)
+    if postprocess:
+        ledger["postprocess"] = postprocess
+    _write_json(qa_dir / "openrouter-video.json", ledger)
     _update_manifest_video(
         run,
         {
             "status": "succeeded",
             "task_id": task_id,
             "output": relative_output,
-            "qa_path": "qa/seedance-video.json",
+            "qa_path": "qa/openrouter-video.json",
             "usage": final_response.get("usage", {}),
             "generation": options,
+            "postprocess": postprocess,
         },
     )
     return ledger
@@ -688,7 +711,7 @@ def run_seedance_video(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a Seedance video from a prepared storyboard run."
+        description="Generate a video from a prepared storyboard run through OpenRouter."
     )
     parser.add_argument("--run", required=True, help="Prepared video storyboard run.")
     parser.add_argument("--prompt")
@@ -700,14 +723,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Public or provider-accepted storyboard image URL. Repeat for references.",
     )
     parser.add_argument(
+        "--first-frame-asset-id",
+        help="Use this manifest asset id as the local/storyboard first frame when image URLs are read from the manifest or --allow-data-url.",
+    )
+    parser.add_argument(
         "--include-all-frames",
         action="store_true",
-        help="Send every available storyboard URL/reference instead of only the first.",
+        help="Collect all storyboard URLs/frames. Grok's first_frame support still anchors only the first frame unless --include-reference-images is also used.",
+    )
+    parser.add_argument(
+        "--include-reference-images",
+        action="store_true",
+        help="Send images after the first as input_references. Use only after confirming the selected model handles reference images.",
     )
     parser.add_argument(
         "--allow-data-url",
         action="store_true",
-        help="Send local generated frames as data URLs when no image URL is available.",
+        help="Send local generated frames as data URLs. OpenRouter recommends public HTTPS image URLs for production.",
     )
     parser.add_argument("--model")
     parser.add_argument("--endpoint")
@@ -717,13 +749,6 @@ def build_parser() -> argparse.ArgumentParser:
     audio = parser.add_mutually_exclusive_group()
     audio.add_argument("--generate-audio", dest="generate_audio", action="store_true", default=None)
     audio.add_argument("--no-generate-audio", dest="generate_audio", action="store_false")
-    watermark = parser.add_mutually_exclusive_group()
-    watermark.add_argument("--watermark", dest="watermark", action="store_true", default=None)
-    watermark.add_argument("--no-watermark", dest="watermark", action="store_false")
-    parser.add_argument("--seed", type=int)
-    parser.add_argument("--callback-url")
-    parser.add_argument("--return-last-frame", action="store_true")
-    parser.add_argument("--image-role")
     parser.add_argument("--output")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     parser.add_argument("--poll-interval", type=float, default=DEFAULT_POLL_INTERVAL)
@@ -734,12 +759,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        result = run_seedance_video(
+        result = run_openrouter_video(
             args.run,
             prompt=args.prompt,
             prompt_file=args.prompt_file,
             image_urls=args.image_url,
+            first_frame_asset_id=args.first_frame_asset_id,
             include_all_frames=args.include_all_frames,
+            include_reference_images=args.include_reference_images,
             allow_data_url=args.allow_data_url,
             model=args.model,
             endpoint=args.endpoint,
@@ -747,17 +774,12 @@ def main(argv: list[str] | None = None) -> int:
             duration=args.duration,
             resolution=args.resolution,
             generate_audio=args.generate_audio,
-            watermark=args.watermark,
-            seed=args.seed,
-            callback_url=args.callback_url,
-            return_last_frame=args.return_last_frame,
-            image_role=args.image_role,
             output=args.output,
             dry_run=args.dry_run,
             timeout_seconds=args.timeout,
             poll_interval=args.poll_interval,
         )
-    except SeedanceRunnerError as exc:
+    except OpenRouterVideoRunnerError as exc:
         raise SystemExit(str(exc)) from exc
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0

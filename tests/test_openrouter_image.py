@@ -27,6 +27,29 @@ def test_build_payload_uses_requested_size_and_quality():
     assert "high quality" in content
 
 
+def test_build_image_api_payload_uses_prompt_and_input_references(tmp_path):
+    reference = tmp_path / "logo.png"
+    reference.write_bytes(b"image bytes")
+
+    payload = openrouter_image.build_image_api_payload(
+        "Make a vertical storyboard frame.",
+        model="openai/gpt-image-2",
+        size="1024x1536",
+        quality="medium",
+        references=[str(reference)],
+    )
+
+    assert payload["model"] == "openai/gpt-image-2"
+    assert payload["size"] == "1024x1536"
+    assert payload["quality"] == "medium"
+    assert payload["output_format"] == "png"
+    assert "1024x1536" in payload["prompt"]
+    assert payload["input_references"][0]["type"] == "image_url"
+    redacted = openrouter_image.redact_payload(payload)
+    assert redacted["input_references"][0]["image_url"]["url"] == "<redacted data URL>"
+    assert "image bytes" not in json.dumps(redacted)
+
+
 def test_dry_run_prints_redacted_payload_without_api_key(tmp_path, monkeypatch, capsys):
     prompt = tmp_path / "prompt.txt"
     prompt.write_text("Render this.", encoding="utf-8")
@@ -55,8 +78,8 @@ def test_dry_run_prints_redacted_payload_without_api_key(tmp_path, monkeypatch, 
 
     output = json.loads(capsys.readouterr().out)
     assert output["api_key_set"] is False
-    assert output["payload"]["model"] == "openai/gpt-5.4-image-2"
-    assert output["payload"]["messages"][0]["content"][1]["image_url"]["url"] == "<redacted data URL>"
+    assert output["payload"]["model"] == "openai/gpt-image-2"
+    assert output["payload"]["input_references"][0]["image_url"]["url"] == "<redacted data URL>"
     assert "image bytes" not in json.dumps(output)
 
 
@@ -275,9 +298,9 @@ def test_main_marks_manifest_prompted_before_request(tmp_path, monkeypatch):
     asset = observed["asset"]
     assert asset["status"] == "prompted"
     assert asset["prompt_path"] == "prompt.txt"
-    assert asset["request"]["endpoint"] == openrouter_image.ENDPOINT
-    content = asset["request"]["payload"]["messages"][0]["content"]
-    assert content[1]["image_url"]["url"] == "<redacted data URL>"
+    assert asset["request"]["endpoint"] == openrouter_image.IMAGE_ENDPOINT
+    content = asset["request"]["payload"]["input_references"]
+    assert content[0]["image_url"]["url"] == "<redacted data URL>"
     assert "image bytes" not in json.dumps(asset["request"])
 
 
@@ -337,7 +360,7 @@ def test_main_marks_manifest_generated_after_saving_image(tmp_path, monkeypatch,
     assert asset["output"] == "generated/01-1-1.png"
     assert asset["outputs"] == ["generated/01-1-1.png"]
     assert asset["prompt_path"] == "prompt.txt"
-    assert asset["request"]["payload"]["model"] == "openai/gpt-5.4-image-2"
+    assert asset["request"]["payload"]["model"] == "openai/gpt-image-2"
     assert asset["validation_errors"] == []
 
 
@@ -391,7 +414,7 @@ def test_force_regenerates_validated_asset(tmp_path, monkeypatch, capsys):
 
     capsys.readouterr()
     data = manifest.load(manifest_path)
-    assert calls == [openrouter_image.ENDPOINT]
+    assert calls == [openrouter_image.IMAGE_ENDPOINT]
     assert data["assets"]["01"]["status"] == "generated"
     assert data["assets"]["01"]["output"] == "generated/01-1-1.png"
 

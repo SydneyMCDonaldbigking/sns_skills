@@ -26,7 +26,9 @@ the pan; 05 core cooking action; 06 seasoning/sauce/product added for flavor
 mechanism; 07 doneness/texture close-up; 08 plating process; 09 finished dish
 hero shot with company table sign, logo prop, or packaging beside it and no
 visible subtitles or on-screen text. Branding must be a real physical prop, not
-a screen subtitle, floating sticker, overlay, or ad banner.
+a screen subtitle, floating sticker, overlay, or ad banner. For English-region
+deliverables, `product_or_brand_cue` must name `ASIAN GROCER ONLINE` with small
+`powered by UMALL`, and must not use the Chinese-region UMALL logo.
 
 ## Assumptions
 

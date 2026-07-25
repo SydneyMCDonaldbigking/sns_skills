@@ -34,6 +34,16 @@ def _response(size: tuple[int, int], cost: float = 0.01) -> dict:
     }
 
 
+def _image_api_response(size: tuple[int, int], cost: float = 0.01) -> dict:
+    buffer = BytesIO()
+    Image.new("RGB", size, "white").save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return {
+        "data": [{"b64_json": encoded, "media_type": "image/png"}],
+        "usage": {"total_tokens": 12, "cost": cost, "currency": "USD"},
+    }
+
+
 def _prepared_run(tmp_path: Path, platform: str, assets: list[str]) -> Path:
     run_dir = tmp_path / "output" / "run"
     analysis = run_dir / "analysis"
@@ -64,7 +74,7 @@ def test_run_openrouter_carousel_generates_pages_and_writes_outputs(tmp_path, mo
     calls = []
 
     def fake_request(payload, api_key, endpoint):
-        calls.append((payload["size"], api_key, endpoint))
+        calls.append((payload["model"], payload["size"], payload.get("aspect_ratio"), api_key, endpoint))
         return _response((1152, 1152), cost=0.01)
 
     result = runner.run_carousel(
@@ -75,7 +85,11 @@ def test_run_openrouter_carousel_generates_pages_and_writes_outputs(tmp_path, mo
     )
 
     assert len(calls) == 2
-    assert {call[0] for call in calls} == {"1152x1152"}
+    assert {call[0] for call in calls} == {"openai/gpt-image-2"}
+    assert {call[1] for call in calls} == {"1152x1152"}
+    assert {call[2] for call in calls} == {"1:1"}
+    assert {call[3] for call in calls} == {"test-key"}
+    assert {call[4] for call in calls} == {runner.openrouter_image.IMAGE_ENDPOINT}
     assert (run_dir / "raw" / "page-01-response.json").is_file()
     assert (run_dir / "raw" / "page-02-response.json").is_file()
     assert (run_dir / "generated" / "page-01.png").is_file()
@@ -117,9 +131,10 @@ def test_run_openrouter_carousel_uses_manifest_request_reference_images(tmp_path
         request_fn=fake_request,
     )
 
-    content = calls[0]["messages"][0]["content"]
-    assert [item["type"] for item in content] == ["text", "image_url"]
-    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert calls[0]["input_references"][0]["type"] == "image_url"
+    assert calls[0]["input_references"][0]["image_url"]["url"].startswith(
+        "data:image/png;base64,"
+    )
 
 
 def test_run_openrouter_carousel_normalizes_square_api_size(tmp_path, monkeypatch):
@@ -166,21 +181,60 @@ def test_run_openrouter_carousel_generates_english_vertical_storyboard(tmp_path,
         [f"{index:02d}" for index in range(1, 10)],
     )
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    calls = []
+
+    def fake_request(payload, api_key, endpoint):
+        calls.append((payload["model"], payload["size"], endpoint, sorted(payload)))
+        return _image_api_response((1024, 1536), cost=0.01)
 
     result = runner.run_carousel(
         run_dir,
         api_only=True,
         concurrency=2,
-        request_fn=lambda payload, api_key, endpoint: _response((1080, 1920), cost=0.01),
+        request_fn=fake_request,
     )
 
+    assert {call[0] for call in calls} == {"openai/gpt-image-2"}
+    assert {call[1] for call in calls} == {"1024x1536"}
+    assert {call[2] for call in calls} == {runner.openrouter_image.IMAGE_ENDPOINT}
+    assert all("prompt" in call[3] and "messages" not in call[3] for call in calls)
     assert (run_dir / "generated" / "page-01.png").is_file()
     assert (run_dir / "generated" / "page-09.png").is_file()
     with Image.open(run_dir / "generated" / "page-01.png") as image:
         assert image.size == (1080, 1920)
+    with Image.open(run_dir / "generated-original-size" / "page-01.png") as image:
+        assert image.size == (1024, 1536)
     with Image.open(run_dir / "overview" / "contact-sheet.png") as image:
         assert image.size == (1080, 1920)
     assert result["validation"]["valid"] is True
+
+
+def test_run_openrouter_carousel_rejects_square_output_for_vertical_video(
+    tmp_path,
+    monkeypatch,
+):
+    run_dir = _prepared_run(
+        tmp_path,
+        "vertical-video",
+        [f"{index:02d}" for index in range(1, 10)],
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    try:
+        runner.run_carousel(
+            run_dir,
+            api_only=True,
+            concurrency=1,
+            max_attempts=1,
+            request_fn=lambda payload, api_key, endpoint: _image_api_response((1024, 1024), cost=0.01),
+        )
+    except runner.CarouselRunnerError as exc:
+        assert "expected 1080x1920, got 1024x1024" in str(exc)
+    else:
+        raise AssertionError("Expected CarouselRunnerError")
+
+    data = manifest.load(run_dir / "analysis" / "manifest.json")
+    assert data["assets"]["01"]["status"] == "failed"
 
 
 def test_run_openrouter_carousel_skips_existing_correct_size_without_key(tmp_path, monkeypatch):
@@ -211,7 +265,8 @@ def test_run_openrouter_carousel_api_only_stops_on_failure(tmp_path, monkeypatch
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
 
     def fake_request(payload, api_key, endpoint):
-        if "Prompt for 02" in payload["messages"][0]["content"][0]["text"]:
+        prompt_text = payload.get("prompt") or payload["messages"][0]["content"][0]["text"]
+        if "Prompt for 02" in prompt_text:
             raise runner.openrouter_image.OpenRouterHTTPError(500, "boom")
         return _response((1152, 1536), cost=0.01)
 

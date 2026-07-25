@@ -14,3 +14,10 @@ data/material-index*.jsonl
 .env.local
 .env.*
 *.local.env
+
+# Obsidian local state. Keep shared vault notes/config, not machine sessions.
+.obsidian/workspace*.json
+.obsidian/cache/
+.obsidian/plugins/
+.trash/
+.codex_tmp/

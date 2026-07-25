@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).parents[2]
 LOCAL_ENV = ROOT / ".env.local"
 ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+IMAGE_ENDPOINT = "https://openrouter.ai/api/v1/images"
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -81,6 +82,17 @@ def post_json(payload: dict, api_key: str, endpoint: str = ENDPOINT) -> dict:
 def save_images(response: dict, out_dir: Path, stem: str) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
+    for image_index, item in enumerate(response.get("data", []), start=1):
+        if not isinstance(item, dict) or not item.get("b64_json"):
+            continue
+        media_type = str(item.get("media_type") or "image/png")
+        suffix = ".svg" if media_type == "image/svg+xml" else ".png"
+        out_path = out_dir / f"{stem}-{image_index}{suffix}"
+        out_path.write_bytes(base64.b64decode(str(item["b64_json"])))
+        saved.append(out_path)
+    if saved:
+        return saved
+
     choices = response.get("choices", [])
     for choice_index, choice in enumerate(choices, start=1):
         message = choice.get("message", {})
@@ -309,6 +321,35 @@ def build_payload(
     }
 
 
+def build_image_api_payload(
+    prompt: str,
+    *,
+    model: str,
+    size: str,
+    quality: str,
+    references: list[str] | None = None,
+    aspect_ratio: str | None = None,
+) -> dict:
+    payload: dict = {
+        "model": model,
+        "prompt": (
+            f"{prompt}\n\nOutput requirements: generate one image at "
+            f"{size}. Use {quality} quality. Return a PNG image."
+        ),
+        "size": size,
+        "quality": quality,
+        "output_format": "png",
+    }
+    if aspect_ratio:
+        payload["aspect_ratio"] = aspect_ratio
+    if references:
+        payload["input_references"] = [
+            {"type": "image_url", "image_url": {"url": data_url(Path(ref))}}
+            for ref in references
+        ]
+    return payload
+
+
 def redact_payload(payload: dict) -> dict:
     redacted = json.loads(json.dumps(payload))
     for message in redacted.get("messages", []):
@@ -319,6 +360,10 @@ def redact_payload(payload: dict) -> dict:
             image_url = item.get("image_url") if isinstance(item, dict) else None
             if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
                 image_url["url"] = "<redacted data URL>"
+    for item in redacted.get("input_references", []):
+        image_url = item.get("image_url") if isinstance(item, dict) else None
+        if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
+            image_url["url"] = "<redacted data URL>"
     return redacted
 
 
@@ -329,10 +374,14 @@ def resolve_generation_config(
 ) -> dict:
     env_file = load_env()
     config = image_provider.resolve()
+    resolved_model = model or config["model"]
+    endpoint = config["endpoint"] or (
+        IMAGE_ENDPOINT if resolved_model.startswith("openai/gpt-image") else ENDPOINT
+    )
     return {
-        "model": model or config["model"],
+        "model": resolved_model,
         "quality": quality or config["quality"],
-        "endpoint": config["endpoint"] or ENDPOINT,
+        "endpoint": endpoint,
         "api_key": os.environ.get("OPENROUTER_API_KEY") or env_file.get("OPENROUTER_API_KEY"),
     }
 
@@ -374,13 +423,22 @@ def generate_image(
         raise SystemExit("OPENROUTER_API_KEY is not set")
 
     prompt = Path(prompt_file).read_text(encoding="utf-8")
-    payload = build_payload(
-        prompt,
-        model=config["model"],
-        size=size,
-        quality=config["quality"],
-        references=references or [],
-    )
+    if config["endpoint"].rstrip("/").endswith("/images"):
+        payload = build_image_api_payload(
+            prompt,
+            model=config["model"],
+            size=size,
+            quality=config["quality"],
+            references=references or [],
+        )
+    else:
+        payload = build_payload(
+            prompt,
+            model=config["model"],
+            size=size,
+            quality=config["quality"],
+            references=references or [],
+        )
     if dry_run:
         return {
             "endpoint": config["endpoint"],

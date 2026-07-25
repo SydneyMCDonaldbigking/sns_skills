@@ -18,6 +18,11 @@ The output should feel like a real social cooking clip, not a slideshow. Keep
 food physics, heat, steam, oil, sauce thickness, utensil movement, and ingredient
 state changes plausible.
 
+The final storyboard files must be Douyin/TikTok vertical frames at
+`1080x1920`. If the image API cannot directly produce `1080x1920`, use only the
+video runner's portrait intermediate path and locally reframe to `1080x1920`.
+Do not reuse square carousel sizing for this video route.
+
 ## Nine-Frame Shot Map
 
 Use exactly nine storyboard frames unless the user explicitly asks for another
@@ -43,6 +48,14 @@ Company branding may appear in frames 01 and 09 only as a real object in the
 scene: a table sign, printed logo prop, product packaging, apron patch, or
 similar physical item. Do not turn the logo into a screen subtitle, floating
 sticker, overlay, or ad banner.
+
+For English-region cooking videos, the physical brand prop must use the
+`ASIAN GROCER ONLINE` lockup with small `powered by UMALL`, from
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
+Do not use the Chinese-region UMALL logo in English-region videos. The logo's
+real printed lockup is allowed only as part of the physical prop; no added
+subtitles, ingredient labels, title cards, lower-thirds, stickers, or screen
+text are allowed.
 
 ## Storyboard Image Prompt Rules
 

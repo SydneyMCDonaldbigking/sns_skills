@@ -12,6 +12,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 import base64
 from datetime import datetime, timezone
 import json
+import os
 import re
 import shutil
 import sys
@@ -30,12 +31,18 @@ if str(SCRIPT_DIR) not in sys.path:
 import make_contact_sheet
 import manifest
 import openrouter_image
+import reframe_image
 import validate_output
 
 
 STORYBOARD_PLATFORMS = {"video", "vertical-video"}
 SUPPORTED_PLATFORMS = {"xiaohongshu", "instagram-facebook"} | STORYBOARD_PLATFORMS
 MAX_CONCURRENCY = 2
+VERTICAL_VIDEO_PROVIDER_SIZE = (1024, 1536)
+VERTICAL_VIDEO_IMAGE_MODEL = "openai/gpt-image-2"
+IMAGE_API_DEFAULT_MODEL = "openai/gpt-image-2"
+CHAT_IMAGE_MODEL = "openai/gpt-5.4-image-2"
+API_MODES = {"auto", "chat_completions", "images"}
 VIDEO_STORYBOARD_LABELS = [
     "Hook",
     "Setup",
@@ -120,13 +127,92 @@ def _same_aspect_ratio(size: tuple[int, int], expected_size: tuple[int, int]) ->
     return size[0] * expected_size[1] == size[1] * expected_size[0]
 
 
-def _normalize_image_size(path: Path, expected_size: tuple[int, int], run_dir: Path) -> bool:
+def _provider_request_size(platform: str, expected_size: tuple[int, int]) -> tuple[int, int]:
+    if platform == "vertical-video":
+        return VERTICAL_VIDEO_PROVIDER_SIZE
+    return expected_size
+
+
+def _aspect_ratio(size: tuple[int, int]) -> str:
+    from math import gcd
+
+    divisor = gcd(size[0], size[1])
+    return f"{size[0] // divisor}:{size[1] // divisor}"
+
+
+def _apply_platform_image_config(
+    config: dict[str, Any],
+    *,
+    platform: str,
+    explicit_model: str | None,
+    explicit_api_mode: str | None = None,
+) -> dict[str, Any]:
+    resolved = dict(config)
+    requested_mode = explicit_api_mode or os.environ.get("VSR_IMAGE_API_MODE", "auto")
+    if requested_mode not in API_MODES:
+        raise CarouselRunnerError(
+            f"Unsupported image API mode {requested_mode!r}; use auto, "
+            "chat_completions, or images"
+        )
+    if requested_mode == "auto":
+        if platform == "vertical-video":
+            api_mode = "images"
+        elif str(resolved.get("model", "")).startswith("openai/gpt-image"):
+            api_mode = "images"
+        elif platform in {"xiaohongshu", "instagram-facebook"} and resolved.get("model") == CHAT_IMAGE_MODEL:
+            api_mode = "images"
+        elif explicit_model and explicit_model.startswith("openai/gpt-image"):
+            api_mode = "images"
+        elif str(resolved.get("endpoint", "")).rstrip("/").endswith("/images"):
+            api_mode = "images"
+        else:
+            api_mode = "chat_completions"
+    else:
+        api_mode = requested_mode
+
+    if api_mode == "images":
+        resolved["api_mode"] = "images"
+        if platform == "vertical-video":
+            resolved["model"] = (
+                explicit_model
+                or os.environ.get("VSR_VERTICAL_VIDEO_IMAGE_MODEL")
+                or VERTICAL_VIDEO_IMAGE_MODEL
+            )
+            resolved["endpoint"] = os.environ.get(
+                "VSR_VERTICAL_VIDEO_IMAGE_ENDPOINT",
+                openrouter_image.IMAGE_ENDPOINT,
+            )
+        else:
+            resolved["model"] = (
+                explicit_model
+                or os.environ.get("VSR_IMAGE_API_MODEL")
+                or (
+                    IMAGE_API_DEFAULT_MODEL
+                    if resolved.get("model") == CHAT_IMAGE_MODEL
+                    else resolved.get("model", IMAGE_API_DEFAULT_MODEL)
+                )
+            )
+            if resolved.get("endpoint") == openrouter_image.ENDPOINT:
+                resolved["endpoint"] = openrouter_image.IMAGE_ENDPOINT
+    else:
+        resolved["api_mode"] = "chat_completions"
+    return resolved
+
+
+def _normalize_image_size(
+    path: Path,
+    expected_size: tuple[int, int],
+    run_dir: Path,
+    *,
+    allow_portrait_reframe: bool = False,
+) -> bool:
     size = _image_size(path)
     if size is None:
         return False
     if size == expected_size:
         return True
-    if not _same_aspect_ratio(size, expected_size):
+    same_aspect = _same_aspect_ratio(size, expected_size)
+    if not same_aspect and (not allow_portrait_reframe or size[1] <= size[0]):
         return False
 
     original_dir = run_dir / "generated-original-size"
@@ -135,9 +221,12 @@ def _normalize_image_size(path: Path, expected_size: tuple[int, int], run_dir: P
     if not original.exists():
         shutil.copy2(path, original)
 
-    with Image.open(path) as image:
-        resized = image.convert("RGB").resize(expected_size, Image.Resampling.LANCZOS)
-    resized.save(path)
+    if same_aspect:
+        with Image.open(path) as image:
+            resized = image.convert("RGB").resize(expected_size, Image.Resampling.LANCZOS)
+        resized.save(path)
+    else:
+        reframe_image.reframe(path, path, expected_size, mode="cover", x_anchor=0.75, y_anchor=0.5)
     return True
 
 
@@ -241,8 +330,22 @@ def _first_image_url(response: dict[str, Any]) -> str:
     raise CarouselRunnerError("OpenRouter response did not contain an image")
 
 
+def _first_image_api_data(response: dict[str, Any]) -> bytes | None:
+    for item in response.get("data", []):
+        if not isinstance(item, dict):
+            continue
+        encoded = item.get("b64_json")
+        if encoded:
+            return base64.b64decode(str(encoded))
+    return None
+
+
 def _save_first_image(response: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
+    image_data = _first_image_api_data(response)
+    if image_data is not None:
+        output.write_bytes(image_data)
+        return
     url = _first_image_url(response)
     if url.startswith("data:image"):
         _header, encoded = url.split(",", 1)
@@ -327,6 +430,7 @@ def _generate_page(
     manifest_path: Path,
     manifest_data: dict[str, Any],
     asset_id: str,
+    platform: str,
     expected_size: tuple[int, int],
     config: dict[str, Any],
     max_attempts: int,
@@ -337,13 +441,25 @@ def _generate_page(
     output = _generated_path(run_dir, asset_id)
     raw_path = _raw_response_path(run_dir, asset_id)
     references = _references_for_asset(run_dir, manifest_data, asset_id)
-    payload = openrouter_image.build_payload(
-        prompt,
-        model=config["model"],
-        size=f"{expected_size[0]}x{expected_size[1]}",
-        quality=config["quality"],
-        references=references,
-    )
+    request_size = _provider_request_size(platform, expected_size)
+    request_size_text = f"{request_size[0]}x{request_size[1]}"
+    if config.get("api_mode") == "images":
+        payload = openrouter_image.build_image_api_payload(
+            prompt,
+            model=config["model"],
+            size=request_size_text,
+            quality=config["quality"],
+            references=references,
+            aspect_ratio=_aspect_ratio(request_size),
+        )
+    else:
+        payload = openrouter_image.build_payload(
+            prompt,
+            model=config["model"],
+            size=request_size_text,
+            quality=config["quality"],
+            references=references,
+        )
 
     _mark_manifest(
         manifest_path,
@@ -368,7 +484,12 @@ def _generate_page(
         )
         _write_json(raw_path, response)
         _save_first_image(response, output)
-        if not _normalize_image_size(output, expected_size, run_dir):
+        if not _normalize_image_size(
+            output,
+            expected_size,
+            run_dir,
+            allow_portrait_reframe=platform == "vertical-video",
+        ):
             actual = _image_size(output)
             got = f", got {actual[0]}x{actual[1]}" if actual else ""
             raise CarouselRunnerError(
@@ -496,6 +617,7 @@ def run_carousel(
     model: str | None = None,
     quality: str | None = None,
     request_fn=None,
+    api_mode: str | None = None,
 ) -> dict[str, Any]:
     if concurrency < 1 or concurrency > MAX_CONCURRENCY:
         raise CarouselRunnerError("--concurrency must be 1 or 2")
@@ -518,7 +640,12 @@ def run_carousel(
     if platform in STORYBOARD_PLATFORMS:
         _preflight_storyboard_prompts(run, asset_ids)
 
-    config = openrouter_image.resolve_generation_config(model=model, quality=quality)
+    config = _apply_platform_image_config(
+        openrouter_image.resolve_generation_config(model=model, quality=quality),
+        platform=platform,
+        explicit_model=model,
+        explicit_api_mode=api_mode,
+    )
     ledger = _new_cost_ledger(run, config)
     cost_path = run / "qa" / "openrouter-cost.json"
     manifest_lock = threading.Lock()
@@ -526,7 +653,12 @@ def run_carousel(
     pending: list[str] = []
     for asset_id in asset_ids:
         output = _generated_path(run, asset_id)
-        _normalize_image_size(output, expected_size, run)
+        _normalize_image_size(
+            output,
+            expected_size,
+            run,
+            allow_portrait_reframe=platform == "vertical-video",
+        )
         if _image_matches(output, expected_size):
             relative_output = _relative_to_run(output, run)
             raw_path = _raw_response_path(run, asset_id)
@@ -573,6 +705,7 @@ def run_carousel(
             manifest_path=manifest_path,
             manifest_data=data,
             asset_id=asset_id,
+            platform=platform,
             expected_size=expected_size,
             config=config,
             max_attempts=max_attempts,
@@ -652,6 +785,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-attempts", type=int, default=2)
     parser.add_argument("--model")
     parser.add_argument("--quality")
+    parser.add_argument(
+        "--api-mode",
+        choices=sorted(API_MODES),
+        default=None,
+        help="OpenRouter request mode. Use images for the dedicated Image API.",
+    )
     return parser
 
 
@@ -665,6 +804,7 @@ def main(argv: list[str] | None = None) -> int:
             max_attempts=args.max_attempts,
             model=args.model,
             quality=args.quality,
+            api_mode=args.api_mode,
         )
     except CarouselRunnerError as exc:
         raise SystemExit(str(exc)) from exc

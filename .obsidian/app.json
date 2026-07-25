@@ -1,0 +1,8 @@
+{
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "docs/memory/inbox",
+  "promptDelete": false,
+  "showLineNumber": false,
+  "attachmentFolderPath": "docs/memory/attachments"
+}

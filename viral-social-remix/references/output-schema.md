@@ -100,3 +100,19 @@ and `last_error`. Store storyboard image URLs on per-asset `storyboard_url` when
 the Seedance runner should use URLs from the manifest instead of `--image-url`.
 The video itself must not contain subtitles or on-screen text; voiceover and
 natural cooking audio are allowed when supported.
+
+After OpenRouter Grok video handoff, store:
+
+- `raw/openrouter-video-create-request.json`: redacted request payload.
+- `raw/openrouter-video-create-response.json`: redacted task creation response.
+- `raw/openrouter-video-status.json`: latest redacted task status response.
+- `generated/openrouter-video.mp4`, or the custom MP4 path passed with
+  `--output`.
+- `qa/openrouter-video.json`: task id, provider metadata, output path, usage,
+  generation controls, and redacted final response.
+
+The manifest may include top-level `openrouter_video_generation` with `status`,
+`task_id`, `model`, `endpoint`, `prompt_path`, `image_count`, `output`,
+`qa_path`, `usage`, `generation`, `postprocess`, and `last_error`. The Grok
+runner is a separate video-only path and must not change carousel image output
+sizing.

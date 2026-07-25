@@ -29,7 +29,7 @@ def test_image_provider_defaults_are_redacted(monkeypatch):
     config = module.resolve()
     assert config == {
         "provider": "openrouter",
-        "model": "openai/gpt-5.4-image-2",
+        "model": "openai/gpt-image-2",
         "quality": "medium",
         "endpoint": "",
         "api_key_set": False,
@@ -55,4 +55,4 @@ def test_image_provider_env_file_does_not_mutate_process_env(tmp_path, monkeypat
     assert "VSR_IMAGE_MODEL" not in os.environ
 
     monkeypatch.setattr(module, "LOCAL_ENV", tmp_path / "missing.env.local")
-    assert module.resolve()["model"] == "openai/gpt-5.4-image-2"
+    assert module.resolve()["model"] == "openai/gpt-image-2"
