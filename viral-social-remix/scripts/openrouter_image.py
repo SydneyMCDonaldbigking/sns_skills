@@ -38,16 +38,18 @@ class OpenRouterImageError(RuntimeError):
         super().__init__(message)
 
 
-def load_env(path: Path | None = None) -> None:
+def load_env(path: Path | None = None) -> dict[str, str]:
+    values: dict[str, str] = {}
     path = path or LOCAL_ENV
     if not path.exists():
-        return
+        return values
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
 
 def data_url(path: Path) -> str:
@@ -325,13 +327,13 @@ def resolve_generation_config(
     model: str | None = None,
     quality: str | None = None,
 ) -> dict:
-    load_env()
+    env_file = load_env()
     config = image_provider.resolve()
     return {
         "model": model or config["model"],
         "quality": quality or config["quality"],
         "endpoint": config["endpoint"] or ENDPOINT,
-        "api_key": os.environ.get("OPENROUTER_API_KEY"),
+        "api_key": os.environ.get("OPENROUTER_API_KEY") or env_file.get("OPENROUTER_API_KEY"),
     }
 
 

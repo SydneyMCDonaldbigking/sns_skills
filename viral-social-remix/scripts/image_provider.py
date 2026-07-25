@@ -19,9 +19,10 @@ DEFAULTS = {
 }
 
 
-def _load_env_file(path: Path) -> None:
+def _load_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
     if not path.exists():
-        return
+        return values
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -29,17 +30,22 @@ def _load_env_file(path: Path) -> None:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip().strip('"').strip("'")
-        os.environ.setdefault(key, value)
+        values[key] = value
+    return values
+
+
+def _resolve_value(key: str, env_file: dict[str, str], default: str) -> str:
+    return os.environ.get(key, env_file.get(key, default))
 
 
 def resolve() -> dict:
-    _load_env_file(LOCAL_ENV)
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    env_file = _load_env_file(LOCAL_ENV)
+    api_key = _resolve_value("OPENROUTER_API_KEY", env_file, "")
     return {
-        "provider": os.environ.get("VSR_IMAGE_PROVIDER", DEFAULTS["provider"]),
-        "model": os.environ.get("VSR_IMAGE_MODEL", DEFAULTS["model"]),
-        "quality": os.environ.get("VSR_IMAGE_QUALITY", DEFAULTS["quality"]),
-        "endpoint": os.environ.get("VSR_IMAGE_ENDPOINT", DEFAULTS["endpoint"]),
+        "provider": _resolve_value("VSR_IMAGE_PROVIDER", env_file, DEFAULTS["provider"]),
+        "model": _resolve_value("VSR_IMAGE_MODEL", env_file, DEFAULTS["model"]),
+        "quality": _resolve_value("VSR_IMAGE_QUALITY", env_file, DEFAULTS["quality"]),
+        "endpoint": _resolve_value("VSR_IMAGE_ENDPOINT", env_file, DEFAULTS["endpoint"]),
         "api_key_set": bool(api_key),
     }
 

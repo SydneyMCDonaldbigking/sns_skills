@@ -88,13 +88,22 @@ def scan(directory: str | Path) -> dict:
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("directory", help="Directory containing local media inputs.")
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Discover supported social-media files and group them into tasks."
+    )
+    parser.add_argument("directory", type=Path)
+    parser.add_argument("--output", type=Path, help="Optional JSON report path.")
     args = parser.parse_args()
 
-    print(json.dumps(scan(args.directory), ensure_ascii=False, indent=2))
+    result = scan(args.directory)
+    rendered = json.dumps(result, ensure_ascii=False, indent=2)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered + "\n", encoding="utf-8")
+    print(rendered)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

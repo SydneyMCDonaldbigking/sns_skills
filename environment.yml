@@ -1,0 +1,9 @@
+name: sns_skill_dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - ffmpeg>=7
+  - pip:
+      - -e .[test]

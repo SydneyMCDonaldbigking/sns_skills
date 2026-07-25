@@ -26,6 +26,22 @@ and theme; label those assumptions. Ask only for missing mandatory fields or low
 Do not ask again for values already supplied. A user's explicit platform always
 overrides automatic detection.
 
+Before asking for examples or product visuals, check the local material index at
+`data/material-index.jsonl` when it exists. Use it as a memory of already
+collected Xiaohongshu posts, Instagram/Facebook posts, and official brand-site
+assets. If it is missing or stale, rebuild it from completed output folders with
+`scripts/collect_source_assets.py`. Search it with
+`scripts/query_material_index.py` by platform, keyword, record type, or asset
+kind before doing new browser/OCR collection. When preparing a remix, use
+`scripts/build_remix_context.py` to create a compact source-post plus
+brand-asset context pack before loading full source folders into context. For a
+new generation task, prefer `scripts/prepare_remix_run.py` to create the
+timestamped run directory, analysis skeleton, context pack, caption placeholder,
+selected asset mapping, and manifest before drafting prompts.
+Run `scripts/validate_prepared_run.py output/<run>` before image generation to
+catch missing analysis files, mismatched asset mappings, or leftover `TODO`
+draft placeholders.
+
 ## API handoff and autonomy
 
 Codex prepares the local source package, localized copy, page prompts, captions,
@@ -262,6 +278,9 @@ Before generation, write:
 - `analysis/caption-zh.txt` for Xiaohongshu
 - `analysis/caption-en.txt` for Instagram/Facebook
 
+Prefer using `scripts/prepare_remix_run.py` to create these files when the task
+starts from local indexed examples and brand assets.
+
 For video, write the caption file required by its target publishing platform.
 The caption must be ready to paste into the platform, including a hook, body,
 CTA, and relevant hashtags. Keep the Chinese natural for Xiaohongshu and the
@@ -288,6 +307,10 @@ OpenRouter directly from Codex for carousel generation. Default local runner
 configuration is OpenRouter `openai/gpt-5.4-image-2` at medium quality when
 `OPENROUTER_API_KEY` is available in the user's `.env.local` or environment.
 Treat this as the GPT Image 2 generation path for carousel assets.
+
+When a generated scene includes an Umall warehouse or fulfilment background,
+load `references/fixed-brand-scenes.md` and use its warehouse image as the
+mandatory scene reference. Do not invent or substitute a different warehouse.
 
 Write one complete prompt per page in `analysis/page-prompts/page-XX.md`.
 Generate the exact Chinese or English text directly in the image; do not default
@@ -327,15 +350,37 @@ vertical 3x3 `overview/contact-sheet.png`. After visual review, load
 
 Visually review every generated image for product fidelity, brand spelling,
 product spelling, numbers, language, CTA, anatomy, perspective, and continuity.
-Run `scripts/validate_output.py` for deterministic checks. Retry only failed
-assets. For API-only carousel runs, do not use local text overlay as a fallback.
+Run `scripts/validate_output.py asset` for deterministic per-asset checks and
+retry only failed assets. For API-only carousel runs, do not use local text
+overlay as a fallback.
 
-After successful local runner completion, ensure the carousel overview or
-exactly nine-frame storyboard exists via `scripts/make_contact_sheet.py`; the
-carousel runner builds `overview/contact-sheet.png` and writes
-`qa/validation.json` automatically. On restart, read the manifest and skip
-assets already marked `validated` or already present at the correct generated
-size.
+Build the carousel overview or exactly nine-frame storyboard with
+`scripts/make_contact_sheet.py`, then run `scripts/validate_output.py delivery`
+to write `qa/validation.json` and check the complete delivery contract. After
+successful local runner completion, confirm its generated
+`overview/contact-sheet.png`, `qa/validation.json`, and any
+`qa/openrouter-cost.json`. On restart, read the manifest and skip assets already
+marked `validated` or already present at the correct generated size.
+
+After a successful source collection run, register the result into the local
+material index:
+
+```bash
+python viral-social-remix/scripts/collect_source_assets.py --platform rednote --run-dir output/<run>
+python viral-social-remix/scripts/collect_source_assets.py --platform instagram --run-dir output/<run>
+python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<run>
+```
+
+For official brand-site assets, run
+`scripts/enrich_brand_assets.py --run-dir output/<run>` before registering the
+run. This creates `brand_asset_catalog.json` with searchable `title`, `tags`,
+`use_case`, and `quality` fields, then `collect_source_assets.py` will ingest
+those enriched fields.
+
+Keep `data/material-index.jsonl` local and ignored by Git. Commit the collector
+script and workflow documentation, not downloaded media or private indexes. The
+collector writes stable `record_id` values and skips duplicates when the same
+run is registered again.
 
 For Seedance output, check `qa/seedance-video.json`, confirm
 `generated/seedance-video.mp4` exists, and visually review cooking continuity,

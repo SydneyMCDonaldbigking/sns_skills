@@ -1,9 +1,15 @@
+import json
+import subprocess
+import sys
+from pathlib import Path
+
 from PIL import Image
 
 from viral_social_test_loader import load_script
 
 
 validation = load_script("validate_output")
+SCRIPT = Path(__file__).parents[1] / "viral-social-remix" / "scripts" / "validate_output.py"
 
 
 def test_xiaohongshu_rejects_wrong_dimensions(tmp_path):
@@ -99,3 +105,24 @@ def test_vertical_video_delivery_requires_handoff_files(tmp_path):
     assert any("shot-list.md" in error for error in result["errors"])
     assert any("seedance-prompt.md" in error for error in result["errors"])
     assert any("page-prompts" in error for error in result["errors"])
+
+
+def test_delivery_cli_writes_validation_report(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "delivery",
+            str(tmp_path),
+            "--platform",
+            "xiaohongshu",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    report = tmp_path / "qa" / "validation.json"
+    assert result.returncode == 1
+    assert report.is_file()
+    assert json.loads(report.read_text(encoding="utf-8"))["valid"] is False

@@ -6,7 +6,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 
 DEFAULT_PATTERNS = [
@@ -15,7 +15,7 @@ DEFAULT_PATTERNS = [
 ]
 
 
-def load_ocr_engine():
+def load_ocr_engine() -> Any:
     try:
         from rapidocr_onnxruntime import RapidOCR
     except ImportError as exc:
@@ -39,7 +39,7 @@ def iter_images(path: Path) -> Iterable[Path]:
         )
 
 
-def ocr_image(ocr, path: Path) -> dict:
+def ocr_image(ocr: Any, path: Path) -> dict:
     result, elapsed = ocr(str(path))
     lines = []
     if result:

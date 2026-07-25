@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 
 
@@ -41,3 +42,17 @@ def test_image_provider_detects_key_without_returning_it(monkeypatch):
     config = module.resolve()
     assert config["api_key_set"] is True
     assert "secret-value" not in str(config)
+
+
+def test_image_provider_env_file_does_not_mutate_process_env(tmp_path, monkeypatch):
+    monkeypatch.delenv("VSR_IMAGE_MODEL", raising=False)
+    env_file = tmp_path / ".env.local"
+    env_file.write_text("VSR_IMAGE_MODEL=test-env-file-model\n", encoding="utf-8")
+    module = load_module()
+    monkeypatch.setattr(module, "LOCAL_ENV", env_file)
+
+    assert module.resolve()["model"] == "test-env-file-model"
+    assert "VSR_IMAGE_MODEL" not in os.environ
+
+    monkeypatch.setattr(module, "LOCAL_ENV", tmp_path / "missing.env.local")
+    assert module.resolve()["model"] == "openai/gpt-5.4-image-2"

@@ -55,6 +55,7 @@ def test_skill_routes_every_input_and_platform():
         "Xiaohongshu source to English carousel",
         "source platform and target output platform separately",
         "instagram-pantry-essentials-template.md",
+        "fixed-brand-scenes.md",
     ]
     for phrase in required:
         assert phrase in text
