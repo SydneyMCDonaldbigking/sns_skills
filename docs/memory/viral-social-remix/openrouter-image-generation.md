@@ -33,6 +33,27 @@ When `--api-only` is enabled:
 - Do not create local fallback composites.
 - Already-generated pages with the correct dimensions are skipped for resume.
 
+## Final Shopping Guide Page
+
+For commerce-oriented image/carousel posts, the final page is part of the
+delivery contract:
+
+- If the original/source post has a final shopping, category, search, or app
+  guide page, generate the English-region version by preserving that original
+  layout logic.
+- Use the English-region brand lockup:
+  `ASIAN GROCER ONLINE powered by UMALL`.
+- Use real English app/category/search screenshots inside the phone/app area
+  when the user provides them.
+- Do not merely paste the raw phone screenshot as the whole page, and do not
+  invent unrelated CTA copy, prices, UI, or product cards.
+- If the needed app screenshot/reference is missing, ask for it before marking
+  the carousel complete, unless the user explicitly says to skip the shopping
+  handoff.
+- For deterministic shopping-handoff composites, no image API cost is needed;
+  still record the page in `analysis/copy.md`, `analysis/page-prompts/`, and the
+  manifest.
+
 ## Cost Habit
 
 Choose a model that matches quality needs and budget. It is fine to pick a

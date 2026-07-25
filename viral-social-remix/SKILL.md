@@ -238,6 +238,16 @@ localize it as an app-entry guide. If it is a ranked list, recipe step, product
 comparison, tutorial, quote card, or detail page, preserve that exact page role,
 count, layout logic, and copy rhythm.
 
+For commerce-oriented image/carousel work, the final shopping guide is
+mandatory unless the user explicitly waives it. If the source/original contains
+a final app-entry, category, search, or purchase guide page, preserve that page
+role and layout structure in English-region output. Use real English app/search
+screenshots inside the phone/app area when supplied, and use the English-region
+`ASIAN GROCER ONLINE powered by UMALL` logo. Do not simply paste a raw phone
+screenshot as the whole page, do not forget this page, and do not invent prices,
+product cards, UI, or unrelated CTA copy. If the search/app screenshot needed
+for the final page is missing, ask for it before declaring the carousel done.
+
 For cross-platform localization, translate and rewrite the source post's own
 visible copy and caption into natural target-platform language. Do not invent a
 new marketing angle when the source copy already provides the angle. Keep the
@@ -306,6 +316,12 @@ Before generation, write:
 - `analysis/manifest.json` using `scripts/manifest.py`
 - `analysis/caption-zh.txt` for Xiaohongshu
 - `analysis/caption-en.txt` for Instagram/Facebook
+
+For commerce-oriented carousels, include the final shopping guide page in those
+files as a normal deliverable page. Record the source reference screenshot(s),
+the English-region logo asset, and whether the page was API-generated or a
+deterministic reference-based composite. The final contact sheet must show this
+shopping guide page before the run is reported complete.
 
 For video, write the caption file required by its target publishing platform.
 The caption must be ready to paste into the platform, including a hook, body,
@@ -395,6 +411,12 @@ carousel runner builds `overview/contact-sheet.png` and writes
 `qa/validation.json` automatically. On restart, read the manifest and skip
 assets already marked `validated` or already present at the correct generated
 size.
+
+For commerce/image carousel runs, visually confirm the final shopping guide
+page exists in `overview/contact-sheet.png`. It should follow the original guide
+page's structure when one exists, use English-region branding, and contain real
+app/search/category UI instead of invented screenshots. If it is missing, the
+carousel is not finished.
 
 For Seedance output, check `qa/seedance-video.json`, confirm
 `generated/seedance-video.mp4` exists, and visually review cooking continuity,

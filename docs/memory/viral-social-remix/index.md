@@ -10,6 +10,13 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
   asks to change them.
 - A supplied phone screenshot is not automatically the source. If the user says
   it is for the final page, use it only for the final CTA/search/app page.
+- For image/carousel posts with commerce intent, do not forget the final
+  shopping guide page. If the source/original has a purchase/app-entry page,
+  localize that exact page structure into the English region. If the user
+  supplies real English app search screenshots, use them inside the final guide
+  page with the English-region `ASIAN GROCER ONLINE powered by UMALL` logo. Do
+  not finish the carousel until the final shopping handoff is present, or the
+  user explicitly waives it.
 - Carousel generation is API-only for production. Do not fall back to local
   composite pages when `--api-only` is selected.
 - Keys come only from `.env.local` or environment variables and must never be
@@ -61,6 +68,10 @@ Do not treat Seedance as the end of the workflow when the user is talking about
 - 2026-07-25: For cheap video API smoke tests, use OpenRouter Grok with
   `GROK_OPENROUTER_API_KEY`, `x-ai/grok-imagine-video`, 720p, 9:16, no audio,
   and a one-second first-frame test before spending on longer clips.
+- 2026-07-25: For English carousels based on Chinese commerce/source posts, the
+  last page should be an English shopping guide modeled on the original page,
+  not a forgotten afterthought. Use the original guide layout as reference and
+  place real English app/search results inside it.
 
 ## Useful Links
 
