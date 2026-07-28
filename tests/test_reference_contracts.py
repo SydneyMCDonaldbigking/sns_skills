@@ -100,6 +100,33 @@ def test_brand_region_assets_distinguish_english_and_chinese_logos():
     assert (LOGO_DIR / "umall_logo.png").is_file()
 
 
+def test_seedance_reference_documents_controlled_manifest_v2_workflow():
+    text = (REF / "seedance-video.md").read_text(encoding="utf-8")
+    for required in [
+        "Manifest v2",
+        "{{ref:hero-food}}",
+        "[Image 1]",
+        "Never use `@Image1`",
+        "visual-preview",
+        "--approve-final-spend",
+        "request SHA-256",
+        "--continue-from-last-frame",
+        "visual_qa_passed",
+        "prepare-export",
+        "export_qa_passed",
+    ]:
+        assert required in text
+
+
+def test_brand_rules_require_scene_anchored_exact_logo_compositing():
+    cooking = (REF / "cooking-video-workflow.md").read_text(encoding="utf-8")
+    brand = (REF / "brand-region-assets.md").read_text(encoding="utf-8")
+    for text in [cooking, brand]:
+        assert "perspective" in text
+        assert "occlusion" in text
+        assert "floating corner" in text
+
+
 def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():
     text = (REF / "xiaohongshu-real-talk-template.md").read_text(encoding="utf-8")
     for required in [

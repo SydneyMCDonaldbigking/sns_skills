@@ -23,21 +23,34 @@ ChatCut is already installed locally. Do not start by reinstalling it.
 
 After video generation finishes:
 
-1. Collect the generated MP4 outputs from the run directory.
-2. Prefer importing the individual generated segments as separate ChatCut assets
+1. Confirm `video_workflow.status` is `visual_qa_passed`. If the manifest is
+   older, prepare and record the decision with `scripts/video_qa.py` first.
+2. Collect the generated MP4 outputs from the run directory.
+3. Prefer importing the individual generated segments as separate ChatCut assets
    and sequential V1 timeline items. This keeps the edit adjustable at segment
    boundaries.
-3. Use a stitched MP4 only as a quick review/reference asset, or when the user
+4. Use a stitched MP4 only as a quick review/reference asset, or when the user
    explicitly asks to import the already stitched final as one clip.
-4. Create a new ChatCut project with the final platform canvas.
+5. Create a new ChatCut project with the final platform canvas.
    - Douyin/TikTok vertical: `1080x1920`.
    - Use `30fps` in ChatCut unless a specific project needs otherwise.
-5. Import local MP4 files through ChatCut's media import flow.
-6. Place clips on `V1` in order, starting at frame `0`, with no gaps unless
+6. Import local MP4 files through ChatCut's media import flow.
+7. Place clips on `V1` in order, starting at frame `0`, with no gaps unless
    intentionally requested.
-7. Do not add subtitles, title cards, lower-thirds, text, logos, music,
+8. Do not add subtitles, title cards, lower-thirds, text, logos, music,
    voiceover, overlays, transitions, or effects unless the user explicitly asks.
-8. Verify the timeline state and return the editor URL for review.
+9. Verify the timeline state and return the editor URL for review.
+
+When exact logo placement is requested under
+`post-composited-physical-prop`, place and track the official PNG onto an actual
+scene surface with matching perspective, occlusion, lighting, and texture. Do
+not add it as a floating corner logo. `clean-end-card` is a different explicit
+strategy and should not be silently substituted.
+
+After export, run `scripts/video_qa.py prepare-export` on the exact delivered
+file, inspect the export review strip, and record `approve-export` or
+`reject-export --reason`. Do not report the delivery complete until the
+manifest reaches `video_workflow.status: export_qa_passed`.
 
 If the user says they want to "串视频剪辑", "接上剪辑", "导入剪辑",
 "进 ChatCut", "后面剪一下", "加 BGM", "加字幕", "加英文标签", or "导出",

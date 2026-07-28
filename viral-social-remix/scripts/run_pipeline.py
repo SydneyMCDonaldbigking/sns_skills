@@ -26,6 +26,11 @@ import validate_output
 
 VIDEO_PLATFORMS = {"video", "vertical-video"}
 PLATFORMS = {"xiaohongshu", "instagram-facebook"} | VIDEO_PLATFORMS
+VIDEO_REFERENCE_EXTENSIONS = {
+    "image": {".jpg", ".jpeg", ".png", ".webp", ".heic"},
+    "video": {".mp4", ".mov", ".webm", ".m4v"},
+    "audio": {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"},
+}
 DEFAULT_SIZES = {
     "xiaohongshu": "1152x1536",
     "instagram-facebook": "1152x1152",
@@ -179,9 +184,72 @@ def fixed_cooking_shot_list() -> str:
     return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
 
 
-def _mark_compact_reference_mode(manifest_path: Path) -> None:
+def _mark_compact_reference_mode(
+    manifest_path: Path,
+    references: list[dict] | None = None,
+) -> None:
     data = manifest.load(manifest_path)
+    data["schema_version"] = 2
     data["video_mode"] = "compact-reference"
+    data["video"] = {
+        "mode": "compact-reference",
+        "profile": "visual-preview",
+        "references": references or [],
+        "shots": [
+            {
+                "id": "shot-01",
+                "soft_timing": "opening-third",
+                "narrative_role": "ingredient/product setup and first food action",
+                "camera_motion": "one controlled movement",
+            },
+            {
+                "id": "shot-02",
+                "soft_timing": "middle-third",
+                "narrative_role": "main cooking transformation",
+                "camera_motion": "one controlled movement",
+            },
+            {
+                "id": "shot-03",
+                "soft_timing": "final-third",
+                "narrative_role": "texture, plating, or finished hero",
+                "camera_motion": "final hold or one controlled movement",
+            },
+        ],
+          "generation": {
+            "ratio": "9:16",
+            "duration": 5,
+            "resolution": "1080p",
+            "generate_audio": False,
+            "return_last_frame": True,
+              "watermark": False,
+          },
+          "delivery": {
+              "ratio": "9:16",
+              "resolution": "1080p",
+              "duration": None,
+              "expect_audio": None,
+              "text_policy": "editable-post-only",
+          },
+        "continuity": {
+            "last_frame_path": None,
+            "available": False,
+        },
+        "brand": {
+            "strategy": "post-composited-physical-prop",
+            "visible_text": "none",
+        },
+        "budget": {
+            "retry_limit": 1,
+            "stop_before_final": True,
+        },
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "chatcut": "not_started",
+        "export_qa": "not_started",
+        "history": [],
+    }
     data["assumptions"].append(
         {
             "inferred": True,
@@ -189,6 +257,49 @@ def _mark_compact_reference_mode(manifest_path: Path) -> None:
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _video_reference_id(kind: str, index: int, value: str) -> str:
+    stem = Path(urlparse(value).path if is_url(value) else value).stem
+    return f"{kind}-{index:02d}-{_safe_stem(stem)[:32]}"
+
+
+def _prepare_video_references(
+    run_dir: Path,
+    *,
+    image_references: list[str] | None = None,
+    video_references: list[str] | None = None,
+    audio_references: list[str] | None = None,
+) -> list[dict]:
+    prepared: list[dict] = []
+    reference_dir = run_dir / "references" / "inputs"
+    for kind, values in [
+        ("image", image_references or []),
+        ("video", video_references or []),
+        ("audio", audio_references or []),
+    ]:
+        for index, value in enumerate(values, 1):
+            entry = {
+                "id": _video_reference_id(kind, index, value),
+                "type": kind,
+                "order": index,
+            }
+            if is_url(value):
+                entry["url"] = value
+            else:
+                source = Path(value).resolve()
+                if not source.is_file():
+                    raise ValueError(f"Missing {kind} reference: {source}")
+                if source.suffix.lower() not in VIDEO_REFERENCE_EXTENSIONS[kind]:
+                    raise ValueError(
+                        f"Unsupported {kind} reference extension: {source.suffix}"
+                    )
+                reference_dir.mkdir(parents=True, exist_ok=True)
+                target = _unique_path(reference_dir / source.name)
+                shutil.copy2(source, target)
+                entry["path"] = target.relative_to(run_dir).as_posix()
+            prepared.append(entry)
+    return prepared
 
 
 def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[str]:
@@ -335,6 +446,9 @@ def prepare_original_video_run(
     output_root: str | Path = "output",
     task_name: str | None = None,
     caption_language: str | None = None,
+    image_references: list[str] | None = None,
+    video_references: list[str] | None = None,
+    audio_references: list[str] | None = None,
 ) -> Path:
     if platform not in VIDEO_PLATFORMS:
         raise ValueError(f"Original video platform must be one of: {', '.join(sorted(VIDEO_PLATFORMS))}")
@@ -361,7 +475,15 @@ def prepare_original_video_run(
         provider=image_provider.resolve(),
     )
     if platform == "vertical-video":
-        _mark_compact_reference_mode(manifest_path)
+        _mark_compact_reference_mode(
+            manifest_path,
+            _prepare_video_references(
+                run_dir,
+                image_references=image_references,
+                video_references=video_references,
+                audio_references=audio_references,
+            ),
+        )
     return run_dir
 
 
@@ -451,6 +573,9 @@ def cmd_prepare_original_video(args: argparse.Namespace) -> int:
         output_root=args.output_root,
         task_name=args.task_name,
         caption_language=args.caption_language,
+        image_references=args.image_reference,
+        video_references=args.video_reference,
+        audio_references=args.audio_reference,
     )
     print(json.dumps({"run_dir": str(run_dir)}, ensure_ascii=False, indent=2))
     return 0
@@ -517,6 +642,9 @@ def build_parser() -> argparse.ArgumentParser:
     original.add_argument("--output-root", default="output")
     original.add_argument("--task-name")
     original.add_argument("--caption-language", choices=["zh", "en"])
+    original.add_argument("--image-reference", action="append", default=[])
+    original.add_argument("--video-reference", action="append", default=[])
+    original.add_argument("--audio-reference", action="append", default=[])
     original.set_defaults(func=cmd_prepare_original_video)
 
     validate = subparsers.add_parser("validate")

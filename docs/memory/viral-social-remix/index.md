@@ -113,6 +113,11 @@ a generic CTA.
   models each theme as audience promise + emotion + rhythm + proof, and force
   Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export
   QA instead of decorating an unverified rough cut.
+- 2026-07-28: Make video generation manifest-driven. Compile semantic
+  `{{ref:id}}` tokens to provider labels only after reference ordering, run
+  official-limit preflight before spend, save a sanitized request lock/hash,
+  use no-audio preview profiles, persist returned last frames for continuation,
+  and require explicit human visual approval before ChatCut/export.
 
 ## Useful Links
 

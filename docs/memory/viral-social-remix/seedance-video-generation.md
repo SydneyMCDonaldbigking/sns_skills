@@ -42,14 +42,36 @@ For cheaper 720p smoke tests before spending on Seedance, use
 Good preview command shape:
 
 ```powershell
-.\.venv\python.exe .\viral-social-remix\scripts\run_seedance_video.py --run output/xxx --allow-data-url --include-all-frames --duration 5 --ratio 9:16 --resolution 1080p --no-generate-audio --no-watermark
+.\.venv\python.exe .\viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview --dry-run
+.\.venv\python.exe .\viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview
 ```
 
-`--include-all-frames` is for the legacy 9-frame cooking storyboard route. For
-new Seedance 2.0 cooking tests, prefer the official compact prompt style in
-[[seedance-official-prompting]]: 3 soft shot beats, 3-5 real reference assets,
-and one camera movement per shot. For a single first-frame image-to-video test,
-omit `--include-all-frames` so only the first image is sent.
+Put references in manifest `video.references`; use public URLs for video/audio
+references and public URLs or explicitly permitted data URLs for local images.
+Use semantic prompt placeholders such as `{{ref:product-pack}}`. The runner
+compiles them to the final provider order (`[Image 1]`, `[Video 1]`) and rejects
+unknown, missing, or `@Image1` references before spending money.
+
+`--include-all-frames` remains only for the legacy 9-frame cooking storyboard
+route. For new Seedance 2.0 cooking tests, prefer the official compact prompt
+style in [[seedance-official-prompting]]: 3 soft shot beats, 3-5 real reference
+assets, and one camera movement per shot.
+
+Profiles make intent explicit:
+
+- `smoke`: 5s, 720p, no audio.
+- `visual-preview`: 5s, 1080p, no audio, return last frame.
+- `final-clip`: 6s, 1080p, no audio, return last frame.
+- `native-audio-final`: 6s, 1080p, native audio, return last frame.
+
+Explicit CLI options override the profile. The local preflight enforces the
+official 4-15s duration range and limits of 9 images, 3 videos, and 3 audio
+references; audio-only jobs fail before submission.
+
+Manifest budget controls prevent silent escalation: `retry_limit` bounds paid
+retries, `stop_before_final` requires `--approve-final-spend` for final
+profiles, and a prior active/succeeded status blocks accidental duplicate
+submission unless `--force` is deliberate.
 
 ## Official Prompting Update
 
@@ -148,12 +170,33 @@ For cooking video prompts:
 After Seedance finishes:
 
 - Confirm `generated/*.mp4` exists.
-- Run `ffprobe` for duration, resolution, and frame rate.
-- Extract a small frame strip at key timestamps.
+- Run the deterministic QA preparation command:
+
+  ```powershell
+  .\.venv\python.exe .\viral-social-remix\scripts\video_qa.py prepare output/xxx
+  ```
+
+- Review `qa/video-review-strip.jpg` and
+  `qa/video-visual-review.json`.
 - Check for visible subtitles, title cards, labels, floating logos, extra brand
   marks, warped hands, broken food, duplicated objects, and busy background
   drift.
+- Record a decision; passing is never inferred from metadata alone:
+
+  ```powershell
+  .\.venv\python.exe .\viral-social-remix\scripts\video_qa.py approve output/xxx
+  .\.venv\python.exe .\viral-social-remix\scripts\video_qa.py reject output/xxx --reason "package drift"
+  ```
+
 - Report actual token usage and estimated cost to the user.
+
+After ChatCut/export, repeat the metadata plus human-review gate on the actual
+delivery file:
+
+```powershell
+.\.venv\python.exe .\viral-social-remix\scripts\video_qa.py prepare-export output/xxx --video generated/final-export.mp4
+.\.venv\python.exe .\viral-social-remix\scripts\video_qa.py approve-export output/xxx
+```
 
 ## Next Step: ChatCut Editing
 

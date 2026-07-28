@@ -146,6 +146,152 @@ def test_vertical_video_compact_reference_delivery_skips_legacy_storyboard_requi
     assert not any("contact-sheet" in error for error in result["errors"])
 
 
+def _write_compact_delivery_files(tmp_path):
+    analysis = tmp_path / "analysis"
+    qa = tmp_path / "qa"
+    analysis.mkdir()
+    qa.mkdir()
+    for name in [
+        "breakdown.md",
+        "copy.md",
+        "caption-en.txt",
+        "prompts.md",
+        "brief.md",
+        "shot-list.md",
+        "seedance-prompt.md",
+    ]:
+        (analysis / name).write_text("fixture", encoding="utf-8")
+    (qa / "validation.json").write_text("{}", encoding="utf-8")
+    return analysis
+
+
+def test_vertical_video_compact_reference_rejects_empty_structured_references(
+    tmp_path,
+):
+    analysis = _write_compact_delivery_files(tmp_path)
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "platform": "vertical-video",
+                "video": {
+                    "mode": "compact-reference",
+                    "profile": "visual-preview",
+                    "references": [],
+                },
+                "assets": {"01": {"status": "pending"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("at least one image or video" in error for error in result["errors"])
+
+
+def test_vertical_video_compact_reference_rejects_audio_only_manifest(tmp_path):
+    analysis = _write_compact_delivery_files(tmp_path)
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "platform": "vertical-video",
+                "video": {
+                    "mode": "compact-reference",
+                    "profile": "visual-preview",
+                    "references": [
+                        {
+                            "id": "ambience",
+                            "type": "audio",
+                            "order": 1,
+                            "url": "https://cdn.example/ambience.mp3",
+                        }
+                    ],
+                },
+                "assets": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("audio-only" in error for error in result["errors"])
+
+
+def test_vertical_video_compact_reference_rejects_at_image_prompt_syntax(tmp_path):
+    analysis = _write_compact_delivery_files(tmp_path)
+    (analysis / "seedance-prompt.md").write_text(
+        "Use @Image1 as the product reference.",
+        encoding="utf-8",
+    )
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "platform": "vertical-video",
+                "video": {
+                    "mode": "compact-reference",
+                    "profile": "visual-preview",
+                    "references": [
+                        {
+                            "id": "product",
+                            "type": "image",
+                            "order": 1,
+                            "url": "https://cdn.example/product.png",
+                        }
+                    ],
+                },
+                "assets": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("[Image 1]" in error for error in result["errors"])
+
+
+def test_manifest_v2_compact_requires_control_sections(tmp_path):
+    analysis = _write_compact_delivery_files(tmp_path)
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "platform": "vertical-video",
+                "video": {
+                    "mode": "compact-reference",
+                    "profile": "visual-preview",
+                    "references": [
+                        {
+                            "id": "product",
+                            "type": "image",
+                            "order": 1,
+                            "url": "https://cdn.example/product.png",
+                        }
+                    ],
+                    "shots": [],
+                },
+                "assets": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("exactly three soft shots" in error for error in result["errors"])
+    assert any("video.delivery" in error for error in result["errors"])
+    assert any("video_workflow" in error for error in result["errors"])
+    assert any("video.brand" in error for error in result["errors"])
+
+
 def test_delivery_cli_writes_validation_report(tmp_path):
     result = subprocess.run(
         [

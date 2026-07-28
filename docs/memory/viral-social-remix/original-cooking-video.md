@@ -52,8 +52,11 @@ with small `powered by UMALL`.
 Do not rely on Seedance or Grok to redraw the company logo accurately. Video
 models often warp brand text and lockups even when a correct logo reference is
 provided. If the logo must be exact, generate the cooking video with product
-packaging or a non-critical brand prop only, then add the official PNG in
-ChatCut/post as a controlled graphic. Treat AI-generated physical logo signs as
+packaging or a non-critical brand prop only, then composite the official PNG in
+ChatCut/post onto a real scene surface with matched perspective, tracking,
+occlusion, lighting, and texture. It should read as a printed table card,
+package face, or sign—not a floating logo bug. Use a clean end card only when
+that is the declared brand strategy. Treat AI-generated physical logo signs as
 review-only, not final brand-fidelity assets.
 
 ## Continuity
@@ -71,10 +74,14 @@ Use more real references when product fidelity matters:
 
 ## Handoff
 
-Prepare a compact Seedance prompt first, review the real reference assets, then
-hand off to Seedance with `viral-social-remix/scripts/run_seedance_video.py`.
+Prepare a compact Seedance prompt and Manifest v2 first, review the real
+reference assets, then dry-run the compiled request before handing off to
+Seedance with `viral-social-remix/scripts/run_seedance_video.py`.
 
-For Seedance, run a 5-second no-audio preview before paying for a longer final.
+For Seedance, use the `visual-preview` profile for a 5-second no-audio pass
+before paying for a longer final. After generation, run
+`viral-social-remix/scripts/video_qa.py prepare`; do not hand off to ChatCut
+until a human records `approve`.
 The mapo tofu test showed that sparse food-motion scenes work much better than
 rigid mechanical motion. Keep the set minimal, the motion controlled, the
 camera language simple, and the brand sign physical. See

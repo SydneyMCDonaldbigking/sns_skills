@@ -1,5 +1,42 @@
 # Viral Social Remix Skill
 
+## Controlled Seedance workflow
+
+New compact video runs use Manifest v2 instead of an improvised API prompt.
+The manifest owns ordered image/video/audio references, generation profile,
+three soft shots, continuity state, brand strategy, budget guard, and workflow
+status. Prompts use semantic tokens such as `{{ref:product-pack}}`; the local
+runner compiles them to BytePlus labels such as `[Image 1]` only after the
+request order is known.
+
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_pipeline.py prepare-original-video `
+  --brief "English vertical cooking video" `
+  --task-name cooking-preview `
+  --image-reference https://cdn.example.com/product.png
+
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py `
+  --run output/<run> --profile visual-preview --dry-run
+
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py `
+  --run output/<run> --profile visual-preview
+
+.\.venv\python.exe viral-social-remix\scripts\video_qa.py prepare output/<run>
+.\.venv\python.exe viral-social-remix\scripts\video_qa.py approve output/<run>
+
+.\.venv\python.exe viral-social-remix\scripts\video_qa.py prepare-export `
+  output/<run> --video generated/final-export.mp4
+.\.venv\python.exe viral-social-remix\scripts\video_qa.py approve-export output/<run>
+```
+
+`visual-preview` is 5 seconds, 1080p, no audio, and requests the last frame for
+continuation. Preflight enforces the official Seedance 2.0 duration/reference
+limits and rejects invalid prompt labels before submission. Generated MP4s do
+not proceed to ChatCut/export until `video_workflow.status` is
+`visual_qa_passed`, and a final export is not complete until
+`export_qa_passed`. Full details are in
+[`viral-social-remix/references/seedance-video.md`](viral-social-remix/references/seedance-video.md).
+
 把小红书、Instagram/Facebook 图片帖、浏览器中已登录可见的社媒内容或本地视频素材拆解为可复用的内容结构，再结合品牌与产品素材，准备平台可发布的图片轮播、九帧视频故事板和配套文案。
 
 仓库包含 Codex Skill、确定性媒体处理脚本、素材索引工具、浏览器 source capture 工具、OpenRouter 本地生成 runner、输出校验器以及测试。核心使用说明见 [`viral-social-remix/SKILL.md`](viral-social-remix/SKILL.md)。

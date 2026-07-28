@@ -82,6 +82,83 @@ def _prepared_compact_video_run(tmp_path: Path) -> Path:
     return run_dir
 
 
+def _prepared_multimodal_video_run(tmp_path: Path) -> Path:
+    run_dir = tmp_path / "output" / "multimodal"
+    analysis = run_dir / "analysis"
+    analysis.mkdir(parents=True)
+    (analysis / "seedance-prompt.md").write_text(
+        "Use {{ref:food}} for the opening and {{ref:product}} for package "
+        "fidelity. Follow the camera rhythm from {{ref:motion}} and the "
+        "ambience from {{ref:ambience}}.",
+        encoding="utf-8",
+    )
+    (analysis / "shot-list.md").write_text(
+        "Shot 1 opening third\nShot 2 middle third\nShot 3 final third",
+        encoding="utf-8",
+    )
+    manifest.create(
+        analysis / "manifest.json",
+        "vertical-video",
+        [],
+    )
+    data = manifest.load(analysis / "manifest.json")
+    data["schema_version"] = 2
+    data["video_mode"] = "compact-reference"
+    data["video"] = {
+        "mode": "compact-reference",
+        "profile": "visual-preview",
+        "references": [
+            {
+                "id": "food",
+                "type": "image",
+                "order": 1,
+                "url": "https://cdn.example/food.png",
+            },
+            {
+                "id": "product",
+                "type": "image",
+                "order": 2,
+                "url": "https://cdn.example/product.png",
+            },
+            {
+                "id": "motion",
+                "type": "video",
+                "order": 1,
+                "url": "https://cdn.example/motion.mp4",
+            },
+            {
+                "id": "ambience",
+                "type": "audio",
+                "order": 1,
+                "url": "https://cdn.example/ambience.mp3",
+            },
+        ],
+        "generation": {
+            "duration": 5,
+            "resolution": "1080p",
+            "generate_audio": False,
+            "return_last_frame": True,
+            "watermark": False,
+        },
+        "continuity": {
+            "last_frame_path": None,
+            "available": False,
+        },
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "chatcut": "not_started",
+        "export_qa": "not_started",
+        "history": [],
+    }
+    (analysis / "manifest.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return run_dir
+
+
 def _mark_storyboard_validated(run_dir: Path) -> None:
     manifest_path = run_dir / "analysis" / "manifest.json"
     for index in range(1, 10):
@@ -127,7 +204,7 @@ def test_run_seedance_video_dry_run_uses_manifest_storyboard_url(tmp_path, monke
         "ratio": "9:16",
         "duration": 5,
         "resolution": "1080p",
-        "generate_audio": True,
+        "generate_audio": False,
         "watermark": False,
     }
     payload = result["payload"]
@@ -135,7 +212,7 @@ def test_run_seedance_video_dry_run_uses_manifest_storyboard_url(tmp_path, monke
     assert payload["ratio"] == "9:16"
     assert payload["duration"] == 5
     assert payload["resolution"] == "1080p"
-    assert payload["generate_audio"] is True
+    assert payload["generate_audio"] is False
     assert payload["watermark"] is False
     assert payload["content"][0]["type"] == "text"
     assert "tomato egg stir-fry" in payload["content"][0]["text"]
@@ -198,6 +275,57 @@ def test_run_seedance_video_compact_reference_sends_all_manifest_references_by_d
     assert all(item["role"] == "reference_image" for item in image_items)
 
 
+def test_run_seedance_video_compiles_and_sends_multimodal_references(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_multimodal_video_run(tmp_path)
+
+    result = runner.run_seedance_video(run_dir, dry_run=True)
+
+    assert result["profile"] == "visual-preview"
+    assert result["image_count"] == 2
+    assert result["video_count"] == 1
+    assert result["audio_count"] == 1
+    assert result["reference_count"] == 4
+    assert result["generation"]["generate_audio"] is False
+    assert result["payload"]["return_last_frame"] is True
+    prompt = result["payload"]["content"][0]["text"]
+    assert "[Image 1]" in prompt
+    assert "[Image 2]" in prompt
+    assert "[Video 1]" in prompt
+    assert "[Audio 1]" in prompt
+    assert "{{ref:" not in prompt
+    assert [item["type"] for item in result["payload"]["content"][1:]] == [
+        "image_url",
+        "image_url",
+        "video_url",
+        "audio_url",
+    ]
+    assert [item["role"] for item in result["payload"]["content"][1:]] == [
+        "reference_image",
+        "reference_image",
+        "reference_video",
+        "reference_audio",
+    ]
+
+
+def test_run_seedance_video_rejects_official_duration_violation(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_multimodal_video_run(tmp_path)
+
+    try:
+        runner.run_seedance_video(run_dir, dry_run=True, duration="3")
+    except runner.SeedanceRunnerError as exc:
+        assert "between 4 and 15" in str(exc)
+    else:
+        raise AssertionError("Expected SeedanceRunnerError")
+
+
 def test_run_seedance_video_compact_reference_can_submit_without_nine_validated_frames(
     tmp_path,
     monkeypatch,
@@ -234,6 +362,146 @@ def test_run_seedance_video_compact_reference_can_submit_without_nine_validated_
     assert [call[0] for call in calls] == ["POST", "GET"]
     assert result["video_mode"] == "compact-reference"
     assert result["output"] == "generated/seedance-video.mp4"
+
+
+def test_run_seedance_video_downloads_and_registers_last_frame(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_multimodal_video_run(tmp_path)
+    monkeypatch.setenv("BYTEPLUS_ARK_API_KEY", "test-key")
+    downloads = []
+
+    def fake_request(method, url, api_key, payload):
+        if method == "POST":
+            assert payload["return_last_frame"] is True
+            return {"id": "cgt-last-frame"}
+        return {
+            "id": "cgt-last-frame",
+            "status": "succeeded",
+            "content": {
+                "video_url": "https://cdn.example/final.mp4",
+                "last_frame_url": "https://cdn.example/final-frame.png",
+            },
+            "usage": {"total_tokens": 789},
+        }
+
+    def fake_download(url, output):
+        downloads.append((url, output.name))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"download")
+
+    result = runner.run_seedance_video(
+        run_dir,
+        timeout_seconds=10,
+        poll_interval=0,
+        request_fn=fake_request,
+        download_fn=fake_download,
+    )
+
+    assert downloads == [
+        ("https://cdn.example/final.mp4", "seedance-video.mp4"),
+        (
+            "https://cdn.example/final-frame.png",
+            "seedance-video-last-frame.png",
+        ),
+    ]
+    assert result["last_frame_output"] == (
+        "generated/seedance-video-last-frame.png"
+    )
+    assert "video_url" not in result
+    lock_path = run_dir / "analysis" / "seedance-request.lock.json"
+    assert lock_path.is_file()
+    request_lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    assert request_lock["request_sha256"] == result["request_sha256"]
+    assert all(
+        item.get(item["type"], {}).get("url") == "<external URL>"
+        for item in request_lock["payload"]["content"][1:]
+    )
+    assert all(
+        reference["source"] == "<external URL>"
+        for reference in request_lock["references"]
+    )
+
+    data = manifest.load(run_dir / "analysis" / "manifest.json")
+    assert data["video"]["continuity"] == {
+        "last_frame_path": "generated/seedance-video-last-frame.png",
+        "available": True,
+    }
+    assert data["video_workflow"]["status"] == "generated"
+    assert data["video_workflow"]["visual_qa"] == "pending"
+    assert data["video_generation"]["request_sha256"] == result["request_sha256"]
+
+
+def test_run_seedance_video_records_create_failure_and_attempt(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_multimodal_video_run(tmp_path)
+    monkeypatch.setenv("BYTEPLUS_ARK_API_KEY", "test-key")
+
+    def fail_create(method, url, api_key, payload):
+        assert method == "POST"
+        raise runner.SeedanceHTTPError(503, "provider unavailable")
+
+    try:
+        runner.run_seedance_video(
+            run_dir,
+            request_fn=fail_create,
+        )
+    except runner.SeedanceHTTPError:
+        pass
+    else:
+        raise AssertionError("Expected SeedanceHTTPError")
+
+    data = manifest.load(run_dir / "analysis" / "manifest.json")
+    assert data["video_generation"]["status"] == "failed"
+    assert data["video_generation"]["attempts"] == 1
+    assert data["video_generation"]["last_error"]["type"] == (
+        "SeedanceHTTPError"
+    )
+    assert data["video_workflow"]["status"] == "failed"
+    assert [event["status"] for event in data["video_workflow"]["history"]] == [
+        "preflight_validated",
+        "failed",
+    ]
+
+
+def test_run_seedance_video_can_continue_from_registered_last_frame(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_multimodal_video_run(tmp_path)
+    previous = run_dir / "generated" / "previous-last-frame.png"
+    previous.parent.mkdir(parents=True)
+    Image.new("RGB", (1080, 1920), "white").save(previous)
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    data["video"]["continuity"] = {
+        "last_frame_path": "generated/previous-last-frame.png",
+        "available": True,
+    }
+    manifest_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    result = runner.run_seedance_video(
+        run_dir,
+        dry_run=True,
+        allow_data_url=True,
+        continue_from_last_frame=True,
+    )
+
+    assert result["image_count"] == 3
+    image_items = [
+        item
+        for item in result["payload"]["content"]
+        if item["type"] == "image_url"
+    ]
+    assert image_items[0]["image_url"]["url"] == "<redacted data URL>"
+    assert "[Image 2]" in result["payload"]["content"][0]["text"]
+    assert "[Image 3]" in result["payload"]["content"][0]["text"]
 
 
 def test_run_seedance_video_rejects_seed_for_default_seedance_2(tmp_path, monkeypatch):
@@ -292,7 +560,7 @@ def test_run_seedance_video_submits_polls_downloads_and_updates_manifest(
             assert payload["ratio"] == "9:16"
             assert payload["duration"] == 5
             assert payload["resolution"] == "1080p"
-            assert payload["generate_audio"] is True
+            assert payload["generate_audio"] is False
             assert payload["watermark"] is False
             assert payload["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
             return {"id": "cgt-test"}

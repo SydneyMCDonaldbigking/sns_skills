@@ -3,8 +3,16 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 
 from PIL import Image
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import video_job
 
 
 DIMENSIONS = {
@@ -26,11 +34,110 @@ def _load_manifest(base: Path) -> dict | None:
 def _video_mode(data: dict | None) -> str:
     if not data:
         return "storyboard"
-    return str(data.get("video_mode") or data.get("generation_mode") or "storyboard")
+    return video_job.video_mode(data)
 
 
 def _is_compact_reference(data: dict | None) -> bool:
     return _video_mode(data) == "compact-reference"
+
+
+def _validate_compact_job(base: Path, data: dict) -> list[str]:
+    errors: list[str] = []
+    try:
+        references = video_job.collect_manifest_references(data)
+    except video_job.VideoJobError as exc:
+        return [f"invalid compact-reference manifest: {exc}"]
+
+    counts = video_job.reference_counts(references)
+    for kind, limit in video_job.REFERENCE_LIMITS.items():
+        if counts[kind] > limit:
+            errors.append(
+                f"compact-reference manifest has {counts[kind]} {kind} "
+                f"references; maximum is {limit}"
+            )
+    if counts["image"] + counts["video"] < 1:
+        errors.append(
+            "compact-reference manifest needs at least one image or video reference"
+        )
+    try:
+        options = video_job.generation_defaults(data, "vertical-video")
+        model = str(
+            video_job.video_section(data).get("model")
+            or "dreamina-seedance-2-0-260128"
+        )
+        video_job.validate_generation(
+            model=model,
+            options=options,
+            references=references,
+        )
+    except video_job.VideoJobError as exc:
+        message = str(exc)
+        if message not in errors:
+            errors.append(f"invalid compact generation settings: {message}")
+    for reference in references:
+        if reference["source_kind"] != "path":
+            continue
+        path = Path(reference["source"])
+        path = path if path.is_absolute() else base / path
+        if not path.is_file():
+            errors.append(f"missing compact reference file: {path}")
+        if reference["type"] in {"video", "audio"}:
+            errors.append(
+                f"local {reference['type']} reference needs a public URL before "
+                f"Seedance submission: {path}"
+            )
+
+    video = video_job.video_section(data)
+    if data.get("schema_version") == 2:
+        shots = video.get("shots")
+        if not isinstance(shots, list) or len(shots) != 3:
+            errors.append(
+                "Manifest v2 compact video.shots must contain exactly three soft shots"
+            )
+        delivery = video.get("delivery")
+        if not isinstance(delivery, dict):
+            errors.append("Manifest v2 compact video.delivery is required")
+        workflow = data.get("video_workflow")
+        if not isinstance(workflow, dict):
+            errors.append("Manifest v2 compact video_workflow is required")
+        else:
+            for field in ["status", "visual_qa", "chatcut", "export_qa", "history"]:
+                if field not in workflow:
+                    errors.append(
+                        f"Manifest v2 video_workflow.{field} is required"
+                    )
+        try:
+            video_job.budget_summary(data)
+        except video_job.VideoJobError as exc:
+            errors.append(f"invalid compact video budget: {exc}")
+
+    brand = video.get("brand")
+    if isinstance(brand, dict):
+        allowed_strategies = {
+            "product-only",
+            "physical-prop-rough",
+            "post-composited-physical-prop",
+            "clean-end-card",
+            "no-brand-visible",
+        }
+        strategy = brand.get("strategy")
+        if strategy and strategy not in allowed_strategies:
+            errors.append(
+                f"unsupported video brand strategy {strategy!r}; choose one of: "
+                + ", ".join(sorted(allowed_strategies))
+            )
+    elif data.get("schema_version") == 2:
+        errors.append("Manifest v2 compact video.brand strategy is required")
+
+    prompt_path = base / "analysis" / "seedance-prompt.md"
+    if prompt_path.is_file() and references:
+        prompt = prompt_path.read_text(encoding="utf-8")
+        if prompt.strip() and prompt.strip().upper() != "TODO":
+            try:
+                video_job.compile_prompt(prompt, references)
+            except video_job.VideoJobError as exc:
+                errors.append(f"invalid Seedance prompt references: {exc}")
+    return errors
 
 
 def validate_asset(path: str | Path, platform: str, text_review: str) -> dict:
@@ -118,7 +225,13 @@ def validate_delivery(
                     + ", ".join(STORYBOARD_ASSET_IDS)
                 )
             if compact_reference and not asset_ids:
-                errors.append("compact-reference manifest must contain reference assets")
+                video = video_job.video_section(data)
+                if not isinstance(video.get("references"), list):
+                    errors.append(
+                        "compact-reference manifest must contain reference assets"
+                    )
+            if compact_reference:
+                errors.extend(_validate_compact_job(base, data))
         incomplete = [
             asset_id
             for asset_id, item in data.get("assets", {}).items()

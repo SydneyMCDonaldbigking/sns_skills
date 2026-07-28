@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import base64
 from datetime import datetime, timezone
+import hashlib
 import json
 import mimetypes
 import os
@@ -32,6 +33,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import manifest
 import validate_output
+import video_job
 
 
 ROOT = Path(__file__).parents[2]
@@ -44,7 +46,7 @@ DEFAULT_RATIOS = {
     "video": "16:9",
 }
 DEFAULT_RESOLUTION = "1080p"
-DEFAULT_GENERATE_AUDIO = True
+DEFAULT_GENERATE_AUDIO = False
 DEFAULT_WATERMARK = False
 NO_SUBTITLE_POLICY = (
     "No subtitles, captions, title cards, lower-thirds, burned-in text, "
@@ -133,17 +135,24 @@ def _env_bool(name: str, default: bool) -> bool:
 def resolve_generation_options(
     *,
     platform: str,
+    defaults: dict[str, Any] | None = None,
     ratio: str | None = None,
     duration: str | int | None = None,
     resolution: str | None = None,
     generate_audio: bool | None = None,
     watermark: bool | None = None,
 ) -> dict[str, Any]:
-    default_ratio = DEFAULT_RATIOS.get(platform, DEFAULT_RATIO)
+    configured = defaults or {}
+    default_ratio = str(
+        configured.get("ratio") or DEFAULT_RATIOS.get(platform, DEFAULT_RATIO)
+    )
     duration_value = (
         duration
         if duration is not None
-        else os.environ.get("VSR_SEEDANCE_DURATION", DEFAULT_DURATION)
+        else os.environ.get(
+            "VSR_SEEDANCE_DURATION",
+            str(configured.get("duration") or DEFAULT_DURATION),
+        )
     )
     try:
         parsed_duration = int(duration_value)
@@ -155,16 +164,26 @@ def resolve_generation_options(
     return {
         "ratio": ratio or os.environ.get("VSR_SEEDANCE_RATIO", default_ratio),
         "duration": parsed_duration,
-        "resolution": resolution or os.environ.get("VSR_SEEDANCE_RESOLUTION", DEFAULT_RESOLUTION),
+        "resolution": resolution
+        or os.environ.get(
+            "VSR_SEEDANCE_RESOLUTION",
+            str(configured.get("resolution") or DEFAULT_RESOLUTION),
+        ),
         "generate_audio": (
             generate_audio
             if generate_audio is not None
-            else _env_bool("VSR_SEEDANCE_GENERATE_AUDIO", DEFAULT_GENERATE_AUDIO)
+            else _env_bool(
+                "VSR_SEEDANCE_GENERATE_AUDIO",
+                bool(configured.get("generate_audio", DEFAULT_GENERATE_AUDIO)),
+            )
         ),
         "watermark": (
             watermark
             if watermark is not None
-            else _env_bool("VSR_SEEDANCE_WATERMARK", DEFAULT_WATERMARK)
+            else _env_bool(
+                "VSR_SEEDANCE_WATERMARK",
+                bool(configured.get("watermark", DEFAULT_WATERMARK)),
+            )
         ),
     }
 
@@ -194,7 +213,7 @@ def _expected_storyboard_ids() -> list[str]:
 
 
 def _video_mode(data: dict[str, Any]) -> str:
-    return str(data.get("video_mode") or data.get("generation_mode") or "storyboard")
+    return video_job.video_mode(data)
 
 
 def _is_compact_reference(data: dict[str, Any]) -> bool:
@@ -264,9 +283,14 @@ def _data_url(path: Path) -> str:
 def _redact_payload(payload: dict[str, Any]) -> dict[str, Any]:
     redacted = json.loads(json.dumps(payload))
     for item in redacted.get("content", []):
-        image_url = item.get("image_url") if isinstance(item, dict) else None
-        if isinstance(image_url, dict) and str(image_url.get("url", "")).startswith("data:"):
-            image_url["url"] = "<redacted data URL>"
+        if not isinstance(item, dict):
+            continue
+        for field in ["image_url", "video_url", "audio_url"]:
+            media_url = item.get(field)
+            if isinstance(media_url, dict) and str(
+                media_url.get("url", "")
+            ).startswith("data:"):
+                media_url["url"] = "<redacted data URL>"
     return redacted
 
 
@@ -453,7 +477,8 @@ def build_payload(
     prompt: str,
     *,
     model: str,
-    image_urls: list[str],
+    image_urls: list[str] | None = None,
+    references: list[dict[str, Any]] | None = None,
     ratio: str,
     duration: int,
     resolution: str,
@@ -465,11 +490,17 @@ def build_payload(
     image_role: str | None = None,
 ) -> dict[str, Any]:
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-    for url in image_urls:
-        item: dict[str, Any] = {"type": "image_url", "image_url": {"url": url}}
-        if image_role:
-            item["role"] = image_role
-        content.append(item)
+    if references is not None:
+        content.extend(video_job.content_item(reference) for reference in references)
+    else:
+        for url in image_urls or []:
+            item: dict[str, Any] = {
+                "type": "image_url",
+                "image_url": {"url": url},
+            }
+            if image_role:
+                item["role"] = image_role
+            content.append(item)
 
     payload: dict[str, Any] = {
         "model": model,
@@ -513,14 +544,92 @@ def _video_url(response: dict[str, Any]) -> str:
     raise SeedanceRunnerError("Seedance succeeded but did not return a video URL")
 
 
-def _update_manifest_video(run_dir: Path, fields: dict[str, Any]) -> None:
+def _last_frame_url(response: dict[str, Any]) -> str | None:
+    candidates: list[Any] = []
+    content = response.get("content")
+    if isinstance(content, dict):
+        candidates.extend(
+            [
+                content.get("last_frame_url"),
+                content.get("last_frame_image_url"),
+                content.get("last_frame"),
+            ]
+        )
+    candidates.extend(
+        [
+            response.get("last_frame_url"),
+            response.get("last_frame_image_url"),
+            response.get("last_frame"),
+        ]
+    )
+    for value in candidates:
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, dict):
+            nested = value.get("url") or value.get("image_url")
+            if isinstance(nested, dict):
+                nested = nested.get("url")
+            if nested:
+                return str(nested)
+    return None
+
+
+def _update_manifest_video(
+    run_dir: Path,
+    fields: dict[str, Any],
+    *,
+    workflow_status: str | None = None,
+) -> None:
     manifest_path = run_dir / "analysis" / "manifest.json"
     if not manifest_path.is_file():
         return
     data = manifest.load(manifest_path)
-    current = data.get("video_generation", {})
+    current = data.get("video_generation")
+    current = current if isinstance(current, dict) else {}
     current.update(fields)
     data["video_generation"] = current
+    if workflow_status:
+        workflow = data.get("video_workflow")
+        workflow = workflow if isinstance(workflow, dict) else {}
+        history = workflow.get("history")
+        history = history if isinstance(history, list) else []
+        history.append(
+            {
+                "status": workflow_status,
+                "at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        workflow.update(
+            {
+                "status": workflow_status,
+                "history": history,
+            }
+        )
+        if workflow_status == "generated":
+            workflow["visual_qa"] = "pending"
+            workflow.setdefault("chatcut", "not_started")
+            workflow.setdefault("export_qa", "not_started")
+        data["video_workflow"] = workflow
+    _write_json(manifest_path, data)
+
+
+def _register_last_frame(run_dir: Path, relative_path: str) -> None:
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    if not manifest_path.is_file():
+        return
+    data = manifest.load(manifest_path)
+    video = data.get("video")
+    video = video if isinstance(video, dict) else {}
+    continuity = video.get("continuity")
+    continuity = continuity if isinstance(continuity, dict) else {}
+    continuity.update(
+        {
+            "last_frame_path": relative_path,
+            "available": True,
+        }
+    )
+    video["continuity"] = continuity
+    data["video"] = video
     _write_json(manifest_path, data)
 
 
@@ -550,16 +659,82 @@ def poll_task(
         time.sleep(max(0, poll_interval))
 
 
+def _data_with_profile(
+    data: dict[str, Any],
+    profile: str | None,
+) -> dict[str, Any]:
+    if not profile:
+        return data
+    updated = json.loads(json.dumps(data))
+    video = updated.get("video")
+    video = video if isinstance(video, dict) else {}
+    video["profile"] = profile
+    updated["video"] = video
+    return updated
+
+
+def _legacy_generated_references(
+    run_dir: Path,
+    asset_ids: list[str],
+    *,
+    include_all_frames: bool,
+) -> list[dict[str, Any]]:
+    selected = asset_ids if include_all_frames else asset_ids[:1]
+    return video_job.merge_reference_overrides(
+        [],
+        video_job.cli_references(
+            image_refs=[
+                str(_generated_path(run_dir, asset_id))
+                for asset_id in selected
+            ]
+        ),
+    )
+
+
+def _continuity_reference_from_manifest(data: dict[str, Any]) -> str | None:
+    video = video_job.video_section(data)
+    continuity = video.get("continuity")
+    if not isinstance(continuity, dict):
+        return None
+    value = continuity.get("last_frame_url") or continuity.get("last_frame_path")
+    return str(value) if value else None
+
+
+def _request_digest(payload: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _payload_for_lock(payload: dict[str, Any]) -> dict[str, Any]:
+    locked = _redact_payload(payload)
+    for item in locked.get("content", []):
+        if not isinstance(item, dict):
+            continue
+        for field in ["image_url", "video_url", "audio_url"]:
+            value = item.get(field)
+            if isinstance(value, dict) and value.get("url") != "<redacted data URL>":
+                value["url"] = "<external URL>"
+    return locked
+
+
 def run_seedance_video(
     run_dir: str | Path,
     *,
     prompt: str | None = None,
     prompt_file: str | Path | None = None,
     image_urls: list[str] | None = None,
+    video_urls: list[str] | None = None,
+    audio_urls: list[str] | None = None,
     include_all_frames: bool = False,
     allow_data_url: bool = False,
     model: str | None = None,
     endpoint: str | None = None,
+    profile: str | None = None,
     ratio: str | None = None,
     duration: str | None = None,
     resolution: str | None = None,
@@ -567,7 +742,11 @@ def run_seedance_video(
     watermark: bool | None = None,
     seed: int | None = None,
     callback_url: str | None = None,
-    return_last_frame: bool = False,
+    return_last_frame: bool | None = None,
+    approve_final_spend: bool = False,
+    force: bool = False,
+    continuity_reference: str | None = None,
+    continue_from_last_frame: bool = False,
     image_role: str | None = None,
     output: str | Path | None = None,
     dry_run: bool = False,
@@ -585,21 +764,30 @@ def run_seedance_video(
     if platform not in DEFAULT_RATIOS:
         raise SeedanceRunnerError("Seedance video runner requires a video storyboard run")
     asset_ids = list(data.get("assets", {}).keys())
-    if not asset_ids:
-        raise SeedanceRunnerError("Manifest does not contain video reference assets")
     compact_reference = _is_compact_reference(data)
+    job_data = _data_with_profile(data, profile)
 
     config = resolve_config(model=model, endpoint=endpoint)
+    try:
+        defaults = video_job.generation_defaults(job_data, str(platform))
+    except video_job.VideoJobError as exc:
+        raise SeedanceRunnerError(str(exc)) from exc
     options = resolve_generation_options(
         platform=platform,
+        defaults=defaults,
         ratio=ratio,
         duration=duration,
         resolution=resolution,
         generate_audio=generate_audio,
         watermark=watermark,
     )
+    effective_return_last_frame = (
+        return_last_frame
+        if return_last_frame is not None
+        else bool(defaults.get("return_last_frame", False))
+    )
     base_prompt, prompt_path = load_prompt(run, prompt=prompt, prompt_file=prompt_file)
-    final_prompt = compose_prompt(
+    composed_prompt = compose_prompt(
         run,
         base_prompt,
         platform=platform,
@@ -607,26 +795,83 @@ def run_seedance_video(
         duration=duration,
         seed=seed,
     )
-    if compact_reference:
-        _validate_compact_references(data, image_urls)
-    elif not dry_run:
+
+    if not compact_reference and not dry_run:
+        if not asset_ids:
+            raise SeedanceRunnerError("Manifest does not contain storyboard assets")
         _validate_storyboard_ready(run, data, platform, asset_ids)
-    selected_urls = select_image_urls(
-        run,
-        data,
-        asset_ids,
-        image_urls=image_urls,
-        include_all_frames=include_all_frames,
-        allow_data_url=allow_data_url,
-        compact_reference=compact_reference,
-    )
-    effective_image_role = image_role
-    if effective_image_role is None and (include_all_frames or compact_reference):
-        effective_image_role = "reference_image"
+
+    try:
+        manifest_references = video_job.collect_manifest_references(job_data)
+        explicit_references = video_job.cli_references(
+            image_refs=image_urls,
+            video_refs=video_urls,
+            audio_refs=audio_urls,
+        )
+        references = video_job.merge_reference_overrides(
+            manifest_references,
+            explicit_references,
+        )
+        if not compact_reference and not include_all_frames:
+            first_image = next(
+                (item for item in references if item["type"] == "image"),
+                None,
+            )
+            references = (
+                ([first_image] if first_image else [])
+                + [item for item in references if item["type"] != "image"]
+            )
+        if not references and not compact_reference and asset_ids:
+            references = _legacy_generated_references(
+                run,
+                asset_ids,
+                include_all_frames=include_all_frames,
+            )
+
+        continuity_value = continuity_reference
+        if continue_from_last_frame:
+            continuity_value = _continuity_reference_from_manifest(job_data)
+            if not continuity_value:
+                raise video_job.VideoJobError(
+                    "Manifest does not contain video.continuity.last_frame_path "
+                    "or last_frame_url"
+                )
+        if continuity_value:
+            references = video_job.add_continuity_reference(
+                references,
+                continuity_value,
+            )
+
+        materialized_references = video_job.materialize_references(
+            run,
+            references,
+            allow_data_url=allow_data_url,
+        )
+        if image_role:
+            for reference in materialized_references:
+                if reference["type"] == "image":
+                    reference["role"] = image_role
+        elif not compact_reference and not include_all_frames:
+            for reference in materialized_references:
+                if reference["type"] == "image":
+                    reference["role"] = None
+
+        video_job.validate_generation(
+            model=config["model"],
+            options=options,
+            references=materialized_references,
+        )
+        final_prompt, prompt_warnings = video_job.compile_prompt(
+            composed_prompt,
+            materialized_references,
+        )
+    except video_job.VideoJobError as exc:
+        raise SeedanceRunnerError(str(exc)) from exc
+
     payload = build_payload(
         final_prompt,
         model=config["model"],
-        image_urls=selected_urls,
+        references=materialized_references,
         ratio=options["ratio"],
         duration=options["duration"],
         resolution=options["resolution"],
@@ -634,17 +879,42 @@ def run_seedance_video(
         watermark=options["watermark"],
         seed=seed,
         callback_url=callback_url,
-        return_last_frame=return_last_frame,
-        image_role=effective_image_role,
+        return_last_frame=effective_return_last_frame,
     )
     redacted_payload = _redact_payload(payload)
+    counts = video_job.reference_counts(materialized_references)
+    request_sha256 = _request_digest(payload)
+    profile_name = str(defaults["profile"])
+    preflight = {
+        "schema_version": 1,
+        "status": "passed",
+        "video_mode": _video_mode(job_data),
+        "profile": profile_name,
+        "model": config["model"],
+        "prompt_path": prompt_path,
+        "request_sha256": request_sha256,
+        "references": video_job.sanitized_references(materialized_references),
+        "reference_counts": counts,
+        "generation": {
+            **options,
+            "return_last_frame": effective_return_last_frame,
+        },
+        "budget": video_job.budget_summary(job_data),
+        "warnings": prompt_warnings,
+    }
     if dry_run:
         return {
             "endpoint": config["endpoint"],
             "api_key_set": bool(config.get("api_key")),
-            "image_count": len(selected_urls),
-            "video_mode": _video_mode(data),
+            "image_count": counts["image"],
+            "video_count": counts["video"],
+            "audio_count": counts["audio"],
+            "reference_count": sum(counts.values()),
+            "video_mode": _video_mode(job_data),
+            "profile": profile_name,
             "generation": options,
+            "request_sha256": request_sha256,
+            "preflight": preflight,
             "payload": redacted_payload,
         }
 
@@ -654,6 +924,15 @@ def run_seedance_video(
             "Set BYTEPLUS_ARK_API_KEY, BYTEPLUS_API_KEY, VSR_SEEDANCE_API_KEY, "
             "ARK_API_KEY, or SEEDANCE_API_KEY in .env.local or the local environment"
         )
+    try:
+        submission = video_job.authorize_submission(
+            job_data,
+            profile=profile_name,
+            approve_final_spend=approve_final_spend,
+            force=force,
+        )
+    except video_job.VideoJobError as exc:
+        raise SeedanceRunnerError(str(exc)) from exc
 
     raw_dir = run / "raw"
     qa_dir = run / "qa"
@@ -663,28 +942,58 @@ def run_seedance_video(
     if not output_path.is_absolute():
         output_path = run / output_path
 
+    request_lock = {
+        **preflight,
+        "locked_at": datetime.now(timezone.utc).isoformat(),
+        "submission": submission,
+        "payload": _payload_for_lock(payload),
+    }
+    _write_json(run / "analysis" / "seedance-request.lock.json", request_lock)
     _write_json(raw_dir / "seedance-create-request.json", redacted_payload)
-    create_response = request_fn("POST", config["endpoint"], api_key, payload)
-    _write_json(raw_dir / "seedance-create-response.json", create_response)
-    task_id = _task_id(create_response)
     _update_manifest_video(
         run,
         {
-            "status": "submitted",
-            "task_id": task_id,
-            "model": config["model"],
-            "endpoint": config["endpoint"],
-            "prompt_path": prompt_path,
-            "image_count": len(selected_urls),
-            "video_mode": _video_mode(data),
-            "generation": options,
+            "status": "preflight_validated",
+            "profile": profile_name,
+            "request_sha256": request_sha256,
+            "request_lock": "analysis/seedance-request.lock.json",
+            "reference_counts": counts,
+            "attempts": submission["attempt"],
+            "generation": {
+                **options,
+                "return_last_frame": effective_return_last_frame,
+            },
         },
+        workflow_status="preflight_validated",
     )
-
-    def on_status(response: dict[str, Any]) -> None:
-        _write_json(raw_dir / "seedance-status.json", response)
-
+    task_id: str | None = None
     try:
+        create_response = request_fn("POST", config["endpoint"], api_key, payload)
+        _write_json(raw_dir / "seedance-create-response.json", create_response)
+        task_id = _task_id(create_response)
+        _update_manifest_video(
+            run,
+            {
+                "status": "submitted",
+                "task_id": task_id,
+                "model": config["model"],
+                "endpoint": config["endpoint"],
+                "prompt_path": prompt_path,
+                "profile": profile_name,
+                "reference_counts": counts,
+                "attempts": submission["attempt"],
+                "video_mode": _video_mode(job_data),
+                "generation": {
+                    **options,
+                    "return_last_frame": effective_return_last_frame,
+                },
+            },
+            workflow_status="submitted",
+        )
+
+        def on_status(response: dict[str, Any]) -> None:
+            _write_json(raw_dir / "seedance-status.json", response)
+
         final_response = poll_task(
             task_id,
             api_key=api_key,
@@ -696,14 +1005,33 @@ def run_seedance_video(
         )
         url = _video_url(final_response)
         download_fn(url, output_path)
+        last_frame_output = None
+        if effective_return_last_frame:
+            last_frame_url = _last_frame_url(final_response)
+            if last_frame_url:
+                last_frame_path = output_path.with_name(
+                    f"{output_path.stem}-last-frame.png"
+                )
+                download_fn(last_frame_url, last_frame_path)
+                last_frame_output = _relative_to_run(last_frame_path, run)
+                _register_last_frame(run, last_frame_output)
+            else:
+                prompt_warnings.append(
+                    "return_last_frame was requested but the provider response "
+                    "did not include a recognized last-frame URL"
+                )
     except Exception as exc:
+        failure = {
+            "status": "failed",
+            "attempts": submission["attempt"],
+            "last_error": {"type": exc.__class__.__name__, "message": str(exc)},
+        }
+        if task_id:
+            failure["task_id"] = task_id
         _update_manifest_video(
             run,
-            {
-                "status": "failed",
-                "task_id": task_id,
-                "last_error": {"type": exc.__class__.__name__, "message": str(exc)},
-            },
+            failure,
+            workflow_status="failed",
         )
         raise
 
@@ -720,13 +1048,22 @@ def run_seedance_video(
         "task_id": task_id,
         "status": "succeeded",
         "prompt_path": prompt_path,
-        "image_count": len(selected_urls),
-        "video_mode": _video_mode(data),
-        "generation": options,
-        "video_url": url,
+        "profile": profile_name,
+        "image_count": counts["image"],
+        "video_count": counts["video"],
+        "audio_count": counts["audio"],
+        "reference_count": sum(counts.values()),
+        "reference_counts": counts,
+        "video_mode": _video_mode(job_data),
+        "generation": {
+            **options,
+            "return_last_frame": effective_return_last_frame,
+        },
+        "request_sha256": request_sha256,
         "output": relative_output,
+        "last_frame_output": last_frame_output,
+        "warnings": prompt_warnings,
         "usage": final_response.get("usage", {}),
-        "final_response": final_response,
     }
     _write_json(qa_dir / "seedance-video.json", ledger)
     _update_manifest_video(
@@ -736,10 +1073,19 @@ def run_seedance_video(
             "task_id": task_id,
             "output": relative_output,
             "qa_path": "qa/seedance-video.json",
+            "profile": profile_name,
+            "request_sha256": request_sha256,
+            "reference_counts": counts,
+            "attempts": submission["attempt"],
+            "last_frame_output": last_frame_output,
             "usage": final_response.get("usage", {}),
-            "video_mode": _video_mode(data),
-            "generation": options,
+            "video_mode": _video_mode(job_data),
+            "generation": {
+                **options,
+                "return_last_frame": effective_return_last_frame,
+            },
         },
+        workflow_status="generated",
     )
     return ledger
 
@@ -753,9 +1099,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prompt-file")
     parser.add_argument(
         "--image-url",
+        "--image-ref",
+        dest="image_url",
         action="append",
         default=[],
-        help="Public or provider-accepted storyboard image URL. Repeat for references.",
+        help="Image reference URL or local path. Repeat for references.",
+    )
+    parser.add_argument(
+        "--video-url",
+        "--video-ref",
+        dest="video_url",
+        action="append",
+        default=[],
+        help="Public video reference URL. Repeat up to three times.",
+    )
+    parser.add_argument(
+        "--audio-url",
+        "--audio-ref",
+        dest="audio_url",
+        action="append",
+        default=[],
+        help="Public audio reference URL. Repeat up to three times.",
     )
     parser.add_argument(
         "--include-all-frames",
@@ -769,6 +1133,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--model")
     parser.add_argument("--endpoint")
+    parser.add_argument(
+        "--profile",
+        choices=sorted(video_job.PROFILE_DEFAULTS),
+        help="Generation profile; explicit CLI options still take precedence.",
+    )
     parser.add_argument("--ratio")
     parser.add_argument("--duration")
     parser.add_argument("--resolution")
@@ -780,7 +1149,37 @@ def build_parser() -> argparse.ArgumentParser:
     watermark.add_argument("--no-watermark", dest="watermark", action="store_false")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--callback-url")
-    parser.add_argument("--return-last-frame", action="store_true")
+    last_frame = parser.add_mutually_exclusive_group()
+    last_frame.add_argument(
+        "--return-last-frame",
+        dest="return_last_frame",
+        action="store_true",
+        default=None,
+    )
+    last_frame.add_argument(
+        "--no-return-last-frame",
+        dest="return_last_frame",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--continuity-reference",
+        help="Previous clip last-frame URL or local image path to prepend.",
+    )
+    parser.add_argument(
+        "--continue-from-last-frame",
+        action="store_true",
+        help="Use video.continuity.last_frame_path/url from the manifest.",
+    )
+    parser.add_argument(
+        "--approve-final-spend",
+        action="store_true",
+        help="Approve a final-spend profile when manifest budget requires it.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow an intentional new paid attempt despite a prior active/succeeded state.",
+    )
     parser.add_argument("--image-role")
     parser.add_argument("--output")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
@@ -797,10 +1196,13 @@ def main(argv: list[str] | None = None) -> int:
             prompt=args.prompt,
             prompt_file=args.prompt_file,
             image_urls=args.image_url,
+            video_urls=args.video_url,
+            audio_urls=args.audio_url,
             include_all_frames=args.include_all_frames,
             allow_data_url=args.allow_data_url,
             model=args.model,
             endpoint=args.endpoint,
+            profile=args.profile,
             ratio=args.ratio,
             duration=args.duration,
             resolution=args.resolution,
@@ -809,6 +1211,10 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
             callback_url=args.callback_url,
             return_last_frame=args.return_last_frame,
+            approve_final_spend=args.approve_final_spend,
+            force=args.force,
+            continuity_reference=args.continuity_reference,
+            continue_from_last_frame=args.continue_from_last_frame,
             image_role=args.image_role,
             output=args.output,
             dry_run=args.dry_run,

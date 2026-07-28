@@ -78,10 +78,52 @@ def test_prepare_original_video_run_creates_compact_reference_skeleton(tmp_path:
 
     data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert data["platform"] == "vertical-video"
+    assert data["schema_version"] == 2
     assert data["video_mode"] == "compact-reference"
+    assert data["video"]["mode"] == "compact-reference"
+    assert data["video"]["profile"] == "visual-preview"
+    assert data["video"]["generation"]["generate_audio"] is False
+    assert data["video"]["generation"]["return_last_frame"] is True
+    assert data["video"]["delivery"] == {
+        "ratio": "9:16",
+        "resolution": "1080p",
+        "duration": None,
+        "expect_audio": None,
+        "text_policy": "editable-post-only",
+    }
+    assert data["video"]["references"] == []
+    assert data["video_workflow"]["status"] == "prepared"
     assert data["source"]["kind"] == "original_brief"
     assert data["source"]["brief_path"] == "analysis/brief.md"
     assert list(data["assets"]) == ["01", "02", "03"]
+
+
+def test_prepare_original_video_run_records_structured_references(tmp_path: Path):
+    image = tmp_path / "product.png"
+    image.write_bytes(b"image")
+
+    run_dir = pipeline.prepare_original_video_run(
+        brief="Brand: UMall. Dish: quick tomato egg stir fry.",
+        output_root=tmp_path / "output",
+        task_name="tomato-egg-refs",
+        image_references=[str(image)],
+        video_references=["https://cdn.example/motion.mp4"],
+        audio_references=["https://cdn.example/ambience.mp3"],
+    )
+
+    data = json.loads(
+        (run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8")
+    )
+    references = data["video"]["references"]
+    assert [item["type"] for item in references] == [
+        "image",
+        "video",
+        "audio",
+    ]
+    assert references[0]["path"].startswith("references/inputs/")
+    assert (run_dir / references[0]["path"]).read_bytes() == b"image"
+    assert references[1]["url"] == "https://cdn.example/motion.mp4"
+    assert references[2]["url"] == "https://cdn.example/ambience.mp3"
 
 
 def test_prepare_url_run_downloads_direct_media_url(tmp_path: Path):

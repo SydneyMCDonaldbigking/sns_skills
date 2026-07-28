@@ -98,9 +98,10 @@ uses BytePlus ModelArk Seedance 2.0 by default, reads `BYTEPLUS_ARK_API_KEY`,
 video task, polls it, downloads `content.video_url`, and writes
 `generated/seedance-video.mp4`.
 For this route, the required publishing ratio is vertical short-video `9:16`,
-the default request is `1080p` with `generate_audio: true` and
-`watermark: false`, and any script, platform caption, or voiceover plan should
-be natural English.
+the default `visual-preview` profile is `1080p`, 5 seconds,
+`generate_audio: false`, `return_last_frame: true`, and `watermark: false`.
+Use `native-audio-final` only after the visual pass is accepted. Any script,
+platform caption, or voiceover plan should be natural English.
 Do not place subtitles, captions, title cards, lower-thirds, labels, or any
 on-screen text in generated reference frames or the final video; the rule is no
 visible text. Voiceover and natural
@@ -118,14 +119,25 @@ use the Chinese-region UMALL logo for English videos or English carousels.
 For a Seedance dry run:
 
 ```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --image-url https://example.com/storyboard-frame-01.png --dry-run
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview --dry-run
 ```
 
 For production:
 
 ```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --image-url https://example.com/storyboard-frame-01.png
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview
 ```
+
+Store image/video/audio inputs in manifest `video.references` with stable IDs.
+Author prompts with `{{ref:<id>}}`; the runner compiles those placeholders to
+the official `[Image 1]`, `[Video 1]`, and `[Audio 1]` request labels. It must
+reject `@Image1`, unknown references, audio-only jobs, unsupported dimensions,
+durations outside 4-15 seconds, and reference counts over the provider limits
+before task submission.
+Honor `video.budget.retry_limit` and `stop_before_final`. A final profile
+requires `--approve-final-spend`, and a manifest already marked
+`preflight_validated`, `submitted`, or `succeeded` must not create a second
+paid task unless the operator deliberately passes `--force`.
 
 For low-cost Grok/OpenRouter vertical video tests, load
 `references/openrouter-video.md` and use `scripts/run_openrouter_video.py`
@@ -472,10 +484,16 @@ app/search/category UI instead of invented screenshots. If it is missing, the
 carousel is not finished.
 
 For Seedance output, check `qa/seedance-video.json`, confirm
-`generated/seedance-video.mp4` exists, and visually review cooking continuity,
-food state changes, product/brand fidelity, unsafe actions, absence of
-subtitles/on-screen text, duration, aspect ratio, and platform fit. Voiceover is
-acceptable; burned-in subtitles are not.
+`generated/seedance-video.mp4` exists, then run
+`scripts/video_qa.py prepare output/<run>`. Review
+`qa/video-review-strip.jpg` for cooking continuity, food state changes,
+product/brand fidelity, unsafe actions, absence of subtitles/on-screen text,
+duration, aspect ratio, and platform fit. Record `approve` or `reject --reason`;
+only `video_workflow.status: visual_qa_passed` may proceed to ChatCut/export.
+Voiceover is acceptable in an audio-enabled final; burned-in subtitles are not.
+After ChatCut export, run `scripts/video_qa.py prepare-export` against the
+actual final file and record `approve-export` or `reject-export --reason`.
+Delivery is complete only at `video_workflow.status: export_qa_passed`.
 
 For OpenRouter Grok video output, check `qa/openrouter-video.json`, confirm the
 configured MP4 exists, and verify duration, 720x1280 or chosen resolution,

@@ -79,8 +79,14 @@ Do not rely on a single logo image plus text prompt to preserve brand identity.
 Treat product/package and logo/sign as visual anchors:
 
 - pass them as `reference_image`;
-- reference them explicitly in the prompt as `@Image1`, `@Image2`, etc.;
-- after each `@ImageN`, add a noun/clarifier, e.g. `@Image2 product package`;
+- give each manifest reference a stable semantic ID such as `hero-food` or
+  `product-pack`;
+- write `{{ref:hero-food}}` and `{{ref:product-pack}}` while authoring; the
+  local prompt compiler converts them to BytePlus labels such as `[Image 1]`
+  and `[Image 2]` after the final request order is known;
+- after each reference, add a noun/clarifier, e.g. `[Image 2] product package`;
+- never use `@Image1`; that syntax is rejected locally because it is not the
+  provider label used by the official request examples;
 - describe where the physical object appears in the scene;
 - do not write raw asset IDs inside the prompt.
 
@@ -131,3 +137,8 @@ For multi-clip generation, request `return_last_frame: true` when supported and
 use the previous clip's last frame as the next clip's first visual reference.
 Still verify joins in post, because official guidance says extension/stitching
 can show frame jumps and may need trimming/alignment in an editor.
+
+The local runner downloads the returned frame, records it under
+`video.continuity.last_frame_path`, and can prepend it to the next request with
+`--continue-from-last-frame`. This improves control, but it does not replace a
+visual join review.

@@ -76,9 +76,13 @@ subtitles, ingredient labels, title cards, lower-thirds, stickers, or screen
 text are allowed.
 
 Important brand-fidelity rule: do not expect a video model to redraw the exact
-company logo. Product packaging may be generated from references, but exact
-company logo lockups should be added deterministically in ChatCut/post from the
-official PNG when final brand accuracy matters. AI-rendered physical logo signs
+company logo. Product packaging may be generated from references. When final
+brand accuracy matters, composite the official PNG onto a real scene surface
+in ChatCut/post as a perspective-matched table card, package face, sign, or
+other physical prop. Preserve scene perspective, motion tracking, occlusion,
+lighting, and texture so it remains part of the photographed world. A clean
+brand end card is a separate explicit strategy. Never solve logo accuracy with
+a floating corner bug or sticker-like overlay. AI-rendered physical logo signs
 are acceptable only for rough review, and fail QA if the logo shape or wording
 does not match the source asset.
 
@@ -117,6 +121,9 @@ Write `analysis/seedance-prompt.md` as one direct video-generation prompt:
   lateral tracking, overhead cut, gentle handheld follow, or final hold.
 - Ask for continuity across cookware, ingredients, product packaging, lighting,
   and physical brand prop.
+- Refer to manifest assets with semantic placeholders such as
+  `{{ref:product-pack}}`; let the runner compile them to `[Image 1]`,
+  `[Video 1]`, and other final provider labels.
 - Specify realistic food physics and avoid sudden ingredient teleporting.
 - Forbid all visible text overlays and subtitles. If narration is useful,
   include an English voiceover plan or voiceover tone, but keep the video image

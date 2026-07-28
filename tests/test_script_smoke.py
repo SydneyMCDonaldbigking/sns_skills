@@ -28,6 +28,8 @@ def test_core_workflow_scripts_expose_command_line_help():
         "extract_keyframes.py",
         "make_contact_sheet.py",
         "validate_output.py",
+        "run_seedance_video.py",
+        "video_qa.py",
     ]:
         result = subprocess.run(
             [sys.executable, str(SCRIPTS / script_name), "--help"],

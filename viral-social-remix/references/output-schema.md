@@ -34,11 +34,14 @@ videos; `caption-zh.txt` only for explicit Chinese Xiaohongshu target output.
 Video uses the target publishing platform's caption language.
 
 Manifest schema version `1` records source provenance, platform confidence,
-assumptions, provider configuration, and per-asset generation state.
+assumptions, provider configuration, and per-asset generation state for
+carousel and legacy storyboard runs. Compact multimodal video jobs use schema
+version `2`, retaining those fields and adding a deterministic `video` plan and
+`video_workflow` state.
 
 Top-level fields:
 
-- `schema_version`: currently `1`.
+- `schema_version`: `1` for legacy/carousel jobs; `2` for compact video jobs.
 - `source`: `{ "kind": ..., "paths": [...], "url": ... }`. `kind` may be
   `local_file`, `local_folder`, `direct_url`, or `unknown`; direct URL inputs
   record `content_type` and byte count when downloaded.
@@ -92,25 +95,62 @@ When the legacy still-storyboard route is explicitly selected, also include:
 - `overview/contact-sheet.png`: 3x3 storyboard overview.
 
 For the preferred compact-reference route, record product/package/logo/source
-references in manifest asset entries, using `reference_paths`,
-`storyboard_url`, or another explicit URL/reference field. The Seedance prompt
-should refer to the selected references by order (`Image 1`, `Image 2`,
-`Video 1`) after they are passed to the provider.
+references in `video.references`. Each entry contains a stable `id`, `type`
+(`image`, `video`, or `audio`), type-local `order`, and exactly one `url` or
+`path`. Local video/audio references must be uploaded to trusted storage before
+submission. Legacy `reference_paths` and `storyboard_url` asset fields remain
+readable for existing runs.
+
+Author semantic prompt tokens such as `{{ref:hero-food}}`. The runner compiles
+them to the official final request labels (`[Image 1]`, `[Video 1]`,
+`[Audio 1]`) after ordering. `@Image1`, unknown IDs, and labels beyond the
+submitted reference count fail preflight.
+
+Compact video manifests also record:
+
+- `video.mode` and `video.profile`.
+- `video.shots`: three ordered soft beats for the default short-form route.
+- `video.generation`: ratio, duration, resolution, `generate_audio`,
+  `return_last_frame`, and watermark policy.
+- `video.continuity`: returned last-frame path/URL and availability.
+- `video.brand.strategy`: the chosen visibility/fidelity approach.
+- `video.budget`: retry and final-spend stop controls.
+- `video_workflow`: status, visual QA, ChatCut, export QA, and append-only
+  history.
 
 After Seedance handoff, store:
 
+- `analysis/seedance-request.lock.json`: sanitized compiled prompt, generation
+  controls, ordered references, warnings, and request SHA-256.
 - `raw/seedance-create-request.json`: redacted request payload.
 - `raw/seedance-create-response.json`: task creation response.
 - `raw/seedance-status.json`: latest task status response.
 - `generated/seedance-video.mp4`: downloaded generated video.
-- `qa/seedance-video.json`: task id, provider metadata, output path, usage, and final response.
+- `generated/seedance-video-last-frame.png`: optional downloaded continuation
+  frame.
+- `qa/seedance-video.json`: task id, provider metadata, relative output path,
+  reference counts, request hash, generation controls, and usage. Do not copy
+  expiring output URLs or full provider responses into this committed-safe
+  ledger.
+- `qa/video-visual-review.json`: metadata validation and human decision.
+- `qa/video-review-strip.jpg`: extracted visual review strip.
+- `qa/export-review.json`: final ChatCut/export metadata and human decision.
+- `qa/export-review-strip.jpg`: final delivery review strip.
 
 The manifest may include top-level `video_generation` with `status`, `task_id`,
-`model`, `endpoint`, `prompt_path`, `image_count`, `output`, `qa_path`, `usage`,
-and `last_error`. Store storyboard image URLs on per-asset `storyboard_url` when
-the Seedance runner should use URLs from the manifest instead of `--image-url`.
-The video itself must not contain subtitles or on-screen text; voiceover and
-natural cooking audio are allowed when supported.
+`model`, `endpoint`, `profile`, `prompt_path`, media reference counts,
+`request_sha256`, `request_lock`, `generation`, `output`, `last_frame`,
+`qa_path`, `usage`, and `last_error`. `video_workflow.status` progresses through
+`prepared`, `preflight_validated`, `submitted`, `generated`,
+`awaiting_human_review`, and finally `visual_qa_passed` or
+`visual_qa_failed`; `metadata_failed` is a hard QA stop. After ChatCut, it
+continues through `export_qa_awaiting_human_review` and finishes at
+`export_qa_passed` or `export_qa_failed`. Append each transition to
+`video_workflow.history`.
+
+The video itself must not contain subtitles or on-screen text. The default
+visual-preview profile is no-audio. Voiceover and natural cooking audio are
+allowed only in an explicitly selected audio-enabled final profile.
 
 After OpenRouter Grok video handoff, store:
 

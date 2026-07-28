@@ -29,6 +29,10 @@ sign, storefront sign, product packaging cue, or brand lockup.
   the video must still have no added captions, ingredient labels, title cards,
   or screen text.
 - Video models often distort exact logo lockups. For final videos, prefer using
-  product packaging or a generic brand prop during generation, then place the
-  official logo PNG in ChatCut/post when the logo must be exact. Any
-  AI-generated logo sign with altered wording, shape, or colors fails QA.
+  product packaging or a generic brand prop during generation. When the logo
+  must be exact, composite the official PNG in ChatCut/post onto a tracked
+  physical surface such as a table card, package face, or wall sign, with
+  matching perspective, occlusion, lighting, and texture. Do not use a
+  floating corner overlay. A clean end card is allowed only when the selected
+  brand strategy explicitly calls for one. Any AI-generated logo sign with
+  altered wording, shape, or colors fails QA.
