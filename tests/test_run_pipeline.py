@@ -55,7 +55,7 @@ def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
     assert list(data["assets"]) == ["01", "02"]
 
 
-def test_prepare_original_video_run_creates_three_clip_storyboard_skeleton(tmp_path: Path):
+def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_path: Path):
     run_dir = pipeline.prepare_original_video_run(
         brief="Brand: UMall. Dish: quick tomato egg stir fry.",
         output_root=tmp_path / "output",
@@ -65,14 +65,17 @@ def test_prepare_original_video_run_creates_three_clip_storyboard_skeleton(tmp_p
     assert (run_dir / "analysis" / "brief.md").is_file()
     assert (run_dir / "analysis" / "shot-list.md").is_file()
     assert (run_dir / "analysis" / "seedance-prompt.md").is_file()
-    assert (run_dir / "analysis" / "caption-en.txt").is_file()
+    assert not (run_dir / "analysis" / "caption-en.txt").exists()
+    assert not (run_dir / "analysis" / "breakdown.md").exists()
+    assert not (run_dir / "analysis" / "copy.md").exists()
+    assert not (run_dir / "analysis" / "prompts.md").exists()
     shot_list = (run_dir / "analysis" / "shot-list.md").read_text(encoding="utf-8")
     assert "TODO" not in shot_list
     for phrase in [
-        "frames 01-03",
-        "frames 04-06",
-        "frames 07-09",
-        "exactly three ordered frames per request",
+        "first frame 01",
+        "first frame 02",
+        "first frame 03",
+        "must not be imported into ChatCut",
     ]:
         assert phrase in shot_list
     for index in range(1, 4):
@@ -86,13 +89,13 @@ def test_prepare_original_video_run_creates_three_clip_storyboard_skeleton(tmp_p
     data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert data["platform"] == "vertical-video"
     assert data["schema_version"] == 2
-    assert data["video_mode"] == "storyboard-three-clips"
-    assert data["video"]["mode"] == "storyboard-three-clips"
+    assert data["video_mode"] == "director-first-frame-three-clips"
+    assert data["video"]["mode"] == "director-first-frame-three-clips"
     assert data["video"]["profile"] == "final-clip"
     assert [group["frames"] for group in data["video"]["clip_groups"]] == [
-        ["01", "02", "03"],
-        ["04", "05", "06"],
-        ["07", "08", "09"],
+        ["01"],
+        ["02"],
+        ["03"],
     ]
     assert data["video"]["generation"]["generate_audio"] is False
     assert data["video"]["generation"]["return_last_frame"] is True
@@ -109,9 +112,7 @@ def test_prepare_original_video_run_creates_three_clip_storyboard_skeleton(tmp_p
     assert data["video_workflow"]["status"] == "prepared"
     assert data["source"]["kind"] == "original_brief"
     assert data["source"]["brief_path"] == "analysis/brief.md"
-    assert list(data["assets"]) == [
-        "01", "02", "03", "04", "05", "06", "07", "08", "09"
-    ]
+    assert list(data["assets"]) == ["01", "02", "03"]
 
 
 def test_prepare_original_video_run_records_structured_references(tmp_path: Path):

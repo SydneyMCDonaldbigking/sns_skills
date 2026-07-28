@@ -55,20 +55,19 @@ def test_output_schema_documents_manifest_generation_state():
         assert required in text
 
 
-def test_cooking_workflow_uses_fixed_no_text_brand_prop_storyboard():
+def test_cooking_workflow_uses_director_first_frame_contract():
     text = (REF / "cooking-video-workflow.md").read_text(encoding="utf-8")
     for required in [
-        "ingredients/product close-ups -> cooking process -> plated finished dish",
-        "01 Ingredient, seasoning, and product close-up",
-        "09 Finished dish hero shot with company table sign",
-        "real physical prop",
-        "no subtitles, captions, title cards, lower-thirds, labels",
+        "three director-designed first frames",
+        "one `1080x1920` opening frame per clip",
+        "Give each request only its matching opening frame",
+        "Do not generate nine storyboard frames by default",
+        "generation references, not editing assets",
         "ASIAN GROCER ONLINE",
         "powered by UMALL",
-        "Do not use the Chinese-region UMALL logo",
+        "Never use the Chinese-region logo",
     ]:
         assert required in text
-    assert "natural platform text only if needed" not in text
 
 
 def test_fixed_brand_scene_reference_points_to_readable_asset():
@@ -124,7 +123,7 @@ def test_brand_rules_require_scene_anchored_exact_logo_compositing():
     for text in [cooking, brand]:
         assert "perspective" in text
         assert "occlusion" in text
-        assert "floating corner" in text
+        assert "floating" in text
 
 
 def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():

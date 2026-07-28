@@ -1,35 +1,17 @@
 # Original Cooking Video Memory
 
-Current company production rule for original no-face cooking commercials:
-
-`9 API-generated storyboard frames -> 3 groups of 3 -> 3 silent Seedance clips x 6s -> ChatCut finish at the coherent duration`
-
-This rule overrides the older compact one-prompt/three-soft-shot experiment.
-Each Seedance request receives three separate ordered images as its start,
-middle, and end anchors:
-
-1. `01-03`: product hook and pan setup.
-2. `04-06`: frying, steam, lid, and cooking transformation.
-3. `07-09`: crisp reveal, plating, and finished hero.
-
-Create the official `ASIAN GROCER ONLINE` with small `powered by UMALL`
-tabletop sign inside the storyboard image API pass as the same real physical
-prop. Do not ask Seedance to invent it and do not default to a floating
-post-production logo overlay.
-
-Maintain the same no-face hand model, sleeves, kitchen, cookware, light,
-dumplings, package, and sign across all nine frames. Generate each later frame
-as an edit of the preceding frame with the product and logo references still
-attached.
-
-The single canonical specification is:
+The single production specification is:
 `../../../viral-social-remix/references/cooking-video-workflow.md`.
-Do not duplicate its shot list or prompt template here.
 
-After generation, import the three clips separately into ChatCut. Do not force
-18 seconds down to 15 seconds when the sequence is coherent; trim only defects,
-repetition, awkward joins, or dead time.
+Current default:
 
-Add the user-recorded voiceover. The agent generates and mixes the BGM and
-cooking SFX. Add editable English current-step captions at the visual center:
-white type, subtle dark stroke/shadow, no colored box, timed to the action.
+`3 director-designed first frames -> 3 silent Seedance clips x 6s -> ChatCut finish`
+
+Each clip gets only its own opening frame. The director chooses the angle,
+composition, starting action, camera move, and intended endpoint. Use a
+designed or returned last frame only when a join needs exact control.
+
+First frames, product/logo references, contact sheets, and QA images are
+generation-only assets. Import only accepted MP4 clips into ChatCut.
+
+Do not duplicate the full workflow in memory notes.

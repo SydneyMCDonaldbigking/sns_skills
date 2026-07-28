@@ -1,149 +1,101 @@
 # Cooking Video Workflow
 
-Use this reference for original no-face cooking commercials.
+This is the single authority for original no-face cooking commercials. Do not
+load old run notes unless something fails.
 
-## Fixed production contract
+## Default chain
 
-The recipe arc is:
+`three script beats -> three director-designed first frames -> three silent 6s Seedance clips -> ChatCut finish`
 
-`ingredients/product close-ups -> cooking process -> plated finished dish`
+The first frames are generation references, not editing assets.
 
-The generation chain is:
+## Direct the three clips
 
-`9 separate storyboard PNGs -> 3 groups of 3 frames -> 3 silent Seedance clips x 6s -> ChatCut finish at the coherent duration`
+Write one useful cooking beat per clip:
 
-Each 6-second Seedance clip gets exactly three ordered storyboard images:
+1. Product hook and first preparation action.
+2. Main cooking or assembly transformation.
+3. Finish, pack/plate, and branded result.
 
-- Frames `01-03` -> clip 1: product hook and pan setup.
-- Frames `04-06` -> clip 2: fry, steam, and browning.
-- Frames `07-09` -> clip 3: reveal, plating, and brand hero.
+For each beat, decide before generating:
 
-Never use one frame per clip, one three-frame request for the whole commercial,
-or all nine frames in one Seedance request.
+- the shot size and camera angle;
+- the starting food/action state;
+- the product and physical logo-sign placement;
+- one camera movement;
+- the intended end composition and handoff to the next clip.
 
-## Draw the nine frames
+Generate one `1080x1920` opening frame per clip with the configured image API.
+Do not generate nine storyboard frames by default. Do not import the three
+opening frames into ChatCut.
 
-Use the configured image API, normally GPT Image 2, to create nine individual
-portrait images at `1080x1920`. The contact sheet is only for human review; it
-is not a Seedance input.
+Use the official English logo:
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
+Render it as a real printed tabletop sign with scene perspective, lighting,
+shadow, and occlusion. Never use the Chinese-region logo or a floating overlay.
 
-Frame 01 establishes the visual world from the product image, official logo,
-and art direction. Create frames 02-09 as controlled edits of the preceding
-frame while also supplying the product and official logo references. Keep the
-same:
+Keep the product, kitchen, hands/clothing, light, cookware, and color grade
+consistent. No face. Product-package text and the physical logo sign are
+allowed; other generated text, subtitles, labels, watermarks, and title cards
+are forbidden.
 
-- kitchen surface, pan, plate, light direction, and color grade;
-- hand model, sleeves, skin tone, and manicure;
-- dumpling shape, scale, count, and cooked-state progression;
-- product package, tabletop sign, and camera language.
-
-Do not show a face. Hands and torso below the shoulders are allowed.
-
-Use this nine-frame story:
-
-01 Ingredient, seasoning, and product close-up; frozen dumplings and package,
-with the physical company table sign already present.
-
-02 The same hands arrange dumplings in the same pan.
-
-03 Oil begins to sizzle; low macro angle, first appetizing movement.
-
-04 Water enters the pan and steam rises naturally.
-
-05 The same lid covers the pan; condensation and heat are plausible.
-
-06 Lid lifts to reveal cooked dumplings; steam direction remains consistent.
-
-07 Dumplings turn to reveal an even golden crisp base.
-
-08 The same hands plate the dumplings with a clean, controlled motion.
-
-09 Finished dish hero shot with company table sign and product package.
-
-Every frame prompt must name its prior-frame reference, product reference, logo
-reference, unchanged continuity anchors, exact new food state, camera framing,
-and what must not change. Describe only one meaningful action change per frame.
-
-## Logo as a photographed prop
-
-Use:
-`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`
-
-The sign must show the English-region lockup `ASIAN GROCER ONLINE` with small
-`powered by UMALL`. Do not use the Chinese-region UMALL logo.
-
-Draw it during storyboard generation as one real physical prop: a small
-premium printed tabletop card on the cooking surface. Keep its proportions,
-wording, placement, material, perspective, lighting, contact shadow, and
-occlusion consistent. It must not become a floating corner logo, screen
-overlay, sticker, subtitle, or end-card graphic.
-
-Place the same sign visibly in at least one anchor of every three-frame group,
-and in frame 09. If the logo is misspelled or the sign changes identity, reject
-and regenerate that storyboard frame before calling Seedance. Perspective or
-occlusion may change naturally with the camera; the prop identity may not.
-
-## Image prompt skeleton
-
-Write one prompt per file in `analysis/page-prompts/page-XX.md`:
+## First-frame prompt
 
 ```text
-Create storyboard frame XX of 09, vertical 1080x1920, premium no-face food
-commercial. Edit the supplied previous frame; also use the supplied product and
-official logo references.
+Create opening frame [01/02/03] for a premium vertical no-face food commercial,
+1080x1920. This frame begins clip [1/2/3] and depicts [starting action].
 
-UNCHANGED: [kitchen, pan, hands/sleeves, lighting, dumpling count/shape,
-package, physical tabletop logo sign, color grade].
-CHANGE ONLY: [one cooking action or food-state transition].
-CAMERA: [shot size, angle, lens feel, static or one simple move intention].
-LOGO PROP: preserve the exact ASIAN GROCER ONLINE / powered by UMALL printed
-tabletop sign as a real object with correct perspective, shadow, and occlusion.
-NEGATIVE: face, extra fingers, warped utensils, floating objects, invented
-packaging, impossible food physics, text overlays, subtitles, captions, title
-cards, lower-thirds, labels, watermarks, or any additional brand.
+DIRECTOR: [shot size, camera angle, lens feel, composition].
+CONTINUITY: preserve [product, package, kitchen, hands/clothing, cookware,
+lighting, food state, color grade].
+END INTENTION: the six-second shot should naturally arrive at [end composition].
+LOGO PROP: reproduce the supplied ASIAN GROCER ONLINE / powered by UMALL logo
+as a real tabletop sign with correct perspective, shadow, and occlusion.
+NEGATIVE: face, extra fingers, warped tools, invented packaging, floating logo,
+subtitles, captions, labels, title cards, lower-thirds, watermarks.
 ```
 
-Product-package text and the exact printed logo on the real sign are allowed.
-All other visible text is forbidden: no subtitles, captions, title cards, lower-thirds, labels, or watermarks.
+## Seedance motion prompt
 
-## Seedance requests
+Give each request only its matching opening frame. Let Seedance create the
+intermediate motion.
 
-Use image-to-video with three ordered input frames per request. Treat them as
-start, middle, and end anchors for one continuous six-second action.
+```text
+Begin exactly from the supplied opening frame. [Subject action].
+Camera: [one restrained movement].
+End with [specific composition/action state] so the next clip can begin cleanly.
+Preserve the product, package, physical logo sign, kitchen, hands/clothing,
+food identity, lighting, and color grade. Natural cooking physics. No face,
+new objects, scene teleporting, subtitles, overlays, watermarks, or extra logos.
+```
 
-For every request:
+For every request: `6s`, `9:16`, `1080p`, `generate_audio: false`, and
+`return_last_frame: true`.
 
-- duration: `6s`
-- aspect ratio: `9:16`
-- resolution: `1080p`
-- audio: off / `generate_audio: false`
-- continuity: preserve the supplied people-free set, food, package, and sign
-- motion: natural hands, oil, steam, lid, utensils, and food physics
-- camera: one restrained commercial movement; no scene teleporting
+Use only the first frame by default. When a join needs exact control, design the
+prior endpoint or use its returned last frame as the next clip's opening
+reference. Do not add extra still anchors merely for reassurance.
 
-Do not ask Seedance to invent text, narration, music, or a new logo.
+## Fast review
+
+Review one strip covering all three clips. Check only:
+
+- correct product and logo prop;
+- no face or broken hands;
+- believable food/action progression;
+- usable join and no generated overlay text.
+
+Retry only the failed clip.
 
 ## ChatCut finish
 
-Import the three accepted clips as separate editable items in order. If all
-three clips join coherently, preserve the full sequence even when it is close
-to 18 seconds. Trim only failed motion, duplicated action, awkward joins, or
-dead time; never force the edit to 15 seconds.
+Import only the three accepted MP4 clips, in order. Never import opening frames,
+product/logo references, contact sheets, or QA images.
 
-Add these as separate editable tracks:
+Keep the coherent natural duration; do not force 18 seconds to 15. Add separate
+editable tracks for agent-generated Japanese BGM and timed cooking SFX. Add the
+user's voiceover only when supplied. Add editable English current-step captions
+at the visual center: white, subtle dark stroke/shadow, no colored box.
 
-- the user's recorded English voiceover;
-- commercial BGM generated by the agent;
-- frying, sizzling, steam, lid, plating, and plate-contact SFX generated by
-  the agent.
-
-Add editable English step captions describing the action currently visible,
-for example `PAN-FRY`, `ADD WATER`, `COVER & STEAM`, and `CRISP & SERVE`.
-Place them at the visual center of the video in white, with a subtle dark
-stroke or shadow, no colored box, and exact timing to the cooking step.
-
-The no-text rule applies to storyboard and Seedance generation. These required
-step captions are created only in ChatCut, so they remain editable.
-Finish only after visual QA confirms continuity, food progression, hand anatomy,
-package fidelity, exact logo-sign fidelity, duration, framing, and a clean audio
-tail.
+Do one final visual/audio check and export. Use deeper QA or troubleshooting
+only when that check finds a concrete defect.

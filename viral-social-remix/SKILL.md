@@ -5,182 +5,115 @@ description: Use when a user provides a viral social-post URL, image, video, loc
 
 # Viral Social Remix
 
-Keep this file as the route map. Load only the reference needed for the chosen
-output. Do not load the whole vault.
+Use this file only as a route map. Current user instructions override memory.
+Never load the whole vault.
 
-## 1. Read persistent context
+## Context
 
-Read `docs/memory/viral-social-remix/index.md`, then only the linked memory for
-the active route. Current user instructions override memory.
+Always read `brand-profile.md` and `references/brand-region-assets.md`. Reuse
+known product and brand values. Product and brand are mandatory.
+Ask only for missing mandatory fields or low-confidence platform when a value
+is still `未填写`.
 
-Read `brand-profile.md` and `references/brand-region-assets.md` before asking
-questions. Reuse completed values; ask only when product or brand is still
-`未填写`. Product and brand are mandatory. Ask only for missing mandatory fields or low-confidence platform.
+For an original cooking commercial, skip the memory index and read only
+`references/cooking-video-workflow.md`. For other routes, read
+`docs/memory/viral-social-remix/index.md`, then only the linked route note.
 
-Search `data/material-index.jsonl` before recollecting known sources or brand
-assets. Use `scripts/query_material_index.py` and
-`scripts/build_remix_context.py` when relevant.
+Search `data/material-index.jsonl` before recollecting known sources or assets.
+Use `scripts/query_material_index.py` or `scripts/build_remix_context.py` only
+when needed.
 
-## 2. Classify the route
+## Choose one route
 
 Infer the source platform and target output platform separately.
 
-- **Xiaohongshu source to English carousel**: preserve page count and meaning,
-  output natural English `1152x1152`, write `caption-en.txt`.
-- **Chinese Xiaohongshu output**: output `1152x1536`, write
-  `caption-zh.txt`.
-- **Instagram/Facebook carousel**: preserve source page count, output natural
-  English `1152x1152`, write `caption-en.txt`.
-- **General video remix**: select exactly nine narrative frames and create a
-  `1920x1080` storyboard/contact sheet.
+- **Xiaohongshu source to English carousel**: preserve page count, order,
+  meaning, and page roles; output natural English `1152x1152` and
+  `caption-en.txt`.
+- **Chinese Xiaohongshu output**: preserve the source structure; output
+  `1152x1536` and `caption-zh.txt`.
+- **Instagram/Facebook carousel**: preserve page count and roles; output
+  natural English `1152x1152` and `caption-en.txt`.
+- **General video remix**: select exactly nine narrative frames and build the
+  requested storyboard/contact sheet.
 - **Original cooking commercial**: use `vertical-video`, `9:16`,
-  `1080x1920`; follow the nine-frame/three-clip contract below.
+  `1080x1920`, and the director-first-frame route below.
 
-Load `references/platform-profiles.md` and
-`references/breakdown-schema.md`. For `real-talk` Xiaohongshu posts, also load
-`references/xiaohongshu-real-talk-template.md`. For `pantry-essentials`
-Instagram/Facebook posts, load
-`references/instagram-pantry-essentials-template.md`.
+For carousel and general video routes, load `references/platform-profiles.md`
+and `references/breakdown-schema.md`. Load
+`references/xiaohongshu-real-talk-template.md` only for real-talk posts and
+`references/instagram-pantry-essentials-template.md` only for pantry posts.
 
-## 3. Acquire the source
+## Acquire and prepare
 
-Accept a post URL, logged-in browser tab, local file, local folder, or original
+Accept a post URL, active logged-in tab, local file, local folder, or original
 brief.
 
-- Local folder: run `scripts/scan_media.py`; inspect every discovered image.
-- Logged-in social page: reuse the existing Browser/Chrome tab. Do not reload
-  or open a duplicate unless necessary.
-- Xiaohongshu capture: use `scripts/xhs_browser_capture.mjs`, then
+- Scan a local folder with `scripts/scan_media.py`.
+- Capture Xiaohongshu with `scripts/xhs_browser_capture.mjs`, then
   `scripts/capture_source_package.py`.
-- Other source packages: use `scripts/capture_source_package.py`.
+- Use `scripts/capture_source_package.py` for other source packages.
 
 Preserve source order, caption, author, URL, page count, media files, and a
-screenshot fallback. Do not pretend blocked originals were downloaded.
+screenshot fallback. Do not claim blocked originals were downloaded.
 
-## 4. Prepare a resumable run
+Create a resumable run with `scripts/create_run_dir.py`,
+`scripts/prepare_remix_run.py`, or `scripts/run_pipeline.py`. Follow
+`references/output-schema.md`; keep state in `scripts/manifest.py`; never
+overwrite a prior run. Run deterministic validation before paid generation.
 
-Use `scripts/create_run_dir.py` or `scripts/prepare_remix_run.py`. Follow
-`references/output-schema.md`. Store generation state in
-`scripts/manifest.py`; never overwrite a prior run.
+## Carousel
 
-Required analysis files:
+Preserve layout logic and copy meaning. Keep the final shopping/search guide
+unless the user waives it. Use real supplied UI/screenshots; never invent
+prices, products, or app screens.
 
-- `analysis/breakdown.md`
-- `analysis/copy.md`
-- `analysis/prompts.md`
-- `analysis/page-prompts/page-XX.md`
-- `analysis/manifest.json`
-- the required `caption-zh.txt` or `caption-en.txt`
+Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
+the provider with `scripts/image_provider.py`. Production GPT Image 2 uses the
+configured image API; `openai/gpt-5.4-image-2` is the explicit legacy route.
+Load `references/fixed-brand-scenes.md` only when a warehouse scene is required.
+When the API is available, generate the assets; do not stop at prompts.
 
-Run `scripts/validate_prepared_run.py` before paid generation.
+## Original cooking commercial
 
-## 5. Carousel workflow
+Load `references/cooking-video-workflow.md` as the single production authority.
+Load `references/seedance-video.md` only after a runner/API failure.
 
-Preserve each source page's role, layout logic, copy meaning, and page count.
-For commerce posts, retain the final shopping/search guide unless the user
-waives it. Use real supplied UI/screenshots; do not invent prices, products, or
-app screens.
+Default:
 
-Load `references/prompt-patterns.md` and
-`references/image-provider.md`. Resolve the provider through
-`scripts/image_provider.py`. GPT Image 2 production uses the configured image
-API; `openai/gpt-5.4-image-2` remains the explicit legacy chat-completions
-route. If a warehouse scene is required, load
-`references/fixed-brand-scenes.md`.
+`3 director-designed first frames -> 3 silent Seedance clips x 6s -> ChatCut finish`
 
-When the image API is available, run it; do not stop at writing prompts:
+- Direct three script beats. For each clip choose the angle, composition,
+  starting action, one camera move, and intended endpoint.
+- Generate exactly three `1080x1920` first frames containing the supplied
+  product and official physical `ASIAN GROCER ONLINE / powered by UMALL`
+  company table sign as a real physical prop.
+- Give each Seedance request only its own opening frame. Use a designed or
+  returned last frame only when a join needs exact control.
+- Use `6s`, `9:16`, `1080p`, silent generation, no face, and no generated
+  subtitles or overlays.
+- Review all three clips once and retry only a visible failure.
+- Import only accepted MP4 clips into ChatCut. Never import first frames,
+  storyboards, product/logo references, contact sheets, or QA images.
+- Keep the coherent natural duration. Generate editable BGM and cooking SFX;
+  add the user's voiceover when supplied; add centered white editable
+  current-step captions with a subtle dark stroke/shadow and no colored box.
 
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/<run> --api-only --concurrency 2
-```
+Prepare with `scripts/run_pipeline.py prepare-original-video`. Generate each
+clip with `scripts/run_seedance_video.py --storyboard-group 1`, then repeat for
+groups 2 and 3. Use `scripts/run_openrouter_video.py` and
+`references/openrouter-video.md` only for an explicitly selected Grok route.
 
-## 6. Original cooking commercial: fixed contract
+## Finish
 
-Load `references/cooking-video-workflow.md`. Do not load the general
-`references/seedance-video.md` unless the runner/API needs troubleshooting; its
-provider examples do not override this production contract.
+After generation, make one representative visual pass across all clips. After
+export, verify the actual file's duration, dimensions, streams, opening, joins,
+ending, and audio tail. Use deeper QA or troubleshooting only after a concrete
+failure.
 
-The production unit is:
-
-`9 individual storyboard frames -> 3 groups -> 3 silent Seedance clips of 6s -> ChatCut finish at the natural coherent duration`
-
-Hard rules:
-
-1. Use our configured image API to generate all nine individual
-   `1080x1920` storyboard frames. Do not send a text-only prompt directly to
-   Seedance.
-2. Create frame 01 from the product, official logo, and art direction.
-   Generate every later frame by editing the previous frame while reusing the
-   same product and logo references. Lock the kitchen, pan, hands, clothing,
-   lighting, dumpling shape/count, packaging, and camera language.
-3. Draw the official `ASIAN GROCER ONLINE` with small `powered by UMALL`
-   directly on the same company table sign as a real physical prop in the
-   storyboard. Use
-   `viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
-   Do not substitute the Chinese-region UMALL logo. The physical sign is
-   established during storyboard generation, not added as a default floating
-   post overlay.
-4. Produce nine separate PNGs; the 3x3 contact sheet is review-only.
-5. Submit exactly three ordered storyboard images per Seedance request:
-   frames `01-03` -> clip 1, `04-06` -> clip 2, `07-09` -> clip 3.
-   Each clip is 6 seconds, `9:16`, `1080p`, and `generate_audio: false`.
-6. Never send one frame per clip, all nine frames to one request, or only one
-   three-frame request for the whole commercial.
-7. In ChatCut, place the three clips in order. If the 18-second sequence is
-   coherent, keep it; trim only failed motion, repeated action, or dead time.
-   Never force the edit to 15 seconds.
-8. Add the user's recorded Voiceover. Generate the BGM and cooking SFX
-   yourself, then place and mix them as separate editable tracks.
-9. Add editable English captions that state the current cooking step. Put each
-   caption in the visual center of the video, white, with a subtle dark
-   stroke/shadow and no colored box. Time captions to the actual action.
-10. No face. Storyboards and Seedance output enforce `no visible text`: no
-   generated subtitles, title cards, lower-thirds, labels, watermarks, or other
-   added text. Product packaging and the real logo sign remain allowed scene
-   objects. Final step captions are added only in ChatCut.
-
-Prepare the run with:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_pipeline.py prepare-original-video --brief "brand/product/dish brief" --task-name cooking-commercial
-```
-
-After the nine frames validate, dry-run and then submit each group separately:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/<run> --storyboard-group 1 --allow-data-url --dry-run
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/<run> --storyboard-group 1 --allow-data-url --approve-final-spend
-```
-
-Repeat only the group number for groups 2 and 3. The runner selects `01-03`,
-`04-06`, or `07-09` and writes separate clip, request-lock, and QA files.
-
-Use `scripts/run_openrouter_carousel.py` for the nine storyboard images and
-`scripts/run_seedance_video.py` for Seedance. Use
-`scripts/run_openrouter_video.py` only for an explicitly selected Grok test.
-Load `references/openrouter-video.md` for the Grok route.
-
-## 7. Validate and finish
-
-Run `scripts/validate_output.py` and visually inspect the contact sheet. Retry
-only failed assets.
-
-For each generated video, inspect representative frames and run
-`scripts/video_qa.py prepare`; record `approve` or `reject --reason`. Do not
-send rejected clips to ChatCut.
-
-After ChatCut export, run `scripts/video_qa.py prepare-export`, inspect the
-actual final file, then record `approve-export` or `reject-export --reason`.
-Check duration, aspect ratio, continuity, food state, hand anatomy, exact
-product/logo fidelity, audio balance, and audio tail.
-
-Write `output/<run>/qa/run-notes.md` from the memory template only after a
-successful run. Distill only reusable lessons; never store keys, raw provider
-responses, signed URLs, or base64 payloads in Obsidian.
-
-## 8. Boundaries
+Write a run note only after success and only when it contains a reusable
+lesson. Never store keys, raw provider responses, signed URLs, or base64
+payloads in Obsidian.
 
 Do not bypass authentication or anti-scraping controls. Do not reproduce source
-watermarks, unauthorized logos, or real-person identity. If API access is
-blocked, finish the resumable run package and give the exact local command
-instead of inventing a fallback result.
+watermarks, unauthorized logos, or real-person identity.

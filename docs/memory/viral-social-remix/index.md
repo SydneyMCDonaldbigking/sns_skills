@@ -48,12 +48,11 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 ## Video Chain
 
-For original cooking video work, read only:
-
-1. [[original-cooking-video]] for the current company contract.
-2. [[aesthetic-library/no-face-asian-cooking-style]] only when defining a new
-   visual direction.
-3. [[chatcut-handoff-workflow]] after the three Seedance clips pass review.
+For original cooking video work, use
+`../../../viral-social-remix/references/cooking-video-workflow.md` as the only
+production contract. Read aesthetic memory only when defining a new visual
+direction and [[chatcut-handoff-workflow]] only after the three clips pass
+review.
 
 Provider research remains available in [[seedance-video-generation]] and
 [[seedance-official-prompting]], but it does not override the company contract.
@@ -104,11 +103,10 @@ a generic CTA.
 - 2026-07-26: Clear the saved image/carousel taste library. For graphically
   designed posts, reference the original/source or a chosen competitor post
   directly instead of improvising a house style from memory.
-- 2026-07-28: Company cooking-commercial production overrides the earlier
-  compact-prompt experiment: draw nine API storyboard frames, group them
-  `01-03`, `04-06`, and `07-09`, then give exactly three ordered frames to each
-  silent 6s Seedance request. Establish the real English logo tabletop sign in
-  those storyboard images before video generation.
+- 2026-07-28: Company cooking-commercial production uses three
+  director-designed opening frames, one per silent 6s Seedance clip. Direct the
+  angle, starting action, camera move, and endpoint; let Seedance create the
+  intermediate motion. Opening frames stay outside ChatCut.
 - 2026-07-28: A ChatCut theme is not a font/filter preset. Teach execution
   models each theme as audience promise + emotion + rhythm + proof, and force
   Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export

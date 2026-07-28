@@ -5,10 +5,10 @@ Use this reference after a `vertical-video` or `video` run has a finished
 profile.
 
 For the current company cooking-commercial route, first follow
-`cooking-video-workflow.md`: nine storyboard frames, fixed groups `01-03`,
-`04-06`, `07-09`, and three separate silent 6s requests using
-`--storyboard-group`. The compact-reference examples below document other or
-older video jobs and do not override that contract.
+`cooking-video-workflow.md`: three director-designed opening frames and three
+separate silent 6s requests using `--storyboard-group`. Each request gets only
+its matching opening frame. The examples below document provider controls and
+older jobs; they do not override that contract.
 
 ## Control Model
 
@@ -292,8 +292,8 @@ For `post-composited-physical-prop`, track the official logo PNG onto a real
 scene surface with matching perspective, motion, occlusion, lighting, and
 texture. It must not become a floating overlay.
 
-For `storyboard-physical-prop`, keep the exact physical sign already present in
-the three supplied storyboard anchors. Do not ask Seedance or ChatCut to redraw
+For `first-frame-physical-prop`, keep the exact physical sign already present in
+the supplied opening frame. Do not ask Seedance or ChatCut to redraw
 or replace it.
 
 ## Secret Handling

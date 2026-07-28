@@ -560,13 +560,19 @@ def _finalize_run(
 ) -> dict[str, Any]:
     generated = [_generated_path(run_dir, asset_id) for asset_id in asset_ids]
     if all(path.is_file() for path in generated):
-        if platform in STORYBOARD_PLATFORMS:
+        director_first_frames = (
+            manifest_data.get("video_mode")
+            == "director-first-frame-three-clips"
+            or (manifest_data.get("video") or {}).get("mode")
+            == "director-first-frame-three-clips"
+        )
+        if platform in STORYBOARD_PLATFORMS and not director_first_frames:
             make_contact_sheet.make_storyboard(
                 generated,
                 run_dir / "overview" / "contact-sheet.png",
                 _storyboard_labels(manifest_data, asset_ids),
             )
-        else:
+        elif platform not in STORYBOARD_PLATFORMS:
             make_contact_sheet.make_carousel(
                 generated,
                 run_dir / "overview" / "contact-sheet.png",
@@ -632,9 +638,19 @@ def run_carousel(
     asset_ids = list(data.get("assets", {}).keys())
     if not asset_ids:
         raise CarouselRunnerError("Manifest does not contain carousel assets")
-    if platform in STORYBOARD_PLATFORMS and len(asset_ids) != 9:
+    director_first_frames = (
+        data.get("video_mode") == "director-first-frame-three-clips"
+        or (data.get("video") or {}).get("mode")
+        == "director-first-frame-three-clips"
+    )
+    expected_storyboard_count = 3 if director_first_frames else 9
+    if (
+        platform in STORYBOARD_PLATFORMS
+        and len(asset_ids) != expected_storyboard_count
+    ):
         raise CarouselRunnerError(
-            f"{platform} storyboard requires exactly 9 assets before API generation; "
+            f"{platform} storyboard requires exactly {expected_storyboard_count} "
+            "assets before API generation; "
             f"found {len(asset_ids)}"
         )
     if platform in STORYBOARD_PLATFORMS:

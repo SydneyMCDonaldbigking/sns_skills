@@ -52,11 +52,10 @@ Use semantic prompt placeholders such as `{{ref:product-pack}}`. The runner
 compiles them to the final provider order (`[Image 1]`, `[Video 1]`) and rejects
 unknown, missing, or `@Image1` references before spending money.
 
-For the current company cooking-commercial route, use the nine generated
-storyboard frames in three fixed groups: `01-03`, `04-06`, and `07-09`.
-Every 6s Seedance request receives exactly one group of three ordered images.
-The compact-prompt notes below remain provider research, not the active company
-production contract.
+For the current company cooking-commercial route, use three director-designed
+opening frames. Every 6s Seedance request receives only its own opening frame.
+The director specifies the angle, starting action, one camera move, and intended
+endpoint; Seedance creates the intermediate motion.
 
 Profiles make intent explicit:
 
@@ -162,8 +161,9 @@ For cooking video prompts:
 - Repeat the no-visible-text policy in the Seedance prompt.
 - Prefer controlled, small motions: steam, gentle stirring, sauce pour,
   spooning into a bowl.
-- For a company cooking commercial, use three storyboard anchors for that
-  6-second clip; do not send all nine frames to one request.
+- For a company cooking commercial, use one director-designed opening frame for
+  that 6-second clip. Add another still only when an exact transition requires
+  it.
 - Avoid asking for too many distinct actions in 5 seconds unless the visual
   references already make the progression obvious.
 

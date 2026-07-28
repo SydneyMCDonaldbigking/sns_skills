@@ -38,15 +38,16 @@ DEFAULT_SIZES = {
     "vertical-video": "1080x1920",
 }
 FIXED_COOKING_SHOTS = [
-    "Clip 1 / frames 01-03 / 6s: product hook, dumplings arranged in the pan, first sizzle.",
-    "Clip 2 / frames 04-06 / 6s: water and steam, lid/condensation, cooked reveal.",
-    "Clip 3 / frames 07-09 / 6s: golden-base reveal, plating, finished hero.",
+    "Clip 1 / first frame 01 / 6s: product hook and first preparation action.",
+    "Clip 2 / first frame 02 / 6s: main cooking or assembly transformation.",
+    "Clip 3 / first frame 03 / 6s: finish, pack/plate, and branded result.",
     "",
-    "Generate nine separate 1080x1920 storyboard PNGs with the configured image API.",
-    "Each later frame edits the preceding frame while reusing product and official logo references.",
-    "Give Seedance exactly three ordered frames per request: 01-03, 04-06, then 07-09.",
+    "Direct the angle, composition, starting action, camera move, and intended endpoint for each clip.",
+    "Generate exactly three 1080x1920 opening frames with the configured image API.",
+    "Give Seedance only the matching opening frame for each request: 01, 02, then 03.",
     "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
-    "Keep the same no-face hands, sleeves, kitchen, pan, light, dumplings, package, and physical logo tabletop sign.",
+    "Keep the same no-face hands, clothing, kitchen, light, product, package, and physical logo tabletop sign.",
+    "Opening frames are generation references and must not be imported into ChatCut.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -186,31 +187,31 @@ def fixed_cooking_shot_list() -> str:
     return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
 
 
-def _mark_three_clip_storyboard_mode(
+def _mark_director_three_clip_mode(
     manifest_path: Path,
     storyboard_references: list[dict] | None = None,
 ) -> None:
     data = manifest.load(manifest_path)
     data["schema_version"] = 2
-    data["video_mode"] = "storyboard-three-clips"
+    data["video_mode"] = "director-first-frame-three-clips"
     data["storyboard_references"] = storyboard_references or []
     data["video"] = {
-        "mode": "storyboard-three-clips",
+        "mode": "director-first-frame-three-clips",
         "profile": "final-clip",
         "clip_groups": [
             {
                 "id": "clip-01",
-                "frames": ["01", "02", "03"],
+                "frames": ["01"],
                 "duration": 6,
             },
             {
                 "id": "clip-02",
-                "frames": ["04", "05", "06"],
+                "frames": ["02"],
                 "duration": 6,
             },
             {
                 "id": "clip-03",
-                "frames": ["07", "08", "09"],
+                "frames": ["03"],
                 "duration": 6,
             },
         ],
@@ -236,7 +237,7 @@ def _mark_three_clip_storyboard_mode(
             "available": False,
         },
         "brand": {
-            "strategy": "storyboard-physical-prop",
+            "strategy": "first-frame-physical-prop",
             "asset": "viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png",
             "visible_text": "physical-prop-only",
         },
@@ -252,15 +253,15 @@ def _mark_three_clip_storyboard_mode(
         "export_qa": "not_started",
         "history": [],
         "clips": {
-            "clip-01": {"frames": ["01", "02", "03"], "status": "prepared"},
-            "clip-02": {"frames": ["04", "05", "06"], "status": "prepared"},
-            "clip-03": {"frames": ["07", "08", "09"], "status": "prepared"},
+            "clip-01": {"frames": ["01"], "status": "prepared"},
+            "clip-02": {"frames": ["02"], "status": "prepared"},
+            "clip-03": {"frames": ["03"], "status": "prepared"},
         },
     }
     data["assumptions"].append(
         {
             "inferred": True,
-            "value": "Nine storyboard frames, grouped three per silent 6s Seedance clip; ChatCut preserves a coherent full sequence and trims only defects or dead time.",
+            "value": "Three director-designed opening frames, one per silent 6s Seedance clip; ChatCut imports only accepted MP4 clips and preserves a coherent full sequence.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -335,16 +336,18 @@ def _create_run_layout(run_dir: Path, platform: str, caption_language: str | Non
         directory.mkdir(parents=True, exist_ok=True)
 
     analysis = run_dir / "analysis"
+    if platform == "vertical-video":
+        _write_if_missing(analysis / "shot-list.md", fixed_cooking_shot_list())
+        _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
+        (analysis / "seedance-prompts").mkdir(parents=True, exist_ok=True)
+        return
+
     language = _caption_language(platform, caption_language)
     _write_if_missing(analysis / "breakdown.md", "# Breakdown\n\nTODO\n")
     _write_if_missing(analysis / "copy.md", "# Copy\n\nTODO\n")
     _write_if_missing(analysis / "prompts.md", "# Prompts\n\nTODO\n")
     _write_if_missing(analysis / f"caption-{language}.txt", "TODO\n")
-    if platform == "vertical-video":
-        _write_if_missing(analysis / "shot-list.md", fixed_cooking_shot_list())
-        _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
-        (analysis / "seedance-prompts").mkdir(parents=True, exist_ok=True)
-    elif platform in VIDEO_PLATFORMS:
+    if platform in VIDEO_PLATFORMS:
         _write_if_missing(analysis / "shot-list.md", "# Shot List\n\nTODO\n")
         _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
 
@@ -471,9 +474,9 @@ def prepare_original_video_run(
     )
     if platform == "vertical-video":
         group_actions = {
-            1: "Animate the product hook, pan arrangement, and first natural sizzle.",
-            2: "Animate the water, steam, lid condensation, and cooked reveal.",
-            3: "Animate the golden-base reveal, plating, and final branded dish hero.",
+            1: "Begin exactly from first frame 01. Animate the product hook and first preparation action.",
+            2: "Begin exactly from first frame 02. Animate the main cooking or assembly transformation.",
+            3: "Begin exactly from first frame 03. Animate the finish, pack or plate action, and branded result.",
         }
         for group, action in group_actions.items():
             _write_if_missing(
@@ -483,18 +486,20 @@ def prepare_original_video_run(
                 / f"clip-{group:02d}.md",
                 (
                     f"# Seedance Clip {group:02d}\n\n"
-                    f"{action} Preserve the supplied no-face hands, pan, "
-                    "dumplings, package, lighting, and the exact physical "
+                    f"{action} Use one restrained commercial camera movement "
+                    "and finish at the director-specified endpoint. Preserve "
+                    "the supplied no-face hands, clothing, kitchen, food, "
+                    "product package, lighting, and the exact physical "
                     "ASIAN GROCER ONLINE / powered by UMALL tabletop sign. "
-                    "One restrained commercial camera movement, realistic food "
-                    "physics, no new objects, no subtitles or overlay text.\n"
+                    "Realistic food physics, no new objects, no subtitles or "
+                    "overlay text.\n"
                 ),
             )
     manifest_path = run_dir / "analysis" / "manifest.json"
     manifest.create(
         manifest_path,
         platform,
-        _asset_ids(platform, []),
+        ["01", "02", "03"] if platform == "vertical-video" else _asset_ids(platform, []),
         source={
             "kind": "original_brief",
             "paths": [brief_source] if brief_source else [],
@@ -504,7 +509,7 @@ def prepare_original_video_run(
         provider=image_provider.resolve(),
     )
     if platform == "vertical-video":
-        _mark_three_clip_storyboard_mode(
+        _mark_director_three_clip_mode(
             manifest_path,
             _prepare_video_references(
                 run_dir,

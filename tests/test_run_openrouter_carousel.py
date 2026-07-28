@@ -209,6 +209,69 @@ def test_run_openrouter_carousel_generates_english_vertical_storyboard(tmp_path,
     assert result["validation"]["valid"] is True
 
 
+def test_run_openrouter_carousel_generates_three_director_opening_frames(
+    tmp_path,
+    monkeypatch,
+):
+    run_dir = _prepared_run(
+        tmp_path,
+        "vertical-video",
+        ["01", "02", "03"],
+    )
+    prompt_dir = run_dir / "analysis" / "seedance-prompts"
+    prompt_dir.mkdir()
+    for index in range(1, 4):
+        (prompt_dir / f"clip-{index:02d}.md").write_text(
+            f"Animate clip {index}.",
+            encoding="utf-8",
+        )
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    data["schema_version"] = 2
+    data["video_mode"] = "director-first-frame-three-clips"
+    data["video"] = {
+        "mode": "director-first-frame-three-clips",
+        "clip_groups": [
+            {"id": "clip-01", "frames": ["01"]},
+            {"id": "clip-02", "frames": ["02"]},
+            {"id": "clip-03", "frames": ["03"]},
+        ],
+        "generation": {
+            "duration": 6,
+            "ratio": "9:16",
+            "resolution": "1080p",
+            "generate_audio": False,
+        },
+        "brand": {"strategy": "first-frame-physical-prop"},
+    }
+    data["video_workflow"] = {
+        "clips": {
+            f"clip-{index:02d}": {"frames": [f"{index:02d}"]}
+            for index in range(1, 4)
+        }
+    }
+    manifest_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    result = runner.run_carousel(
+        run_dir,
+        api_only=True,
+        concurrency=2,
+        request_fn=lambda payload, api_key, endpoint: _image_api_response(
+            (1024, 1536),
+            cost=0.01,
+        ),
+    )
+
+    assert len(result["generated"]) == 3
+    assert (run_dir / "generated" / "page-01.png").is_file()
+    assert (run_dir / "generated" / "page-03.png").is_file()
+    assert result["validation"]["valid"] is True
+
+
 def test_run_openrouter_carousel_rejects_square_output_for_vertical_video(
     tmp_path,
     monkeypatch,

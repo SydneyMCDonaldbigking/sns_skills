@@ -132,6 +132,68 @@ def _prepared_three_clip_storyboard_run(tmp_path: Path) -> Path:
     return run_dir
 
 
+def _prepared_director_three_clip_run(tmp_path: Path) -> Path:
+    run_dir = tmp_path / "output" / "director"
+    analysis = run_dir / "analysis"
+    generated = run_dir / "generated"
+    prompt_dir = analysis / "seedance-prompts"
+    prompt_dir.mkdir(parents=True)
+    generated.mkdir(parents=True)
+    (analysis / "seedance-prompt.md").write_text(
+        "Create a premium no-face cooking commercial.",
+        encoding="utf-8",
+    )
+    (analysis / "shot-list.md").write_text(
+        "Clip 1 hook\nClip 2 cook\nClip 3 finish",
+        encoding="utf-8",
+    )
+    for index in range(1, 4):
+        (prompt_dir / f"clip-{index:02d}.md").write_text(
+            f"Animate clip {index} from its opening frame with one camera move.",
+            encoding="utf-8",
+        )
+        Image.new("RGB", (1080, 1920), "white").save(
+            generated / f"page-{index:02d}.png"
+        )
+    manifest_path = analysis / "manifest.json"
+    manifest.create(manifest_path, "vertical-video", ["01", "02", "03"])
+    data = manifest.load(manifest_path)
+    data["schema_version"] = 2
+    data["video_mode"] = "director-first-frame-three-clips"
+    data["video"] = {
+        "mode": "director-first-frame-three-clips",
+        "profile": "final-clip",
+        "generation": {
+            "ratio": "9:16",
+            "duration": 6,
+            "resolution": "1080p",
+            "generate_audio": False,
+            "return_last_frame": True,
+            "watermark": False,
+        },
+        "budget": {"retry_limit": 1, "stop_before_final": False},
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "chatcut": "not_started",
+        "export_qa": "not_started",
+        "history": [],
+        "clips": {
+            f"clip-{index:02d}": {
+                "frames": [f"{index:02d}"],
+                "status": "prepared",
+            }
+            for index in range(1, 4)
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return run_dir
+
+
 def _prepared_multimodal_video_run(tmp_path: Path) -> Path:
     run_dir = tmp_path / "output" / "multimodal"
     analysis = run_dir / "analysis"
@@ -326,6 +388,32 @@ def test_three_clip_storyboard_dry_run_selects_exact_group(tmp_path, monkeypatch
         item["image_url"]["url"]
         for item in result["payload"]["content"][1:]
     ] == ["<redacted data URL>"] * 3
+
+
+def test_director_three_clip_dry_run_uses_only_matching_first_frame(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_director_three_clip_run(tmp_path)
+
+    result = runner.run_seedance_video(
+        run_dir,
+        storyboard_group=2,
+        allow_data_url=True,
+        dry_run=True,
+    )
+
+    assert result["video_mode"] == "director-first-frame-three-clips"
+    assert result["storyboard_group"] == 2
+    assert result["image_count"] == 1
+    assert result["generation"]["duration"] == 6
+    assert result["generation"]["generate_audio"] is False
+    assert "opening frame 02" in result["payload"]["content"][0]["text"]
+    assert [
+        item["image_url"]["url"]
+        for item in result["payload"]["content"][1:]
+    ] == ["<redacted data URL>"]
 
 
 def test_three_clip_storyboard_requires_group(tmp_path, monkeypatch):

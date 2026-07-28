@@ -27,6 +27,8 @@ STORYBOARD_CLIP_GROUPS = [
     ["04", "05", "06"],
     ["07", "08", "09"],
 ]
+DIRECTOR_ASSET_IDS = ["01", "02", "03"]
+DIRECTOR_CLIP_GROUPS = [["01"], ["02"], ["03"]]
 
 
 def _load_manifest(base: Path) -> dict | None:
@@ -50,7 +52,17 @@ def _is_three_clip_storyboard(data: dict | None) -> bool:
     return _video_mode(data) == "storyboard-three-clips"
 
 
-def _validate_three_clip_storyboard_job(data: dict) -> list[str]:
+def _is_director_three_clip(data: dict | None) -> bool:
+    return _video_mode(data) == "director-first-frame-three-clips"
+
+
+def _validate_three_clip_controls(
+    data: dict,
+    *,
+    mode: str,
+    expected_groups: list[list[str]],
+    brand_strategy: str,
+) -> list[str]:
     errors: list[str] = []
     video = video_job.video_section(data)
     groups = video.get("clip_groups")
@@ -59,26 +71,22 @@ def _validate_three_clip_storyboard_job(data: dict) -> list[str]:
         for item in groups
         if isinstance(item, dict)
     ] if isinstance(groups, list) else []
-    if actual_groups != STORYBOARD_CLIP_GROUPS:
-        errors.append(
-            "storyboard-three-clips groups must be exactly 01-03, 04-06, 07-09"
-        )
+    if actual_groups != expected_groups:
+        errors.append(f"{mode} groups must be {expected_groups}")
     generation = video.get("generation")
     generation = generation if isinstance(generation, dict) else {}
     if generation.get("duration") != 6:
-        errors.append("storyboard-three-clips duration must be 6 seconds")
+        errors.append(f"{mode} duration must be 6 seconds")
     if generation.get("ratio") != "9:16":
-        errors.append("storyboard-three-clips ratio must be 9:16")
+        errors.append(f"{mode} ratio must be 9:16")
     if generation.get("resolution") != "1080p":
-        errors.append("storyboard-three-clips resolution must be 1080p")
+        errors.append(f"{mode} resolution must be 1080p")
     if generation.get("generate_audio") is not False:
-        errors.append("storyboard-three-clips must generate without audio")
+        errors.append(f"{mode} must generate without audio")
     brand = video.get("brand")
     brand = brand if isinstance(brand, dict) else {}
-    if brand.get("strategy") != "storyboard-physical-prop":
-        errors.append(
-            "storyboard-three-clips brand strategy must be storyboard-physical-prop"
-        )
+    if brand.get("strategy") != brand_strategy:
+        errors.append(f"{mode} brand strategy must be {brand_strategy}")
     workflow = data.get("video_workflow")
     workflow = workflow if isinstance(workflow, dict) else {}
     clips = workflow.get("clips")
@@ -87,10 +95,26 @@ def _validate_three_clip_storyboard_job(data: dict) -> list[str]:
         "clip-02",
         "clip-03",
     ]:
-        errors.append(
-            "storyboard-three-clips workflow must track clip-01, clip-02, clip-03"
-        )
+        errors.append(f"{mode} workflow must track clip-01, clip-02, clip-03")
     return errors
+
+
+def _validate_three_clip_storyboard_job(data: dict) -> list[str]:
+    return _validate_three_clip_controls(
+        data,
+        mode="storyboard-three-clips",
+        expected_groups=STORYBOARD_CLIP_GROUPS,
+        brand_strategy="storyboard-physical-prop",
+    )
+
+
+def _validate_director_three_clip_job(data: dict) -> list[str]:
+    return _validate_three_clip_controls(
+        data,
+        mode="director-first-frame-three-clips",
+        expected_groups=DIRECTOR_CLIP_GROUPS,
+        brand_strategy="first-frame-physical-prop",
+    )
 
 
 def _validate_compact_job(base: Path, data: dict) -> list[str]:
@@ -230,17 +254,23 @@ def validate_delivery(
     three_clip_storyboard = (
         platform == "vertical-video" and _is_three_clip_storyboard(data)
     )
+    director_three_clip = (
+        platform == "vertical-video" and _is_director_three_clip(data)
+    )
     language = caption_language or (
         "zh" if platform == "xiaohongshu" else "en"
     )
-    required = [
-        base / "analysis" / "breakdown.md",
-        base / "analysis" / "copy.md",
-        base / "analysis" / f"caption-{language}.txt",
-        base / "analysis" / "prompts.md",
-        base / "analysis" / "manifest.json",
-    ]
-    if not compact_reference:
+    if director_three_clip:
+        required = [base / "analysis" / "manifest.json"]
+    else:
+        required = [
+            base / "analysis" / "breakdown.md",
+            base / "analysis" / "copy.md",
+            base / "analysis" / f"caption-{language}.txt",
+            base / "analysis" / "prompts.md",
+            base / "analysis" / "manifest.json",
+        ]
+    if not compact_reference and not director_three_clip:
         required.append(base / "overview" / "contact-sheet.png")
     if platform == "vertical-video":
         required.extend(
@@ -251,11 +281,12 @@ def validate_delivery(
             ]
         )
         if not compact_reference:
+            first_frame_count = 3 if director_three_clip else 9
             required.extend(
                 base / "analysis" / "page-prompts" / f"page-{index:02d}.md"
-                for index in range(1, 10)
+                for index in range(1, first_frame_count + 1)
             )
-        if three_clip_storyboard:
+        if three_clip_storyboard or director_three_clip:
             required.extend(
                 base
                 / "analysis"
@@ -275,10 +306,15 @@ def validate_delivery(
                         f"{asset.name}: expected {expected[0]}x{expected[1]}, "
                         f"got {image.width}x{image.height}"
                     )
-    if platform in {"video", "vertical-video"} and not compact_reference and len(generated) != 9:
-        errors.append("exactly 9 generated frames")
+    expected_generated = 3 if director_three_clip else 9
+    if (
+        platform in {"video", "vertical-video"}
+        and not compact_reference
+        and len(generated) != expected_generated
+    ):
+        errors.append(f"exactly {expected_generated} generated frames")
     if platform == "vertical-video" and not compact_reference:
-        for index in range(1, 10):
+        for index in range(1, expected_generated + 1):
             expected_frame = generated_dir / f"page-{index:02d}.png"
             if not expected_frame.is_file():
                 errors.append(f"missing required storyboard frame: {expected_frame}")
@@ -286,10 +322,13 @@ def validate_delivery(
     if data:
         if platform == "vertical-video":
             asset_ids = list(data.get("assets", {}).keys())
-            if not compact_reference and asset_ids != STORYBOARD_ASSET_IDS:
+            expected_asset_ids = (
+                DIRECTOR_ASSET_IDS if director_three_clip else STORYBOARD_ASSET_IDS
+            )
+            if not compact_reference and asset_ids != expected_asset_ids:
                 errors.append(
                     "vertical-video manifest assets must be exactly: "
-                    + ", ".join(STORYBOARD_ASSET_IDS)
+                    + ", ".join(expected_asset_ids)
                 )
             if compact_reference and not asset_ids:
                 video = video_job.video_section(data)
@@ -301,6 +340,8 @@ def validate_delivery(
                 errors.extend(_validate_compact_job(base, data))
             if three_clip_storyboard:
                 errors.extend(_validate_three_clip_storyboard_job(data))
+            if director_three_clip:
+                errors.extend(_validate_director_three_clip_job(data))
         incomplete = [
             asset_id
             for asset_id, item in data.get("assets", {}).items()

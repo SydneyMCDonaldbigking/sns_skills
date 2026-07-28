@@ -57,10 +57,16 @@ DEFAULT_TIMEOUT = 1800
 DEFAULT_POLL_INTERVAL = 10
 TERMINAL_FAILURES = {"failed", "cancelled"}
 THREE_CLIP_STORYBOARD_MODE = "storyboard-three-clips"
+DIRECTOR_THREE_CLIP_MODE = "director-first-frame-three-clips"
 STORYBOARD_GROUPS = {
     1: ["01", "02", "03"],
     2: ["04", "05", "06"],
     3: ["07", "08", "09"],
+}
+DIRECTOR_GROUPS = {
+    1: ["01"],
+    2: ["02"],
+    3: ["03"],
 }
 KEY_ENV_NAMES = [
     "BYTEPLUS_ARK_API_KEY",
@@ -229,16 +235,22 @@ def _is_three_clip_storyboard(data: dict[str, Any]) -> bool:
     return _video_mode(data) == THREE_CLIP_STORYBOARD_MODE
 
 
+def _is_director_three_clip(data: dict[str, Any]) -> bool:
+    return _video_mode(data) == DIRECTOR_THREE_CLIP_MODE
+
+
 def _validate_storyboard_ready(
     run_dir: Path,
     data: dict[str, Any],
     platform: str,
     asset_ids: list[str],
+    expected_ids: list[str] | None = None,
 ) -> None:
-    expected_ids = _expected_storyboard_ids()
+    expected_ids = expected_ids or _expected_storyboard_ids()
     if asset_ids != expected_ids:
         raise SeedanceRunnerError(
-            "Seedance requires exactly 9 storyboard assets with ids 01 through 09 "
+            "Seedance requires the prepared opening/storyboard asset ids "
+            f"{', '.join(expected_ids)} "
             f"before submission; found {', '.join(asset_ids) or 'none'}"
         )
 
@@ -390,16 +402,27 @@ def compose_prompt(
     duration: str | None = None,
     seed: int | None = None,
     storyboard_group: int | None = None,
+    director_first_frame: bool = False,
 ) -> str:
     prompt = base_prompt.strip()
     if storyboard_group:
-        frame_ids = STORYBOARD_GROUPS[storyboard_group]
-        prompt = (
-            f"{prompt}\n\nUse the three supplied images in order as the start, "
-            f"middle, and end anchors for one continuous 6-second clip "
-            f"(storyboard frames {frame_ids[0]}-{frame_ids[-1]}). Do not repeat "
-            "the full recipe or introduce actions from another clip."
-        )
+        if director_first_frame:
+            frame_id = DIRECTOR_GROUPS[storyboard_group][0]
+            prompt = (
+                f"{prompt}\n\nBegin exactly from the one supplied opening frame "
+                f"{frame_id}. Treat it as the composition and continuity anchor, "
+                "then create the intermediate action and camera movement. Reach "
+                "the director-specified endpoint without repeating the full "
+                "recipe or introducing actions from another clip."
+            )
+        else:
+            frame_ids = STORYBOARD_GROUPS[storyboard_group]
+            prompt = (
+                f"{prompt}\n\nUse the three supplied images in order as the start, "
+                f"middle, and end anchors for one continuous 6-second clip "
+                f"(storyboard frames {frame_ids[0]}-{frame_ids[-1]}). Do not repeat "
+                "the full recipe or introduce actions from another clip."
+            )
     else:
         shot_list = _read_usable_text(run_dir / "analysis" / "shot-list.md")
         if shot_list and shot_list not in prompt:
@@ -827,25 +850,28 @@ def run_seedance_video(
     asset_ids = list(data.get("assets", {}).keys())
     compact_reference = _is_compact_reference(data)
     three_clip_storyboard = _is_three_clip_storyboard(data)
+    director_three_clip = _is_director_three_clip(data)
+    grouped_three_clip = three_clip_storyboard or director_three_clip
     generation_key: str | None = None
     selected_storyboard_ids = asset_ids
-    if three_clip_storyboard:
-        if storyboard_group not in STORYBOARD_GROUPS:
+    selected_groups = DIRECTOR_GROUPS if director_three_clip else STORYBOARD_GROUPS
+    if grouped_three_clip:
+        if storyboard_group not in selected_groups:
             raise SeedanceRunnerError(
                 "This run requires --storyboard-group 1, 2, or 3. "
-                "Each paid Seedance request uses exactly three storyboard frames."
+                "Each paid Seedance request uses its prepared opening reference."
             )
         if include_all_frames:
             raise SeedanceRunnerError(
-                "Do not use --include-all-frames with storyboard-three-clips; "
-                "the selected group already supplies exactly three frames."
+                "Do not use --include-all-frames with a three-clip cooking run; "
+                "the selected group already supplies the intended reference."
             )
         if video_urls or audio_urls:
             raise SeedanceRunnerError(
-                "storyboard-three-clips accepts only its three image anchors; "
+                "The three-clip cooking route accepts only its image anchor(s); "
                 "BGM, voiceover, and SFX are added later in ChatCut."
             )
-        selected_storyboard_ids = STORYBOARD_GROUPS[storyboard_group]
+        selected_storyboard_ids = selected_groups[storyboard_group]
         generation_key = f"clip-{storyboard_group:02d}"
     job_data = _data_with_profile(data, profile)
     if generation_key:
@@ -889,13 +915,20 @@ def run_seedance_video(
         ratio=ratio,
         duration=duration,
         seed=seed,
-        storyboard_group=storyboard_group if three_clip_storyboard else None,
+        storyboard_group=storyboard_group if grouped_three_clip else None,
+        director_first_frame=director_three_clip,
     )
 
     if not compact_reference and not dry_run:
         if not asset_ids:
             raise SeedanceRunnerError("Manifest does not contain storyboard assets")
-        _validate_storyboard_ready(run, data, platform, asset_ids)
+        _validate_storyboard_ready(
+            run,
+            data,
+            platform,
+            asset_ids,
+            expected_ids=["01", "02", "03"] if director_three_clip else None,
+        )
 
     try:
         manifest_references = video_job.collect_manifest_references(job_data)
@@ -908,7 +941,7 @@ def run_seedance_video(
             manifest_references,
             explicit_references,
         )
-        if three_clip_storyboard:
+        if grouped_three_clip:
             sources = [value for value in image_urls or [] if value]
             if not sources:
                 sources = _manifest_storyboard_urls(
@@ -920,9 +953,11 @@ def run_seedance_video(
                     str(_generated_path(run, asset_id))
                     for asset_id in selected_storyboard_ids
                 ]
-            if len(sources) != 3:
+            expected_source_count = 1 if director_three_clip else 3
+            if len(sources) != expected_source_count:
                 raise video_job.VideoJobError(
-                    f"{generation_key} requires exactly 3 image references; "
+                    f"{generation_key} requires exactly {expected_source_count} "
+                    "image reference(s); "
                     f"found {len(sources)}"
                 )
             references = video_job.merge_reference_overrides(
@@ -968,26 +1003,29 @@ def run_seedance_video(
             for reference in materialized_references:
                 if reference["type"] == "image":
                     reference["role"] = image_role
-        elif not compact_reference and not include_all_frames:
-            for reference in materialized_references:
-                if reference["type"] == "image":
-                    reference["role"] = None
 
         video_job.validate_generation(
             model=config["model"],
             options=options,
             references=materialized_references,
         )
-        if three_clip_storyboard:
+        if grouped_three_clip:
             counts = video_job.reference_counts(materialized_references)
-            if counts != {"image": 3, "video": 0, "audio": 0}:
+            expected_image_count = 1 if director_three_clip else 3
+            expected_counts = {
+                "image": expected_image_count,
+                "video": 0,
+                "audio": 0,
+            }
+            if counts != expected_counts:
                 raise video_job.VideoJobError(
-                    f"{generation_key} must compile to exactly 3 images and no "
+                    f"{generation_key} must compile to exactly "
+                    f"{expected_image_count} image(s) and no "
                     f"video/audio references; found {counts}"
                 )
             if options["duration"] != 6 or options["generate_audio"]:
                 raise video_job.VideoJobError(
-                    "storyboard-three-clips requires a silent 6-second Seedance "
+                    "The three-clip cooking route requires a silent 6-second Seedance "
                     "generation"
                 )
         final_prompt, prompt_warnings = video_job.compile_prompt(
@@ -1279,10 +1317,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--storyboard-group",
         type=int,
-        choices=sorted(STORYBOARD_GROUPS),
+        choices=sorted(DIRECTOR_GROUPS),
         help=(
-            "For storyboard-three-clips runs, select group 1 (01-03), "
-            "2 (04-06), or 3 (07-09)."
+            "For three-clip cooking runs, select clip 1, 2, or 3. "
+            "Director-first-frame mode maps these to opening frames 01, 02, or 03."
         ),
     )
     parser.add_argument(

@@ -78,24 +78,22 @@ reference assets in `assets[asset_id].reference_paths`; the runner also accepts
 the legacy `assets[asset_id].request.reference_images` field for existing runs.
 
 For original English vertical cooking video runs, use platform
-`vertical-video` and mode `storyboard-three-clips`. Additional files:
+`vertical-video` and mode `director-first-frame-three-clips`. Additional files:
 
 - `analysis/brief.md`: user/product/recipe brief.
-- `analysis/shot-list.md`: nine frames grouped `01-03`, `04-06`, `07-09`.
-- `analysis/page-prompts/page-01.md` through `page-09.md`: image API prompts.
-- `analysis/seedance-prompts/clip-01.md` through `clip-03.md`: one motion
-  prompt per 6s group.
-- `analysis/caption-en.txt`: platform post caption only, not video subtitles.
-- `generated/page-01.png` through `page-09.png`: `1080x1920` storyboard frames.
-- `overview/contact-sheet.png`: review-only 3x3 overview.
+- `analysis/shot-list.md`: three directed clip beats and their intended joins.
+- `analysis/page-prompts/page-01.md` through `page-03.md`: opening-frame prompts.
+- `analysis/seedance-prompts/clip-01.md` through `clip-03.md`: one action,
+  camera, and endpoint prompt per 6s clip.
+- `generated/page-01.png` through `page-03.png`: `1080x1920` opening frames.
 - `generated/seedance-clip-01.mp4` through `clip-03.mp4`: separate silent clips.
 - `analysis/seedance-clip-XX-request.lock.json`, matching `raw/` records, and
   `qa/seedance-clip-XX-video.json`: independent request/QA state per clip.
 
 The manifest records `video.clip_groups`, silent 6s generation controls,
-`video.brand.strategy: storyboard-physical-prop`, per-clip
-`video_generations`, and `video_workflow.clips`. Seedance receives exactly the
-three separate storyboard images for the selected group.
+`video.brand.strategy: first-frame-physical-prop`, per-clip
+`video_generations`, and `video_workflow.clips`. Seedance receives exactly one
+opening frame for the selected clip.
 
 Older or non-cooking `compact-reference` jobs may instead record
 product/package/logo/source references in `video.references`. Each entry
