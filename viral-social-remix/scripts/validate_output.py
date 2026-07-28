@@ -16,6 +16,23 @@ DIMENSIONS = {
 STORYBOARD_ASSET_IDS = [f"{index:02d}" for index in range(1, 10)]
 
 
+def _load_manifest(base: Path) -> dict | None:
+    manifest_path = base / "analysis" / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _video_mode(data: dict | None) -> str:
+    if not data:
+        return "storyboard"
+    return str(data.get("video_mode") or data.get("generation_mode") or "storyboard")
+
+
+def _is_compact_reference(data: dict | None) -> bool:
+    return _video_mode(data) == "compact-reference"
+
+
 def validate_asset(path: str | Path, platform: str, text_review: str) -> dict:
     errors = []
     target = Path(path)
@@ -45,6 +62,8 @@ def validate_delivery(
     errors = []
     generated_dir = base / "generated"
     generated = sorted(generated_dir.glob("*.png")) if generated_dir.exists() else []
+    data = _load_manifest(base)
+    compact_reference = platform == "vertical-video" and _is_compact_reference(data)
     language = caption_language or (
         "zh" if platform == "xiaohongshu" else "en"
     )
@@ -54,8 +73,9 @@ def validate_delivery(
         base / "analysis" / f"caption-{language}.txt",
         base / "analysis" / "prompts.md",
         base / "analysis" / "manifest.json",
-        base / "overview" / "contact-sheet.png",
     ]
+    if not compact_reference:
+        required.append(base / "overview" / "contact-sheet.png")
     if platform == "vertical-video":
         required.extend(
             [
@@ -64,10 +84,11 @@ def validate_delivery(
                 base / "analysis" / "seedance-prompt.md",
             ]
         )
-        required.extend(
-            base / "analysis" / "page-prompts" / f"page-{index:02d}.md"
-            for index in range(1, 10)
-        )
+        if not compact_reference:
+            required.extend(
+                base / "analysis" / "page-prompts" / f"page-{index:02d}.md"
+                for index in range(1, 10)
+            )
     errors.extend(
         f"missing required file: {path}" for path in required if not path.is_file()
     )
@@ -80,30 +101,30 @@ def validate_delivery(
                         f"{asset.name}: expected {expected[0]}x{expected[1]}, "
                         f"got {image.width}x{image.height}"
                     )
-    if platform in {"video", "vertical-video"} and len(generated) != 9:
+    if platform in {"video", "vertical-video"} and not compact_reference and len(generated) != 9:
         errors.append("exactly 9 generated frames")
-    if platform == "vertical-video":
+    if platform == "vertical-video" and not compact_reference:
         for index in range(1, 10):
             expected_frame = generated_dir / f"page-{index:02d}.png"
             if not expected_frame.is_file():
                 errors.append(f"missing required storyboard frame: {expected_frame}")
 
-    manifest_path = base / "analysis" / "manifest.json"
-    if manifest_path.is_file():
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if data:
         if platform == "vertical-video":
             asset_ids = list(data.get("assets", {}).keys())
-            if asset_ids != STORYBOARD_ASSET_IDS:
+            if not compact_reference and asset_ids != STORYBOARD_ASSET_IDS:
                 errors.append(
                     "vertical-video manifest assets must be exactly: "
                     + ", ".join(STORYBOARD_ASSET_IDS)
                 )
+            if compact_reference and not asset_ids:
+                errors.append("compact-reference manifest must contain reference assets")
         incomplete = [
             asset_id
             for asset_id, item in data.get("assets", {}).items()
             if item.get("status") != "validated"
         ]
-        if incomplete:
+        if incomplete and not compact_reference:
             errors.append(f"manifest contains incomplete assets: {', '.join(incomplete)}")
     return {"valid": not errors, "errors": errors}
 

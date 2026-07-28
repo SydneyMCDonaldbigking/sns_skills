@@ -59,6 +59,11 @@ the runner now strips audio after download when no audio was requested.
   overlay text.
 - Company branding may appear only if it is a real physical sign, logo prop, or
   packaging already present in the storyboard. It must not become an overlay.
+- Grok can use product and brand images as `input_references`, but it cannot be
+  trusted to reproduce the exact `ASIAN GROCER ONLINE powered by UMALL` lockup.
+  For final delivery, do not ask Grok to render the company logo text. Use the
+  real product package in generation, then place the official logo PNG in
+  ChatCut/post if exact brand identity is required.
 
 ## Local Foley
 
@@ -92,6 +97,9 @@ After Grok finishes:
 - Confirm there is no audio stream when the request used `--no-generate-audio`.
 - Review for cooking continuity, warped ingredients, extra hands/people,
   subtitles, overlay text, and unexpected logo or packaging text.
+- Treat misspelled or visually altered generated logo signs as a fail. Fix by
+  removing logo generation from the video prompt and adding the official logo
+  asset in post.
 - Report provider `usage.cost` when present.
 
 ## Relevant Runs

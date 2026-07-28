@@ -5,7 +5,7 @@
 | Xiaohongshu source to English carousel | Natural English | 1152x1152 | Match source page count | `caption-en.txt` |
 | Xiaohongshu target carousel | Chinese | 1152x1536 | Match source page count | `caption-zh.txt` |
 | Instagram/Facebook carousel | Natural English | 1152x1152 | Match source page count | `caption-en.txt` |
-| English vertical cooking video | Natural English | 1080x1920 | exactly 9 vertical frames plus one 1080x1920 contact sheet | `caption-en.txt` |
+| English vertical cooking video | Natural English | 9:16 video, 1080p default | compact reference pack plus 3 soft Seedance shots; legacy route may use 9 vertical frames | `caption-en.txt` |
 | Video storyboard | Target-market language | 1920x1080 | exactly 9 frames plus one 1920x1080 contact sheet | Target-platform caption |
 
 Use an explicit user target platform when supplied. Otherwise infer source and
@@ -21,4 +21,6 @@ benefit, proof, result, and CTA. Do not use nine evenly spaced frames as the
 final selection; inspect candidates and choose narrative nodes.
 
 For English vertical cooking video, use platform `vertical-video`, vertical
-`9:16`, and 1080x1920 storyboard frames before Seedance.
+`9:16`, and a compact reference pack before Seedance. Use 1080x1920 still
+frames only when creating generated reference frames or the explicit legacy
+nine-frame storyboard route.

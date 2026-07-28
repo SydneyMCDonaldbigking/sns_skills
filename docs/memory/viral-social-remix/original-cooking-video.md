@@ -5,7 +5,7 @@ Use this for original English cooking or recipe videos.
 ## Story Arc
 
 The video should feel original and useful, not like a stitched ad. The reliable
-arc is:
+recipe arc is:
 
 1. Ingredient, seasoning, or product close-up.
 2. Prep or cutting.
@@ -17,6 +17,29 @@ arc is:
 8. Plating.
 9. Finished dish hero with company table sign, logo prop, or packaging.
 
+For IG-style English food taste, read
+[[aesthetic-library/no-face-asian-cooking-style]] before drafting storyboard
+prompts. Recent IG samples show that frame 01 should still satisfy the fixed
+ingredient/product role, but should be framed like a sensory hook: tight,
+food-first, tactile, and already delicious-looking rather than a flat
+ingredient inventory.
+
+## Preferred Seedance Structure
+
+For new Seedance 2.0 cooking tests, do not default to nine separate still
+storyboard frames. Use the official compact shot-sequencing style from
+[[seedance-official-prompting]].
+
+For a 6-second visual test, write three soft shot beats:
+
+1. `Shot 1, opening third`: ingredient/product close-up and first food action.
+2. `Shot 2, middle third`: main cooking transformation.
+3. `Shot 3, final third`: texture, plating, or finished hero.
+
+Use the nine recipe arc beats above as planning material, not as nine forced
+visual inputs. Only create nine storyboard frames when the user explicitly asks
+for that legacy route or when a source-remake needs many still anchors.
+
 ## Text Policy
 
 Storyboard frames and final video should have no visible subtitles, title
@@ -26,21 +49,37 @@ Branding can appear as a real physical object in the scene, especially frame 01
 and frame 09. For English-region output, use the `ASIAN GROCER ONLINE` lockup
 with small `powered by UMALL`.
 
+Do not rely on Seedance or Grok to redraw the company logo accurately. Video
+models often warp brand text and lockups even when a correct logo reference is
+provided. If the logo must be exact, generate the cooking video with product
+packaging or a non-critical brand prop only, then add the official PNG in
+ChatCut/post as a controlled graphic. Treat AI-generated physical logo signs as
+review-only, not final brand-fidelity assets.
+
 ## Continuity
 
-Keep the same kitchen, lighting, cookware, dish, product packaging, and hand
-model across all nine frames. The food state must progress logically from raw
+Keep the same kitchen, lighting, cookware, dish, product packaging, and physical
+brand prop across all shots. The food state must progress logically from raw
 ingredients to finished dish.
+
+Use more real references when product fidelity matters:
+
+- product/package image;
+- physical English-region logo/sign prop;
+- finished dish or first-frame mood image;
+- source/reference cooking video for rhythm and camera movement when available.
 
 ## Handoff
 
-Generate nine vertical storyboard frames first, review them, then hand off to
-Seedance with `viral-social-remix/scripts/run_seedance_video.py`.
+Prepare a compact Seedance prompt first, review the real reference assets, then
+hand off to Seedance with `viral-social-remix/scripts/run_seedance_video.py`.
 
 For Seedance, run a 5-second no-audio preview before paying for a longer final.
 The mapo tofu test showed that sparse food-motion scenes work much better than
-rigid mechanical motion. Keep the set minimal, the motion controlled, and the
-brand sign physical. See `seedance-video-generation.md` for cost and QA rules.
+rigid mechanical motion. Keep the set minimal, the motion controlled, the
+camera language simple, and the brand sign physical. See
+`seedance-video-generation.md` and `seedance-official-prompting.md` for cost,
+prompting, and QA rules.
 
 After Seedance produces accepted MP4 clips, continue through
 [[chatcut-handoff-workflow]] when the user wants the video imported for editing,

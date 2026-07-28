@@ -28,3 +28,7 @@ sign, storefront sign, product packaging cue, or brand lockup.
 - The logo can contain its real printed text as part of a physical object, but
   the video must still have no added captions, ingredient labels, title cards,
   or screen text.
+- Video models often distort exact logo lockups. For final videos, prefer using
+  product packaging or a generic brand prop during generation, then place the
+  official logo PNG in ChatCut/post when the logo must be exact. Any
+  AI-generated logo sign with altered wording, shape, or colors fails QA.

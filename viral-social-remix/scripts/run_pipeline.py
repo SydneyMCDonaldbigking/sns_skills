@@ -33,15 +33,9 @@ DEFAULT_SIZES = {
     "vertical-video": "1080x1920",
 }
 FIXED_COOKING_SHOTS = [
-    "01 Ingredient, seasoning, and product close-up on a clean prep table; company logo/signage or packaging may appear only as a real physical prop.",
-    "02 Main ingredient prep or cutting.",
-    "03 Cookware, hot oil, and aromatics starting.",
-    "04 Main ingredient goes into the pan.",
-    "05 Core cooking action: stir-fry, sear, simmer, or boil.",
-    "06 Seasoning, sauce, or product is added to show the flavor mechanism.",
-    "07 Doneness and texture close-up proving the dish is appetizing.",
-    "08 Plating process.",
-    "09 Finished dish hero shot with company table sign, logo prop, or packaging beside it; no visible subtitles or on-screen text.",
+    "Shot 1, opening third / approximately 0-2s: ingredient, seasoning, product, and physical brand prop close-up in one clean cooking setup; begin the first food action. Use one camera movement only.",
+    "Shot 2, middle third / approximately 2-4s: main cooking transformation such as oil shimmering, aromatics blooming, ingredient entering the pan, sauce pouring, or gentle stir-fry. Use one camera movement only.",
+    "Shot 3, final third / approximately 4-6s: appetizing texture close-up, plating, or finished dish hero with the physical English-region logo/sign/packaging beside the dish. Hold the final hero. No visible subtitles or on-screen text.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -166,6 +160,10 @@ def _asset_ids(platform: str, files: list[Path]) -> list[str]:
     return [f"{index:02d}" for index in range(1, count + 1)]
 
 
+def _compact_video_asset_ids() -> list[str]:
+    return ["01", "02", "03"]
+
+
 def _caption_language(platform: str, value: str | None) -> str:
     if value:
         return value
@@ -179,6 +177,18 @@ def _write_if_missing(path: Path, text: str) -> None:
 
 def fixed_cooking_shot_list() -> str:
     return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
+
+
+def _mark_compact_reference_mode(manifest_path: Path) -> None:
+    data = manifest.load(manifest_path)
+    data["video_mode"] = "compact-reference"
+    data["assumptions"].append(
+        {
+            "inferred": True,
+            "value": "Seedance compact-reference mode: three soft shot beats and real reference assets, not a forced nine-frame storyboard.",
+        }
+    )
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[str]:
@@ -337,10 +347,11 @@ def prepare_original_video_run(
         f"# Brief\n\n{brief_text}\n",
         encoding="utf-8",
     )
+    manifest_path = run_dir / "analysis" / "manifest.json"
     manifest.create(
-        run_dir / "analysis" / "manifest.json",
+        manifest_path,
         platform,
-        _asset_ids(platform, []),
+        _compact_video_asset_ids() if platform == "vertical-video" else _asset_ids(platform, []),
         source={
             "kind": "original_brief",
             "paths": [brief_source] if brief_source else [],
@@ -349,6 +360,8 @@ def prepare_original_video_run(
         },
         provider=image_provider.resolve(),
     )
+    if platform == "vertical-video":
+        _mark_compact_reference_mode(manifest_path)
     return run_dir
 
 

@@ -107,6 +107,45 @@ def test_vertical_video_delivery_requires_handoff_files(tmp_path):
     assert any("page-prompts" in error for error in result["errors"])
 
 
+def test_vertical_video_compact_reference_delivery_skips_legacy_storyboard_requirements(tmp_path):
+    analysis = tmp_path / "analysis"
+    qa = tmp_path / "qa"
+    analysis.mkdir()
+    qa.mkdir()
+    for name in [
+        "breakdown.md",
+        "copy.md",
+        "caption-en.txt",
+        "prompts.md",
+        "brief.md",
+        "shot-list.md",
+        "seedance-prompt.md",
+    ]:
+        (analysis / name).write_text("fixture", encoding="utf-8")
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "platform": "vertical-video",
+                "video_mode": "compact-reference",
+                "assets": {
+                    "01": {"status": "pending", "storyboard_url": "https://cdn.example/01.png"},
+                    "02": {"status": "pending", "storyboard_url": "https://cdn.example/02.png"},
+                    "03": {"status": "pending", "storyboard_url": "https://cdn.example/03.png"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (qa / "validation.json").write_text("{}", encoding="utf-8")
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is True
+    assert not any("exactly 9 generated frames" in error for error in result["errors"])
+    assert not any("page-prompts" in error for error in result["errors"])
+    assert not any("contact-sheet" in error for error in result["errors"])
+
+
 def test_delivery_cli_writes_validation_report(tmp_path):
     result = subprocess.run(
         [

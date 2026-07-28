@@ -1,9 +1,10 @@
-"""Submit a prepared storyboard run to Seedance through BytePlus ModelArk.
+"""Submit a prepared video run to Seedance through BytePlus ModelArk.
 
 This runner is meant for the user's local terminal. Codex prepares the run
-directory, storyboard frames, and Seedance prompt; the local runner reads the
+directory, reference assets, and Seedance prompt; the local runner reads the
 ignored `.env.local` or environment for the API key, submits the async task,
-polls it, and downloads the returned video.
+polls it, and downloads the returned video. Legacy nine-frame storyboard runs
+remain supported.
 """
 
 from __future__ import annotations
@@ -192,6 +193,14 @@ def _expected_storyboard_ids() -> list[str]:
     return [f"{index:02d}" for index in range(1, 10)]
 
 
+def _video_mode(data: dict[str, Any]) -> str:
+    return str(data.get("video_mode") or data.get("generation_mode") or "storyboard")
+
+
+def _is_compact_reference(data: dict[str, Any]) -> bool:
+    return _video_mode(data) == "compact-reference"
+
+
 def _validate_storyboard_ready(
     run_dir: Path,
     data: dict[str, Any],
@@ -230,6 +239,20 @@ def _validate_storyboard_ready(
         raise SeedanceRunnerError(
             "Storyboard is not ready for Seedance submission: " + "; ".join(errors)
         )
+
+
+def _validate_compact_references(data: dict[str, Any], explicit_urls: list[str] | None) -> None:
+    if explicit_urls:
+        return
+    urls = _manifest_storyboard_urls(data, list(data.get("assets", {}).keys()))
+    paths = _manifest_reference_paths(data, list(data.get("assets", {}).keys()))
+    if urls or paths:
+        return
+    raise SeedanceRunnerError(
+        "Compact Seedance mode needs at least one reference image URL or local "
+        "reference path. Pass --image-url, store image_url/reference_url/storyboard_url "
+        "on manifest assets, or store reference_paths and use --allow-data-url."
+    )
 
 
 def _data_url(path: Path) -> str:
@@ -367,6 +390,18 @@ def _manifest_storyboard_urls(data: dict[str, Any], asset_ids: list[str]) -> lis
     return [url for url in urls if url]
 
 
+def _manifest_reference_paths(data: dict[str, Any], asset_ids: list[str]) -> list[str]:
+    paths: list[str] = []
+    for asset_id in asset_ids:
+        asset = data.get("assets", {}).get(asset_id, {})
+        paths.extend(_list_from_value(asset.get("reference_paths")))
+        request = asset.get("request")
+        if isinstance(request, dict):
+            paths.extend(_list_from_value(request.get("reference_paths")))
+            paths.extend(_list_from_value(request.get("reference_images")))
+    return [path for path in paths if path]
+
+
 def select_image_urls(
     run_dir: Path,
     data: dict[str, Any],
@@ -375,26 +410,41 @@ def select_image_urls(
     image_urls: list[str] | None = None,
     include_all_frames: bool = False,
     allow_data_url: bool = False,
+    compact_reference: bool = False,
 ) -> list[str]:
     urls = [url for url in image_urls or [] if url]
     if not urls:
         urls = _manifest_storyboard_urls(data, asset_ids)
     if urls:
-        return urls if include_all_frames else urls[:1]
+        return urls if include_all_frames or compact_reference else urls[:1]
 
     if not allow_data_url:
         raise SeedanceRunnerError(
-            "Seedance needs at least one storyboard image URL. Pass --image-url, "
-            "store storyboard_url on manifest assets, or use --allow-data-url only "
+            "Seedance needs at least one reference image URL. Pass --image-url, "
+            "store storyboard_url/image_url/reference_url on manifest assets, "
+            "or use --allow-data-url only "
             "after confirming your provider accepts local data URLs."
         )
 
-    selected = asset_ids if include_all_frames else asset_ids[:1]
+    reference_paths = _manifest_reference_paths(data, asset_ids)
+    if reference_paths:
+        selected_paths = reference_paths if include_all_frames or compact_reference else reference_paths[:1]
+        data_urls: list[str] = []
+        for raw_path in selected_paths:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = run_dir / path
+            if not path.is_file():
+                raise SeedanceRunnerError(f"Missing local reference image: {path}")
+            data_urls.append(_data_url(path))
+        return data_urls
+
+    selected = asset_ids if include_all_frames or compact_reference else asset_ids[:1]
     data_urls: list[str] = []
     for asset_id in selected:
         path = _generated_path(run_dir, asset_id)
         if not path.is_file():
-            raise SeedanceRunnerError(f"Missing generated storyboard frame: {path}")
+            raise SeedanceRunnerError(f"Missing generated/reference frame: {path}")
         data_urls.append(_data_url(path))
     return data_urls
 
@@ -536,7 +586,8 @@ def run_seedance_video(
         raise SeedanceRunnerError("Seedance video runner requires a video storyboard run")
     asset_ids = list(data.get("assets", {}).keys())
     if not asset_ids:
-        raise SeedanceRunnerError("Manifest does not contain storyboard assets")
+        raise SeedanceRunnerError("Manifest does not contain video reference assets")
+    compact_reference = _is_compact_reference(data)
 
     config = resolve_config(model=model, endpoint=endpoint)
     options = resolve_generation_options(
@@ -556,7 +607,9 @@ def run_seedance_video(
         duration=duration,
         seed=seed,
     )
-    if not dry_run:
+    if compact_reference:
+        _validate_compact_references(data, image_urls)
+    elif not dry_run:
         _validate_storyboard_ready(run, data, platform, asset_ids)
     selected_urls = select_image_urls(
         run,
@@ -565,9 +618,10 @@ def run_seedance_video(
         image_urls=image_urls,
         include_all_frames=include_all_frames,
         allow_data_url=allow_data_url,
+        compact_reference=compact_reference,
     )
     effective_image_role = image_role
-    if effective_image_role is None and include_all_frames:
+    if effective_image_role is None and (include_all_frames or compact_reference):
         effective_image_role = "reference_image"
     payload = build_payload(
         final_prompt,
@@ -589,6 +643,7 @@ def run_seedance_video(
             "endpoint": config["endpoint"],
             "api_key_set": bool(config.get("api_key")),
             "image_count": len(selected_urls),
+            "video_mode": _video_mode(data),
             "generation": options,
             "payload": redacted_payload,
         }
@@ -621,6 +676,7 @@ def run_seedance_video(
             "endpoint": config["endpoint"],
             "prompt_path": prompt_path,
             "image_count": len(selected_urls),
+            "video_mode": _video_mode(data),
             "generation": options,
         },
     )
@@ -665,6 +721,7 @@ def run_seedance_video(
         "status": "succeeded",
         "prompt_path": prompt_path,
         "image_count": len(selected_urls),
+        "video_mode": _video_mode(data),
         "generation": options,
         "video_url": url,
         "output": relative_output,
@@ -680,6 +737,7 @@ def run_seedance_video(
             "output": relative_output,
             "qa_path": "qa/seedance-video.json",
             "usage": final_response.get("usage", {}),
+            "video_mode": _video_mode(data),
             "generation": options,
         },
     )

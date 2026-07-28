@@ -62,3 +62,11 @@ pages must still pass visual QA for text, products, and brand fidelity.
 
 Record total cost in `qa/openrouter-cost.json`. Mention the cost to the user
 after a successful run.
+
+## Reference-First Rule
+
+Do not draft image/carousel posts from a saved taste library. Use the user's
+source post, supplied screenshots, or a specific competitor/reference post as
+the visual reference, then rebuild with our product assets and English-region
+brand. Keep image carousel platform sizing separate from vertical-video
+storyboard dimensions.

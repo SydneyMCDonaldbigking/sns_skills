@@ -75,16 +75,27 @@ platform's exact dimensions are skipped and marked resumable. Put per-page local
 reference assets in `assets[asset_id].reference_paths`; the runner also accepts
 the legacy `assets[asset_id].request.reference_images` field for existing runs.
 
-For original English vertical cooking video runs, use platform `vertical-video`
-with exactly nine vertical assets. Additional video-prep files:
+For original English vertical cooking video runs, use platform
+`vertical-video`. Preferred Seedance 2.0 runs use a compact reference pack and a
+three-shot prompt. Additional video-prep files:
 
 - `analysis/brief.md`: user/product/recipe brief.
-- `analysis/shot-list.md`: the nine ordered cooking beats.
+- `analysis/shot-list.md`: the ordered Seedance shots, usually three soft
+  beats for a 5-6s preview.
 - `analysis/seedance-prompt.md`: one final motion prompt for Seedance.
 - `analysis/caption-en.txt`: platform post caption only, not video subtitles.
+
+When the legacy still-storyboard route is explicitly selected, also include:
+
 - `analysis/page-prompts/page-01.md` through `page-09.md`: GPT Image 2 storyboard prompts.
 - `generated/page-01.png` through `page-09.png`: `1080x1920` storyboard frames.
 - `overview/contact-sheet.png`: 3x3 storyboard overview.
+
+For the preferred compact-reference route, record product/package/logo/source
+references in manifest asset entries, using `reference_paths`,
+`storyboard_url`, or another explicit URL/reference field. The Seedance prompt
+should refer to the selected references by order (`Image 1`, `Image 2`,
+`Video 1`) after they are passed to the provider.
 
 After Seedance handoff, store:
 

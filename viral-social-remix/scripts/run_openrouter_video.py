@@ -1,4 +1,4 @@
-"""Submit a prepared storyboard run to OpenRouter video generation.
+"""Submit a prepared video run to OpenRouter video generation.
 
 This runner is separate from the BytePlus Seedance runner. It is intended for
 low-cost Grok video tests through OpenRouter's async `/api/v1/videos` API.
@@ -185,6 +185,14 @@ def _generated_path(run_dir: Path, asset_id: str) -> Path:
 
 def _expected_storyboard_ids() -> list[str]:
     return [f"{index:02d}" for index in range(1, 10)]
+
+
+def _video_mode(data: dict[str, Any]) -> str:
+    return str(data.get("video_mode") or data.get("generation_mode") or "storyboard")
+
+
+def _is_compact_reference(data: dict[str, Any]) -> bool:
+    return _video_mode(data) == "compact-reference"
 
 
 def _validate_storyboard_ready(
@@ -396,6 +404,18 @@ def _manifest_storyboard_urls(data: dict[str, Any], asset_ids: list[str]) -> lis
     return [url for url in urls if url]
 
 
+def _manifest_reference_paths(data: dict[str, Any], asset_ids: list[str]) -> list[str]:
+    paths: list[str] = []
+    for asset_id in asset_ids:
+        asset = data.get("assets", {}).get(asset_id, {})
+        paths.extend(_list_from_value(asset.get("reference_paths")))
+        request = asset.get("request")
+        if isinstance(request, dict):
+            paths.extend(_list_from_value(request.get("reference_paths")))
+            paths.extend(_list_from_value(request.get("reference_images")))
+    return [path for path in paths if path]
+
+
 def _ordered_asset_ids(asset_ids: list[str], first_frame_asset_id: str | None) -> list[str]:
     if not first_frame_asset_id:
         return asset_ids
@@ -417,20 +437,39 @@ def select_image_urls(
     include_all_frames: bool = False,
     allow_data_url: bool = False,
     first_frame_asset_id: str | None = None,
+    compact_reference: bool = False,
 ) -> list[str]:
     ordered_asset_ids = _ordered_asset_ids(asset_ids, first_frame_asset_id)
     urls = [url for url in image_urls or [] if url]
     if not urls:
         urls = _manifest_storyboard_urls(data, ordered_asset_ids)
     if urls:
-        return urls if include_all_frames else urls[:1]
+        return urls if include_all_frames or compact_reference else urls[:1]
 
     if not allow_data_url:
+        if compact_reference:
+            return []
         raise OpenRouterVideoRunnerError(
             "OpenRouter video needs a directly downloadable storyboard image URL. "
             "Pass --image-url, store storyboard_url on manifest assets, or use "
             "--allow-data-url only for an experimental test."
         )
+
+    reference_paths = _manifest_reference_paths(data, ordered_asset_ids)
+    if reference_paths:
+        selected_paths = reference_paths if include_all_frames or compact_reference else reference_paths[:1]
+        data_urls: list[str] = []
+        for raw_path in selected_paths:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = run_dir / path
+            if not path.is_file():
+                raise OpenRouterVideoRunnerError(f"Missing local reference image: {path}")
+            data_urls.append(_data_url(path))
+        return data_urls
+
+    if compact_reference:
+        return []
 
     selected = ordered_asset_ids if include_all_frames else ordered_asset_ids[:1]
     data_urls: list[str] = []
@@ -452,6 +491,7 @@ def build_payload(
     resolution: str,
     generate_audio: bool,
     include_reference_images: bool = False,
+    reference_only_images: bool = False,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": model,
@@ -461,7 +501,12 @@ def build_payload(
         "aspect_ratio": aspect_ratio,
         "generate_audio": generate_audio,
     }
-    if image_urls:
+    if image_urls and reference_only_images:
+        payload["input_references"] = [
+            {"type": "image_url", "image_url": {"url": url}}
+            for url in image_urls
+        ]
+    elif image_urls:
         payload["frame_images"] = [
             {
                 "type": "image_url",
@@ -542,6 +587,7 @@ def run_openrouter_video(
     first_frame_asset_id: str | None = None,
     include_all_frames: bool = False,
     include_reference_images: bool = False,
+    reference_only_images: bool = False,
     allow_data_url: bool = False,
     model: str | None = None,
     endpoint: str | None = None,
@@ -579,7 +625,8 @@ def run_openrouter_video(
     )
     base_prompt, prompt_path = load_prompt(run, prompt=prompt, prompt_file=prompt_file)
     final_prompt = compose_prompt(run, base_prompt, platform=platform)
-    if not dry_run:
+    compact_reference = _is_compact_reference(data)
+    if not dry_run and not compact_reference:
         _validate_storyboard_ready(run, data, platform, asset_ids)
     selected_urls = select_image_urls(
         run,
@@ -589,6 +636,7 @@ def run_openrouter_video(
         first_frame_asset_id=first_frame_asset_id,
         include_all_frames=include_all_frames,
         allow_data_url=allow_data_url,
+        compact_reference=compact_reference,
     )
     payload = build_payload(
         final_prompt,
@@ -599,12 +647,14 @@ def run_openrouter_video(
         resolution=options["resolution"],
         generate_audio=options["generate_audio"],
         include_reference_images=include_reference_images,
+        reference_only_images=reference_only_images,
     )
     redacted_payload = _redact_payload(payload)
     if dry_run:
         return {
             "endpoint": config["endpoint"],
             "api_key_set": bool(config.get("api_key")),
+            "video_mode": _video_mode(data),
             "image_count": len(selected_urls),
             "generation": options,
             "payload": redacted_payload,
@@ -639,6 +689,7 @@ def run_openrouter_video(
             "model": config["model"],
             "endpoint": config["endpoint"],
             "prompt_path": prompt_path,
+            "video_mode": _video_mode(data),
             "image_count": len(selected_urls),
             "generation": options,
         },
@@ -685,6 +736,7 @@ def run_openrouter_video(
         "task_id": task_id,
         "status": "succeeded",
         "prompt_path": prompt_path,
+        "video_mode": _video_mode(data),
         "image_count": len(selected_urls),
         "generation": options,
         "output": relative_output,
@@ -701,6 +753,7 @@ def run_openrouter_video(
             "task_id": task_id,
             "output": relative_output,
             "qa_path": "qa/openrouter-video.json",
+            "video_mode": _video_mode(data),
             "usage": final_response.get("usage", {}),
             "generation": options,
             "postprocess": postprocess,
@@ -711,9 +764,9 @@ def run_openrouter_video(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a video from a prepared storyboard run through OpenRouter."
+        description="Generate a video from a prepared video run through OpenRouter."
     )
-    parser.add_argument("--run", required=True, help="Prepared video storyboard run.")
+    parser.add_argument("--run", required=True, help="Prepared video run.")
     parser.add_argument("--prompt")
     parser.add_argument("--prompt-file")
     parser.add_argument(
@@ -735,6 +788,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-reference-images",
         action="store_true",
         help="Send images after the first as input_references. Use only after confirming the selected model handles reference images.",
+    )
+    parser.add_argument(
+        "--reference-only-images",
+        action="store_true",
+        help="Send collected images only as input_references, without using any image as a first frame.",
     )
     parser.add_argument(
         "--allow-data-url",
@@ -767,6 +825,7 @@ def main(argv: list[str] | None = None) -> int:
             first_frame_asset_id=args.first_frame_asset_id,
             include_all_frames=args.include_all_frames,
             include_reference_images=args.include_reference_images,
+            reference_only_images=args.reference_only_images,
             allow_data_url=args.allow_data_url,
             model=args.model,
             endpoint=args.endpoint,

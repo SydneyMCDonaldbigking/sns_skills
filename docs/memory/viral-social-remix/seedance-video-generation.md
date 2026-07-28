@@ -45,9 +45,26 @@ Good preview command shape:
 .\.venv\python.exe .\viral-social-remix\scripts\run_seedance_video.py --run output/xxx --allow-data-url --include-all-frames --duration 5 --ratio 9:16 --resolution 1080p --no-generate-audio --no-watermark
 ```
 
-Use `--include-all-frames` for a 9-frame cooking storyboard. For a single
-first-frame image-to-video test, omit `--include-all-frames` so only the first
-image is sent.
+`--include-all-frames` is for the legacy 9-frame cooking storyboard route. For
+new Seedance 2.0 cooking tests, prefer the official compact prompt style in
+[[seedance-official-prompting]]: 3 soft shot beats, 3-5 real reference assets,
+and one camera movement per shot. For a single first-frame image-to-video test,
+omit `--include-all-frames` so only the first image is sent.
+
+## Official Prompting Update
+
+BytePlus official guidance studied on 2026-07-28:
+
+- Use `Shot 1`, `Shot 2`, `Shot 3` to organize complex videos in event order.
+- Do not over-constrain exact segment durations; second-level timing can be
+  unstable. Use `[0-2s]`, `[2-4s]`, `[4-6s]` only as soft pacing labels.
+- Reference assets by prompt order: `Image 1`, `Image 2`, `Video 1`, `Audio 1`.
+- Use more real object references for product/package/logo fidelity.
+- Specify only one camera movement per shot.
+- Explicitly forbid subtitles, watermarks, extra logos, and overlay text; allow
+  only the referenced physical brand prop/package when needed.
+
+See [[seedance-official-prompting]] for the full note.
 
 ## What Worked
 
@@ -115,13 +132,16 @@ is a specialized workflow or manual post-production plan.
 For cooking video prompts:
 
 - Keep the set sparse. Fewer props usually means fewer video artifacts.
+- Provide enough real references for product/package/logo fidelity. Product and
+  brand references should be physical objects in the scene, not overlays.
 - Say explicitly which props are allowed and which are banned.
 - Put branding only on real physical props, not overlays or stickers.
 - Repeat the no-visible-text policy in the Seedance prompt.
 - Prefer controlled, small motions: steam, gentle stirring, sauce pour,
   spooning into a bowl.
-- Avoid asking for too many distinct actions in 5 seconds unless the storyboard
-  already makes the progression visually obvious.
+- For a 6-second test, use three soft shots rather than nine forced beats.
+- Avoid asking for too many distinct actions in 5 seconds unless the visual
+  references already make the progression obvious.
 
 ## QA Checklist
 

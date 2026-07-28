@@ -1,6 +1,6 @@
 ---
 name: viral-social-remix
-description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or nine-frame video storyboard remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made from GPT Image 2 storyboard frames and a Seedance or OpenRouter Grok video API handoff.
+description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or video remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made with reference assets and a Seedance or OpenRouter Grok video API handoff.
 ---
 
 # Viral Social Remix
@@ -82,10 +82,15 @@ Only stop before handoff for a real blocker: missing mandatory brand/product
 data, inaccessible logged-in source page, unreadable local source files, or an
 incomplete run directory that cannot be fixed locally.
 
-For original English vertical cooking video generation, Codex prepares the recipe brief,
-shot-list, GPT Image 2 page prompts, 1080x1920 vertical storyboard frames,
-Seedance prompt, and manifest. Seedance task creation must also happen from the user's local terminal
-via `scripts/run_seedance_video.py`, not directly from the Codex environment.
+For original English vertical cooking video generation, Codex prepares the
+recipe brief, shot-list, compact Seedance prompt, reference asset mapping, and
+manifest. Prefer the official Seedance 2.0 style: a small set of real product,
+packaging, logo/sign, food-scene, and optional source-motion references plus
+three ordered shot beats for a 5-6s preview. Only generate a full GPT Image 2
+nine-frame storyboard when the user explicitly asks for that legacy route or
+the source-remake needs many still anchors. Seedance task creation must happen
+from the user's local terminal via `scripts/run_seedance_video.py`, not directly
+from the Codex environment.
 Load `references/seedance-video.md` before composing the handoff. The runner
 uses BytePlus ModelArk Seedance 2.0 by default, reads `BYTEPLUS_ARK_API_KEY`,
 `BYTEPLUS_API_KEY`, `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, or
@@ -97,13 +102,14 @@ the default request is `1080p` with `generate_audio: true` and
 `watermark: false`, and any script, platform caption, or voiceover plan should
 be natural English.
 Do not place subtitles, captions, title cards, lower-thirds, labels, or any
-on-screen text in the generated storyboard frames or final video; the rule is
-no visible text. Voiceover and natural
+on-screen text in generated reference frames or the final video; the rule is no
+visible text. Voiceover and natural
 cooking audio are allowed when the selected Seedance model supports audio.
 Use the fixed cooking-video structure: ingredient/product close-ups, cooking
 process, then plated finished dish with company table sign, logo prop, or
-packaging. Company branding may appear only as a real physical prop in frame 01
-and frame 09, never as a screen subtitle, sticker, overlay, or ad banner.
+packaging. Company branding may appear only as a real physical prop in the
+opening setup or final hero, never as a screen subtitle, sticker, overlay, or ad
+banner.
 For English-region deliverables, that physical prop must use the `ASIAN GROCER
 ONLINE` lockup with small `powered by UMALL`, from
 `viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`. Do not
@@ -238,8 +244,9 @@ relevant fields from `references/breakdown-schema.md`.
   1920×1080 storyboard and 16:9 contact sheet.
 
 - Original cooking video: load `references/cooking-video-workflow.md`, use
-  platform `vertical-video`, produce exactly nine 1080x1920 storyboard frames with GPT
-  Image 2, then hand off to Seedance with `analysis/seedance-prompt.md`.
+  platform `vertical-video`, prepare a compact three-shot Seedance prompt and
+  real reference asset pack, then hand off to Seedance with
+  `analysis/seedance-prompt.md`. Use `9:16`; do not reuse carousel sizing.
 
 ## Analyze
 
@@ -285,17 +292,16 @@ product, mechanism, benefit, proof, result, and CTA. Export those selected
 frames. Do not treat evenly spaced candidates as the final narrative selection.
 
 For original cooking videos, do not run keyframe extraction. Load
-`references/cooking-video-workflow.md`. Build exactly nine frames with this
-fixed structure: 01 ingredient/seasoning/product close-up on a clean prep table
-with optional physical company logo/signage/packaging prop; 02 main ingredient
-prep or cutting; 03 cookware, hot oil, and aromatics starting; 04 main
-ingredient into the pan; 05 core cooking action; 06 seasoning/sauce/product
-added for flavor mechanism; 07 doneness/texture close-up; 08 plating process;
-09 finished dish hero shot with company table sign, logo prop, or packaging
-beside it and no visible subtitles or on-screen text. Record cooking state,
-motion intent, continuity anchors, product/brand cue, voiceover/audio plan, and
-text policy for each frame. Keep the same kitchen, cookware, dish, lighting,
-product packaging, and hand model across the whole storyboard.
+`references/cooking-video-workflow.md`. Plan the recipe with the fixed
+ingredient/product close-up -> cooking process -> plated finished dish arc, then
+compress it into three ordered Seedance shots for a 5-6s preview:
+opening setup, middle cooking transformation, and final texture/plating/hero.
+Use `[0-2s]`, `[2-4s]`, and `[4-6s]` only as soft pacing labels; do not hard
+force exact timing unless the user is testing timing obedience. Record cooking
+state, one camera movement per shot, motion intent, continuity anchors,
+reference assets, product/brand cue, voiceover/audio plan, and text policy. Keep
+the same kitchen, cookware, dish, lighting, product packaging, and physical
+brand prop across the whole video.
 
 Preserve source composition, hierarchy, rhythm, and copy structure while
 replacing the product, brand, and specific expression.
@@ -352,9 +358,10 @@ not write or require `caption-zh.txt` unless the target output is explicitly
 Chinese Xiaohongshu.
 
 For original cooking videos, also write `analysis/brief.md`,
-`analysis/shot-list.md`, and `analysis/seedance-prompt.md`. Put one GPT Image 2
-storyboard prompt in each `analysis/page-prompts/page-01.md` through
-`page-09.md`.
+`analysis/shot-list.md`, and `analysis/seedance-prompt.md`. The shot list should
+use three ordered Seedance shots by default. Put GPT Image 2 storyboard prompts
+in `analysis/page-prompts/` only when a still-reference or legacy nine-frame
+storyboard route is explicitly selected.
 
 When visible packaged products matter, load
 `references/product-reference-cache.md` and use cached or official SKU images
@@ -382,12 +389,13 @@ to local text overlay. Use each source page or selected source frame as a
 structural reference while locking product, packaging, recurring people, palette,
 lighting, and typography across the group.
 
-For `vertical-video`, override the general image-text rule: every storyboard
-prompt must say no visible text, no subtitles, no title cards, no lower-thirds,
-and no ingredient labels. Company logos/signage/packaging may appear only as
-real physical props in the scene. For English-region output, use the `ASIAN
-GROCER ONLINE` physical prop with `powered by UMALL`; reserve the Chinese-region
-UMALL logo for Chinese-region or Chinese Xiaohongshu deliverables.
+For `vertical-video`, override the general image-text rule: every generated
+reference still and the final video prompt must say no visible text, no
+subtitles, no title cards, no lower-thirds, and no ingredient labels. Company
+logos/signage/packaging may appear only as real physical props in the scene. For
+English-region output, use the `ASIAN GROCER ONLINE` physical prop with
+`powered by UMALL`; reserve the Chinese-region UMALL logo for Chinese-region or
+Chinese Xiaohongshu deliverables.
 
 For carousel output, instruct the user to run the local API-only runner:
 
@@ -403,14 +411,14 @@ updates `analysis/manifest.json`, and stops on the first missing-page API
 failure when `--api-only` is set. There is no local-composite fallback in
 API-only mode.
 
-For English vertical storyboard output, use the same local runner on a platform `vertical-video`
-manifest:
+For legacy English vertical storyboard output, use the same local runner on a
+platform `vertical-video` manifest:
 
 ```powershell
 .\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
 ```
 
-For `vertical-video`, the runner uses OpenRouter's dedicated Image API with
+For legacy `vertical-video` storyboards, the runner uses OpenRouter's dedicated Image API with
 `openai/gpt-image-2` and a portrait intermediate size, then locally reframes the
 delivered storyboard files to final `1080x1920`. Do not reuse square carousel
 sizing for this video route. It saves `generated/page-01.png` through
@@ -429,7 +437,7 @@ Run `scripts/validate_output.py asset` for deterministic per-asset checks and
 retry only failed assets. For API-only carousel runs, do not use local text
 overlay as a fallback.
 
-Build the carousel overview or exactly nine-frame storyboard with
+Build the carousel overview or legacy nine-frame storyboard with
 `scripts/make_contact_sheet.py`, then run `scripts/validate_output.py delivery`
 to write `qa/validation.json` and check the complete delivery contract. After
 successful local runner completion, confirm its generated

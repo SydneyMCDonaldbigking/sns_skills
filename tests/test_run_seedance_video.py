@@ -50,6 +50,38 @@ def _prepared_video_run(tmp_path: Path) -> Path:
     return run_dir
 
 
+def _prepared_compact_video_run(tmp_path: Path) -> Path:
+    run_dir = tmp_path / "output" / "compact"
+    analysis = run_dir / "analysis"
+    refs = run_dir / "references"
+    analysis.mkdir(parents=True)
+    refs.mkdir(parents=True)
+    (analysis / "seedance-prompt.md").write_text(
+        "Create a 6-second no-face cooking video. Shot 1 opening setup, Shot 2 cooking, Shot 3 final hero.",
+        encoding="utf-8",
+    )
+    (analysis / "shot-list.md").write_text(
+        "Shot 1 opening third\nShot 2 middle third\nShot 3 final third",
+        encoding="utf-8",
+    )
+    manifest.create(
+        analysis / "manifest.json",
+        "vertical-video",
+        ["01", "02", "03"],
+    )
+    data = manifest.load(analysis / "manifest.json")
+    data["video_mode"] = "compact-reference"
+    for index in range(1, 4):
+        data["assets"][f"{index:02d}"]["storyboard_url"] = (
+            f"https://cdn.example/reference-{index:02d}.png"
+        )
+    (analysis / "manifest.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return run_dir
+
+
 def _mark_storyboard_validated(run_dir: Path) -> None:
     manifest_path = run_dir / "analysis" / "manifest.json"
     for index in range(1, 10):
@@ -146,6 +178,64 @@ def test_run_seedance_video_marks_all_storyboard_images_as_references(tmp_path, 
     assert all(item["role"] == "reference_image" for item in image_items)
 
 
+def test_run_seedance_video_compact_reference_sends_all_manifest_references_by_default(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_compact_video_run(tmp_path)
+
+    result = runner.run_seedance_video(run_dir, dry_run=True)
+
+    assert result["video_mode"] == "compact-reference"
+    assert result["image_count"] == 3
+    image_items = result["payload"]["content"][1:]
+    assert [item["image_url"]["url"] for item in image_items] == [
+        "https://cdn.example/reference-01.png",
+        "https://cdn.example/reference-02.png",
+        "https://cdn.example/reference-03.png",
+    ]
+    assert all(item["role"] == "reference_image" for item in image_items)
+
+
+def test_run_seedance_video_compact_reference_can_submit_without_nine_validated_frames(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_compact_video_run(tmp_path)
+    monkeypatch.setenv("BYTEPLUS_ARK_API_KEY", "test-key")
+    calls = []
+
+    def fake_request(method, url, api_key, payload):
+        calls.append((method, payload))
+        if method == "POST":
+            assert len(payload["content"][1:]) == 3
+            return {"id": "cgt-compact"}
+        return {
+            "id": "cgt-compact",
+            "status": "succeeded",
+            "content": {"video_url": "https://cdn.example/compact.mp4"},
+            "usage": {"total_tokens": 456},
+        }
+
+    def fake_download(url, output):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"compact mp4")
+
+    result = runner.run_seedance_video(
+        run_dir,
+        timeout_seconds=10,
+        poll_interval=0,
+        request_fn=fake_request,
+        download_fn=fake_download,
+    )
+
+    assert [call[0] for call in calls] == ["POST", "GET"]
+    assert result["video_mode"] == "compact-reference"
+    assert result["output"] == "generated/seedance-video.mp4"
+
+
 def test_run_seedance_video_rejects_seed_for_default_seedance_2(tmp_path, monkeypatch):
     _isolated_seedance_env(tmp_path, monkeypatch)
     run_dir = _prepared_video_run(tmp_path)
@@ -170,7 +260,7 @@ def test_run_seedance_video_requires_storyboard_url_by_default(tmp_path, monkeyp
     try:
         runner.run_seedance_video(run_dir, dry_run=True)
     except runner.SeedanceRunnerError as exc:
-        assert "storyboard image URL" in str(exc)
+        assert "reference image URL" in str(exc)
     else:
         raise AssertionError("Expected SeedanceRunnerError")
 

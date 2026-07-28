@@ -29,8 +29,14 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 - [[openrouter-image-generation]]: current image API/model/cost rules.
 - [[original-cooking-video]]: original cooking video structure and text policy.
 - [[seedance-video-generation]]: Seedance video cost, preview, and QA rules.
+- [[seedance-official-prompting]]: official Seedance 2.0 prompt-writing notes:
+  compact shot sequencing, multimodal references, camera motion, and text/logo
+  constraints.
 - [[openrouter-grok-video-generation]]: low-cost Grok/OpenRouter 720p video
   smoke tests using `GROK_OPENROUTER_API_KEY`.
+- [[aesthetic-library/README]]: English-region IG/Reels food taste memory,
+  recent-year pattern studies, no-face cooking style, subtitle/BGM preferences,
+  and product integration rules.
 - [[chatcut/README|ChatCut editing memory]]: confirmed editor capability map,
   low-model execution contract, theme playbooks, Agent prompt recipes, and QA
   discipline.
@@ -45,11 +51,28 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 For original cooking video work, the memory chain is:
 
 1. [[original-cooking-video]]
-2. [[seedance-video-generation]] or [[openrouter-grok-video-generation]]
-3. [[chatcut-handoff-workflow]]
+2. [[aesthetic-library/no-face-asian-cooking-style]]
+3. [[seedance-video-generation]]
+4. [[seedance-official-prompting]]
+5. [[openrouter-grok-video-generation]] when a low-cost 720p smoke test is
+   requested
+6. [[chatcut/README|ChatCut editing memory]]
+7. [[chatcut-handoff-workflow]]
 
 Do not treat Seedance as the end of the workflow when the user is talking about
 剪辑, 串视频, BGM, subtitles, labels, review, or export.
+
+## Image Carousel Rule
+
+For image/carousel posts, do not rely on a saved taste library. Use the user's
+source post, supplied screenshots, or a clearly selected competitor/reference
+post as the visual and pacing reference, then rebuild it with our product
+assets, English-region logo, and platform size.
+
+Preserve source page count, page order, and page roles unless the user asks for
+a new structure. If the source ends with a shopping/category/search/app-entry
+guide, remake that final guide page for the English region instead of inventing
+a generic CTA.
 
 ## Latest Lessons
 
@@ -75,6 +98,21 @@ Do not treat Seedance as the end of the workflow when the user is talking about
   last page should be an English shopping guide modeled on the original page,
   not a forgotten afterthought. Use the original guide layout as reference and
   place real English app/search results inside it.
+- 2026-07-25: For English IG-style food videos, recent high-performing samples
+  favor food-first close-ups, one-pan/lazy/time-saving hooks, sparse props,
+  stable camera angles, and centered white post-production text. Generated
+  storyboard/video frames still stay text-free; add labels/subtitles in ChatCut.
+- 2026-07-26: Clear the saved image/carousel taste library. For graphically
+  designed posts, reference the original/source or a chosen competitor post
+  directly instead of improvising a house style from memory.
+- 2026-07-28: Official Seedance 2.0 guidance favors compact timeline shots over
+  over-detailed still storyboards. For 6s cooking tests, use three soft shot
+  beats, more real product/logo references, one camera move per shot, and no
+  hard second-level timing unless the user explicitly wants a timing experiment.
+- 2026-07-28: A ChatCut theme is not a font/filter preset. Teach execution
+  models each theme as audience promise + emotion + rhythm + proof, and force
+  Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export
+  QA instead of decorating an unverified rough cut.
 
 ## Useful Links
 
@@ -82,5 +120,7 @@ Do not treat Seedance as the end of the workflow when the user is talking about
 - `../../../viral-social-remix/references/image-provider.md`
 - `../../../viral-social-remix/references/cooking-video-workflow.md`
 - [[seedance-video-generation]]
+- [[seedance-official-prompting]]
 - [[openrouter-grok-video-generation]]
+- [[chatcut/README|ChatCut editing memory]]
 - [[chatcut-handoff-workflow]]
