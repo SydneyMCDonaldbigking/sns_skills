@@ -56,17 +56,16 @@ dedicated `/api/v1/images` endpoint with `aspect_ratio` set from the target
 platform, because the chat-completions image route may return square images even
 when a portrait size is requested.
 
-For original English vertical cooking videos, do not default to generating nine
-storyboard frames before Seedance. The preferred Seedance 2.0 path uses a small
-set of real reference assets: product/package image, physical English-region
-logo/sign reference, food scene or finished dish reference, and optionally a
-source/camera-motion video. Use GPT Image 2 only when a missing reference still
-must be created, and keep generated stills portrait `1080x1920`.
+For original English vertical cooking videos, the configured image API creates
+exactly nine separate storyboard frames before Seedance. Start from the
+product/package image and official English logo, then generate each later frame
+as an edit of the preceding frame with those references still attached. Keep
+every frame portrait `1080x1920`.
 
-When the legacy nine-frame storyboard route is explicitly selected, the
-prepared video run uses `analysis/page-prompts/page-01.md` through
-`page-09.md`; the local runner writes `generated/page-01.png` through
-`page-09.png` and a vertical 3x3 storyboard overview.
+The prepared run uses `analysis/page-prompts/page-01.md` through `page-09.md`;
+the local runner writes `generated/page-01.png` through `page-09.png` and a
+vertical 3x3 review-only overview. Seedance receives the separate images in
+groups `01-03`, `04-06`, and `07-09`, never the overview.
 
 For `vertical-video`, use OpenRouter's dedicated Image API instead of the
 chat-completions image path. The request uses model

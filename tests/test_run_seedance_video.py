@@ -82,6 +82,56 @@ def _prepared_compact_video_run(tmp_path: Path) -> Path:
     return run_dir
 
 
+def _prepared_three_clip_storyboard_run(tmp_path: Path) -> Path:
+    run_dir = _prepared_video_run(tmp_path)
+    prompt_dir = run_dir / "analysis" / "seedance-prompts"
+    prompt_dir.mkdir()
+    for index in range(1, 4):
+        (prompt_dir / f"clip-{index:02d}.md").write_text(
+            f"Animate cooking clip {index} with realistic motion.",
+            encoding="utf-8",
+        )
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    data["schema_version"] = 2
+    data["video_mode"] = "storyboard-three-clips"
+    data["video"] = {
+        "mode": "storyboard-three-clips",
+        "profile": "final-clip",
+        "generation": {
+            "ratio": "9:16",
+            "duration": 6,
+            "resolution": "1080p",
+            "generate_audio": False,
+            "return_last_frame": False,
+            "watermark": False,
+        },
+        "budget": {"retry_limit": 1, "stop_before_final": False},
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "chatcut": "not_started",
+        "export_qa": "not_started",
+        "history": [],
+        "clips": {
+            f"clip-{index:02d}": {
+                "frames": [
+                    f"{(index - 1) * 3 + offset:02d}"
+                    for offset in range(1, 4)
+                ],
+                "status": "prepared",
+            }
+            for index in range(1, 4)
+        },
+    }
+    manifest_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return run_dir
+
+
 def _prepared_multimodal_video_run(tmp_path: Path) -> Path:
     run_dir = tmp_path / "output" / "multimodal"
     analysis = run_dir / "analysis"
@@ -253,6 +303,89 @@ def test_run_seedance_video_marks_all_storyboard_images_as_references(tmp_path, 
     image_items = result["payload"]["content"][1:]
     assert len(image_items) == 9
     assert all(item["role"] == "reference_image" for item in image_items)
+
+
+def test_three_clip_storyboard_dry_run_selects_exact_group(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_three_clip_storyboard_run(tmp_path)
+
+    result = runner.run_seedance_video(
+        run_dir,
+        storyboard_group=2,
+        allow_data_url=True,
+        dry_run=True,
+    )
+
+    assert result["video_mode"] == "storyboard-three-clips"
+    assert result["storyboard_group"] == 2
+    assert result["image_count"] == 3
+    assert result["generation"]["duration"] == 6
+    assert result["generation"]["generate_audio"] is False
+    assert "frames 04-06" in result["payload"]["content"][0]["text"]
+    assert [
+        item["image_url"]["url"]
+        for item in result["payload"]["content"][1:]
+    ] == ["<redacted data URL>"] * 3
+
+
+def test_three_clip_storyboard_requires_group(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_three_clip_storyboard_run(tmp_path)
+
+    try:
+        runner.run_seedance_video(run_dir, allow_data_url=True, dry_run=True)
+    except runner.SeedanceRunnerError as exc:
+        assert "--storyboard-group 1, 2, or 3" in str(exc)
+    else:
+        raise AssertionError("Expected SeedanceRunnerError")
+
+
+def test_three_clip_storyboard_tracks_each_paid_clip_separately(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_three_clip_storyboard_run(tmp_path)
+    _mark_storyboard_validated(run_dir)
+    monkeypatch.setenv("BYTEPLUS_ARK_API_KEY", "test-key")
+
+    def fake_request(method, url, api_key, payload):
+        if method == "POST":
+            assert len(payload["content"][1:]) == 3
+            return {"id": "task"}
+        return {
+            "id": "task",
+            "status": "succeeded",
+            "content": {"video_url": "https://cdn.example/clip.mp4"},
+        }
+
+    def fake_download(url, output):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"clip")
+
+    for group in range(1, 4):
+        result = runner.run_seedance_video(
+            run_dir,
+            storyboard_group=group,
+            allow_data_url=True,
+            request_fn=fake_request,
+            download_fn=fake_download,
+            poll_interval=0,
+        )
+        assert result["output"] == f"generated/seedance-clip-{group:02d}.mp4"
+
+    data = manifest.load(run_dir / "analysis" / "manifest.json")
+    assert list(data["video_generations"]) == [
+        "clip-01",
+        "clip-02",
+        "clip-03",
+    ]
+    assert all(
+        item["status"] == "succeeded"
+        for item in data["video_generations"].values()
+    )
+    assert data["video_workflow"]["status"] == "generated"
+    assert all(
+        item["status"] == "generated"
+        for item in data["video_workflow"]["clips"].values()
+    )
 
 
 def test_run_seedance_video_compact_reference_sends_all_manifest_references_by_default(

@@ -34,14 +34,13 @@ videos; `caption-zh.txt` only for explicit Chinese Xiaohongshu target output.
 Video uses the target publishing platform's caption language.
 
 Manifest schema version `1` records source provenance, platform confidence,
-assumptions, provider configuration, and per-asset generation state for
-carousel and legacy storyboard runs. Compact multimodal video jobs use schema
-version `2`, retaining those fields and adding a deterministic `video` plan and
-`video_workflow` state.
+assumptions, provider configuration, and per-asset generation state. Controlled
+video jobs use schema version `2`, retaining those fields and adding a
+deterministic `video` plan and `video_workflow` state.
 
 Top-level fields:
 
-- `schema_version`: `1` for legacy/carousel jobs; `2` for compact video jobs.
+- `schema_version`: `1` for basic/carousel jobs; `2` for controlled video jobs.
 - `source`: `{ "kind": ..., "paths": [...], "url": ... }`. `kind` may be
   `local_file`, `local_folder`, `direct_url`, or `unknown`; direct URL inputs
   record `content_type` and byte count when downloaded.
@@ -79,25 +78,31 @@ reference assets in `assets[asset_id].reference_paths`; the runner also accepts
 the legacy `assets[asset_id].request.reference_images` field for existing runs.
 
 For original English vertical cooking video runs, use platform
-`vertical-video`. Preferred Seedance 2.0 runs use a compact reference pack and a
-three-shot prompt. Additional video-prep files:
+`vertical-video` and mode `storyboard-three-clips`. Additional files:
 
 - `analysis/brief.md`: user/product/recipe brief.
-- `analysis/shot-list.md`: the ordered Seedance shots, usually three soft
-  beats for a 5-6s preview.
-- `analysis/seedance-prompt.md`: one final motion prompt for Seedance.
+- `analysis/shot-list.md`: nine frames grouped `01-03`, `04-06`, `07-09`.
+- `analysis/page-prompts/page-01.md` through `page-09.md`: image API prompts.
+- `analysis/seedance-prompts/clip-01.md` through `clip-03.md`: one motion
+  prompt per 6s group.
 - `analysis/caption-en.txt`: platform post caption only, not video subtitles.
-
-When the legacy still-storyboard route is explicitly selected, also include:
-
-- `analysis/page-prompts/page-01.md` through `page-09.md`: GPT Image 2 storyboard prompts.
 - `generated/page-01.png` through `page-09.png`: `1080x1920` storyboard frames.
-- `overview/contact-sheet.png`: 3x3 storyboard overview.
+- `overview/contact-sheet.png`: review-only 3x3 overview.
+- `generated/seedance-clip-01.mp4` through `clip-03.mp4`: separate silent clips.
+- `analysis/seedance-clip-XX-request.lock.json`, matching `raw/` records, and
+  `qa/seedance-clip-XX-video.json`: independent request/QA state per clip.
 
-For the preferred compact-reference route, record product/package/logo/source
-references in `video.references`. Each entry contains a stable `id`, `type`
-(`image`, `video`, or `audio`), type-local `order`, and exactly one `url` or
-`path`. Local video/audio references must be uploaded to trusted storage before
+The manifest records `video.clip_groups`, silent 6s generation controls,
+`video.brand.strategy: storyboard-physical-prop`, per-clip
+`video_generations`, and `video_workflow.clips`. Seedance receives exactly the
+three separate storyboard images for the selected group.
+
+Older or non-cooking `compact-reference` jobs may instead record
+product/package/logo/source references in `video.references`. Each entry
+contains a stable `id`, `type` (`image`, `video`, or `audio`), type-local
+`order`, and exactly one `url` or `path`.
+
+Local video/audio references must be uploaded to trusted storage before
 submission. Legacy `reference_paths` and `storyboard_url` asset fields remain
 readable for existing runs.
 
@@ -106,7 +111,7 @@ them to the official final request labels (`[Image 1]`, `[Video 1]`,
 `[Audio 1]`) after ordering. `@Image1`, unknown IDs, and labels beyond the
 submitted reference count fail preflight.
 
-Compact video manifests also record:
+Compact-reference manifests also record:
 
 - `video.mode` and `video.profile`.
 - `video.shots`: three ordered soft beats for the default short-form route.

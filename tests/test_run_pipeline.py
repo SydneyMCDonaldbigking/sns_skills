@@ -55,7 +55,7 @@ def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
     assert list(data["assets"]) == ["01", "02"]
 
 
-def test_prepare_original_video_run_creates_compact_reference_skeleton(tmp_path: Path):
+def test_prepare_original_video_run_creates_three_clip_storyboard_skeleton(tmp_path: Path):
     run_dir = pipeline.prepare_original_video_run(
         brief="Brand: UMall. Dish: quick tomato egg stir fry.",
         output_root=tmp_path / "output",
@@ -69,33 +69,49 @@ def test_prepare_original_video_run_creates_compact_reference_skeleton(tmp_path:
     shot_list = (run_dir / "analysis" / "shot-list.md").read_text(encoding="utf-8")
     assert "TODO" not in shot_list
     for phrase in [
-        "Shot 1, opening third",
-        "Shot 2, middle third",
-        "Shot 3, final third",
-        "Use one camera movement only",
+        "frames 01-03",
+        "frames 04-06",
+        "frames 07-09",
+        "exactly three ordered frames per request",
     ]:
         assert phrase in shot_list
+    for index in range(1, 4):
+        assert (
+            run_dir
+            / "analysis"
+            / "seedance-prompts"
+            / f"clip-{index:02d}.md"
+        ).is_file()
 
     data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert data["platform"] == "vertical-video"
     assert data["schema_version"] == 2
-    assert data["video_mode"] == "compact-reference"
-    assert data["video"]["mode"] == "compact-reference"
-    assert data["video"]["profile"] == "visual-preview"
+    assert data["video_mode"] == "storyboard-three-clips"
+    assert data["video"]["mode"] == "storyboard-three-clips"
+    assert data["video"]["profile"] == "final-clip"
+    assert [group["frames"] for group in data["video"]["clip_groups"]] == [
+        ["01", "02", "03"],
+        ["04", "05", "06"],
+        ["07", "08", "09"],
+    ]
     assert data["video"]["generation"]["generate_audio"] is False
     assert data["video"]["generation"]["return_last_frame"] is True
     assert data["video"]["delivery"] == {
         "ratio": "9:16",
         "resolution": "1080p",
-        "duration": None,
-        "expect_audio": None,
-        "text_policy": "editable-post-only",
+        "target_duration": None,
+        "duration_policy": "preserve coherent sequence; trim only defects, repetition, awkward joins, or dead time",
+        "expect_audio": True,
+        "audio_policy": "user voiceover plus agent-generated BGM and cooking SFX",
+        "text_policy": "editable white centered current-step captions in ChatCut",
     }
-    assert data["video"]["references"] == []
+    assert data["storyboard_references"] == []
     assert data["video_workflow"]["status"] == "prepared"
     assert data["source"]["kind"] == "original_brief"
     assert data["source"]["brief_path"] == "analysis/brief.md"
-    assert list(data["assets"]) == ["01", "02", "03"]
+    assert list(data["assets"]) == [
+        "01", "02", "03", "04", "05", "06", "07", "08", "09"
+    ]
 
 
 def test_prepare_original_video_run_records_structured_references(tmp_path: Path):
@@ -114,7 +130,7 @@ def test_prepare_original_video_run_records_structured_references(tmp_path: Path
     data = json.loads(
         (run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8")
     )
-    references = data["video"]["references"]
+    references = data["storyboard_references"]
     assert [item["type"] for item in references] == [
         "image",
         "video",

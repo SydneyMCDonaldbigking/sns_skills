@@ -3,8 +3,7 @@
 This runner is meant for the user's local terminal. Codex prepares the run
 directory, reference assets, and Seedance prompt; the local runner reads the
 ignored `.env.local` or environment for the API key, submits the async task,
-polls it, and downloads the returned video. Legacy nine-frame storyboard runs
-remain supported.
+polls it, and downloads the returned video.
 """
 
 from __future__ import annotations
@@ -57,6 +56,12 @@ DEFAULT_DURATION = "5"
 DEFAULT_TIMEOUT = 1800
 DEFAULT_POLL_INTERVAL = 10
 TERMINAL_FAILURES = {"failed", "cancelled"}
+THREE_CLIP_STORYBOARD_MODE = "storyboard-three-clips"
+STORYBOARD_GROUPS = {
+    1: ["01", "02", "03"],
+    2: ["04", "05", "06"],
+    3: ["07", "08", "09"],
+}
 KEY_ENV_NAMES = [
     "BYTEPLUS_ARK_API_KEY",
     "BYTEPLUS_API_KEY",
@@ -220,6 +225,10 @@ def _is_compact_reference(data: dict[str, Any]) -> bool:
     return _video_mode(data) == "compact-reference"
 
 
+def _is_three_clip_storyboard(data: dict[str, Any]) -> bool:
+    return _video_mode(data) == THREE_CLIP_STORYBOARD_MODE
+
+
 def _validate_storyboard_ready(
     run_dir: Path,
     data: dict[str, Any],
@@ -380,11 +389,21 @@ def compose_prompt(
     ratio: str | None = None,
     duration: str | None = None,
     seed: int | None = None,
+    storyboard_group: int | None = None,
 ) -> str:
     prompt = base_prompt.strip()
-    shot_list = _read_usable_text(run_dir / "analysis" / "shot-list.md")
-    if shot_list and shot_list not in prompt:
-        prompt = f"{prompt}\n\nStoryboard beats to follow:\n{shot_list}"
+    if storyboard_group:
+        frame_ids = STORYBOARD_GROUPS[storyboard_group]
+        prompt = (
+            f"{prompt}\n\nUse the three supplied images in order as the start, "
+            f"middle, and end anchors for one continuous 6-second clip "
+            f"(storyboard frames {frame_ids[0]}-{frame_ids[-1]}). Do not repeat "
+            "the full recipe or introduce actions from another clip."
+        )
+    else:
+        shot_list = _read_usable_text(run_dir / "analysis" / "shot-list.md")
+        if shot_list and shot_list not in prompt:
+            prompt = f"{prompt}\n\nStoryboard beats to follow:\n{shot_list}"
 
     if platform == "vertical-video" and "no subtitles" not in prompt.lower():
         prompt = f"{prompt}\n\n{NO_SUBTITLE_POLICY}"
@@ -579,15 +598,25 @@ def _update_manifest_video(
     fields: dict[str, Any],
     *,
     workflow_status: str | None = None,
+    generation_key: str | None = None,
 ) -> None:
     manifest_path = run_dir / "analysis" / "manifest.json"
     if not manifest_path.is_file():
         return
     data = manifest.load(manifest_path)
-    current = data.get("video_generation")
-    current = current if isinstance(current, dict) else {}
-    current.update(fields)
-    data["video_generation"] = current
+    if generation_key:
+        generations = data.get("video_generations")
+        generations = generations if isinstance(generations, dict) else {}
+        current = generations.get(generation_key)
+        current = current if isinstance(current, dict) else {}
+        current.update(fields)
+        generations[generation_key] = current
+        data["video_generations"] = generations
+    else:
+        current = data.get("video_generation")
+        current = current if isinstance(current, dict) else {}
+        current.update(fields)
+        data["video_generation"] = current
     if workflow_status:
         workflow = data.get("video_workflow")
         workflow = workflow if isinstance(workflow, dict) else {}
@@ -597,23 +626,45 @@ def _update_manifest_video(
             {
                 "status": workflow_status,
                 "at": datetime.now(timezone.utc).isoformat(),
+                **({"clip": generation_key} if generation_key else {}),
             }
         )
-        workflow.update(
-            {
-                "status": workflow_status,
-                "history": history,
-            }
-        )
-        if workflow_status == "generated":
-            workflow["visual_qa"] = "pending"
-            workflow.setdefault("chatcut", "not_started")
-            workflow.setdefault("export_qa", "not_started")
+        if generation_key:
+            clips = workflow.get("clips")
+            clips = clips if isinstance(clips, dict) else {}
+            clip = clips.get(generation_key)
+            clip = clip if isinstance(clip, dict) else {}
+            clip.update({**fields, "status": workflow_status})
+            clips[generation_key] = clip
+            clip_statuses = [
+                str((clips.get(f"clip-{index:02d}") or {}).get("status"))
+                for index in range(1, 4)
+            ]
+            if all(status == "generated" for status in clip_statuses):
+                workflow["status"] = "generated"
+                workflow["visual_qa"] = "pending"
+            elif workflow_status == "failed":
+                workflow["status"] = "clip_failed"
+            else:
+                workflow["status"] = "clips_generating"
+            workflow["clips"] = clips
+        else:
+            workflow["status"] = workflow_status
+            if workflow_status == "generated":
+                workflow["visual_qa"] = "pending"
+        workflow["history"] = history
+        workflow.setdefault("chatcut", "not_started")
+        workflow.setdefault("export_qa", "not_started")
         data["video_workflow"] = workflow
     _write_json(manifest_path, data)
 
 
-def _register_last_frame(run_dir: Path, relative_path: str) -> None:
+def _register_last_frame(
+    run_dir: Path,
+    relative_path: str,
+    *,
+    generation_key: str | None = None,
+) -> None:
     manifest_path = run_dir / "analysis" / "manifest.json"
     if not manifest_path.is_file():
         return
@@ -622,12 +673,21 @@ def _register_last_frame(run_dir: Path, relative_path: str) -> None:
     video = video if isinstance(video, dict) else {}
     continuity = video.get("continuity")
     continuity = continuity if isinstance(continuity, dict) else {}
-    continuity.update(
-        {
+    if generation_key:
+        clips = continuity.get("clips")
+        clips = clips if isinstance(clips, dict) else {}
+        clips[generation_key] = {
             "last_frame_path": relative_path,
             "available": True,
         }
-    )
+        continuity["clips"] = clips
+    else:
+        continuity.update(
+            {
+                "last_frame_path": relative_path,
+                "available": True,
+            }
+        )
     video["continuity"] = continuity
     data["video"] = video
     _write_json(manifest_path, data)
@@ -731,6 +791,7 @@ def run_seedance_video(
     video_urls: list[str] | None = None,
     audio_urls: list[str] | None = None,
     include_all_frames: bool = False,
+    storyboard_group: int | None = None,
     allow_data_url: bool = False,
     model: str | None = None,
     endpoint: str | None = None,
@@ -765,7 +826,32 @@ def run_seedance_video(
         raise SeedanceRunnerError("Seedance video runner requires a video storyboard run")
     asset_ids = list(data.get("assets", {}).keys())
     compact_reference = _is_compact_reference(data)
+    three_clip_storyboard = _is_three_clip_storyboard(data)
+    generation_key: str | None = None
+    selected_storyboard_ids = asset_ids
+    if three_clip_storyboard:
+        if storyboard_group not in STORYBOARD_GROUPS:
+            raise SeedanceRunnerError(
+                "This run requires --storyboard-group 1, 2, or 3. "
+                "Each paid Seedance request uses exactly three storyboard frames."
+            )
+        if include_all_frames:
+            raise SeedanceRunnerError(
+                "Do not use --include-all-frames with storyboard-three-clips; "
+                "the selected group already supplies exactly three frames."
+            )
+        if video_urls or audio_urls:
+            raise SeedanceRunnerError(
+                "storyboard-three-clips accepts only its three image anchors; "
+                "BGM, voiceover, and SFX are added later in ChatCut."
+            )
+        selected_storyboard_ids = STORYBOARD_GROUPS[storyboard_group]
+        generation_key = f"clip-{storyboard_group:02d}"
     job_data = _data_with_profile(data, profile)
+    if generation_key:
+        generations = data.get("video_generations")
+        generations = generations if isinstance(generations, dict) else {}
+        job_data["video_generation"] = generations.get(generation_key, {})
 
     config = resolve_config(model=model, endpoint=endpoint)
     try:
@@ -786,7 +872,16 @@ def run_seedance_video(
         if return_last_frame is not None
         else bool(defaults.get("return_last_frame", False))
     )
-    base_prompt, prompt_path = load_prompt(run, prompt=prompt, prompt_file=prompt_file)
+    effective_prompt_file = prompt_file
+    if generation_key and not prompt and not prompt_file:
+        candidate = run / "analysis" / "seedance-prompts" / f"{generation_key}.md"
+        if candidate.is_file():
+            effective_prompt_file = candidate
+    base_prompt, prompt_path = load_prompt(
+        run,
+        prompt=prompt,
+        prompt_file=effective_prompt_file,
+    )
     composed_prompt = compose_prompt(
         run,
         base_prompt,
@@ -794,6 +889,7 @@ def run_seedance_video(
         ratio=ratio,
         duration=duration,
         seed=seed,
+        storyboard_group=storyboard_group if three_clip_storyboard else None,
     )
 
     if not compact_reference and not dry_run:
@@ -812,7 +908,28 @@ def run_seedance_video(
             manifest_references,
             explicit_references,
         )
-        if not compact_reference and not include_all_frames:
+        if three_clip_storyboard:
+            sources = [value for value in image_urls or [] if value]
+            if not sources:
+                sources = _manifest_storyboard_urls(
+                    data,
+                    selected_storyboard_ids,
+                )
+            if not sources:
+                sources = [
+                    str(_generated_path(run, asset_id))
+                    for asset_id in selected_storyboard_ids
+                ]
+            if len(sources) != 3:
+                raise video_job.VideoJobError(
+                    f"{generation_key} requires exactly 3 image references; "
+                    f"found {len(sources)}"
+                )
+            references = video_job.merge_reference_overrides(
+                [],
+                video_job.cli_references(image_refs=sources),
+            )
+        elif not compact_reference and not include_all_frames:
             first_image = next(
                 (item for item in references if item["type"] == "image"),
                 None,
@@ -861,6 +978,18 @@ def run_seedance_video(
             options=options,
             references=materialized_references,
         )
+        if three_clip_storyboard:
+            counts = video_job.reference_counts(materialized_references)
+            if counts != {"image": 3, "video": 0, "audio": 0}:
+                raise video_job.VideoJobError(
+                    f"{generation_key} must compile to exactly 3 images and no "
+                    f"video/audio references; found {counts}"
+                )
+            if options["duration"] != 6 or options["generate_audio"]:
+                raise video_job.VideoJobError(
+                    "storyboard-three-clips requires a silent 6-second Seedance "
+                    "generation"
+                )
         final_prompt, prompt_warnings = video_job.compile_prompt(
             composed_prompt,
             materialized_references,
@@ -889,6 +1018,7 @@ def run_seedance_video(
         "schema_version": 1,
         "status": "passed",
         "video_mode": _video_mode(job_data),
+        "storyboard_group": storyboard_group,
         "profile": profile_name,
         "model": config["model"],
         "prompt_path": prompt_path,
@@ -911,6 +1041,7 @@ def run_seedance_video(
             "audio_count": counts["audio"],
             "reference_count": sum(counts.values()),
             "video_mode": _video_mode(job_data),
+            "storyboard_group": storyboard_group,
             "profile": profile_name,
             "generation": options,
             "request_sha256": request_sha256,
@@ -938,9 +1069,15 @@ def run_seedance_video(
     qa_dir = run / "qa"
     request_fn = request_fn or request_json
     download_fn = download_fn or download_video
-    output_path = Path(output) if output else run / "generated" / "seedance-video.mp4"
+    default_output = (
+        run / "generated" / f"seedance-{generation_key}.mp4"
+        if generation_key
+        else run / "generated" / "seedance-video.mp4"
+    )
+    output_path = Path(output) if output else default_output
     if not output_path.is_absolute():
         output_path = run / output_path
+    artifact_stem = f"seedance-{generation_key}" if generation_key else "seedance"
 
     request_lock = {
         **preflight,
@@ -948,15 +1085,18 @@ def run_seedance_video(
         "submission": submission,
         "payload": _payload_for_lock(payload),
     }
-    _write_json(run / "analysis" / "seedance-request.lock.json", request_lock)
-    _write_json(raw_dir / "seedance-create-request.json", redacted_payload)
+    request_lock_path = (
+        run / "analysis" / f"{artifact_stem}-request.lock.json"
+    )
+    _write_json(request_lock_path, request_lock)
+    _write_json(raw_dir / f"{artifact_stem}-create-request.json", redacted_payload)
     _update_manifest_video(
         run,
         {
             "status": "preflight_validated",
             "profile": profile_name,
             "request_sha256": request_sha256,
-            "request_lock": "analysis/seedance-request.lock.json",
+            "request_lock": _relative_to_run(request_lock_path, run),
             "reference_counts": counts,
             "attempts": submission["attempt"],
             "generation": {
@@ -965,11 +1105,12 @@ def run_seedance_video(
             },
         },
         workflow_status="preflight_validated",
+        generation_key=generation_key,
     )
     task_id: str | None = None
     try:
         create_response = request_fn("POST", config["endpoint"], api_key, payload)
-        _write_json(raw_dir / "seedance-create-response.json", create_response)
+        _write_json(raw_dir / f"{artifact_stem}-create-response.json", create_response)
         task_id = _task_id(create_response)
         _update_manifest_video(
             run,
@@ -989,10 +1130,11 @@ def run_seedance_video(
                 },
             },
             workflow_status="submitted",
+            generation_key=generation_key,
         )
 
         def on_status(response: dict[str, Any]) -> None:
-            _write_json(raw_dir / "seedance-status.json", response)
+            _write_json(raw_dir / f"{artifact_stem}-status.json", response)
 
         final_response = poll_task(
             task_id,
@@ -1014,7 +1156,11 @@ def run_seedance_video(
                 )
                 download_fn(last_frame_url, last_frame_path)
                 last_frame_output = _relative_to_run(last_frame_path, run)
-                _register_last_frame(run, last_frame_output)
+                _register_last_frame(
+                    run,
+                    last_frame_output,
+                    generation_key=generation_key,
+                )
             else:
                 prompt_warnings.append(
                     "return_last_frame was requested but the provider response "
@@ -1032,6 +1178,7 @@ def run_seedance_video(
             run,
             failure,
             workflow_status="failed",
+            generation_key=generation_key,
         )
         raise
 
@@ -1055,6 +1202,7 @@ def run_seedance_video(
         "reference_count": sum(counts.values()),
         "reference_counts": counts,
         "video_mode": _video_mode(job_data),
+        "storyboard_group": storyboard_group,
         "generation": {
             **options,
             "return_last_frame": effective_return_last_frame,
@@ -1065,14 +1213,15 @@ def run_seedance_video(
         "warnings": prompt_warnings,
         "usage": final_response.get("usage", {}),
     }
-    _write_json(qa_dir / "seedance-video.json", ledger)
+    qa_path = qa_dir / f"{artifact_stem}-video.json"
+    _write_json(qa_path, ledger)
     _update_manifest_video(
         run,
         {
             "status": "succeeded",
             "task_id": task_id,
             "output": relative_output,
-            "qa_path": "qa/seedance-video.json",
+            "qa_path": _relative_to_run(qa_path, run),
             "profile": profile_name,
             "request_sha256": request_sha256,
             "reference_counts": counts,
@@ -1086,6 +1235,7 @@ def run_seedance_video(
             },
         },
         workflow_status="generated",
+        generation_key=generation_key,
     )
     return ledger
 
@@ -1125,6 +1275,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-all-frames",
         action="store_true",
         help="Send every available storyboard URL/reference instead of only the first.",
+    )
+    parser.add_argument(
+        "--storyboard-group",
+        type=int,
+        choices=sorted(STORYBOARD_GROUPS),
+        help=(
+            "For storyboard-three-clips runs, select group 1 (01-03), "
+            "2 (04-06), or 3 (07-09)."
+        ),
     )
     parser.add_argument(
         "--allow-data-url",
@@ -1199,6 +1358,7 @@ def main(argv: list[str] | None = None) -> int:
             video_urls=args.video_url,
             audio_urls=args.audio_url,
             include_all_frames=args.include_all_frames,
+            storyboard_group=args.storyboard_group,
             allow_data_url=args.allow_data_url,
             model=args.model,
             endpoint=args.endpoint,

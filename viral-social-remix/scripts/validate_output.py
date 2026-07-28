@@ -22,6 +22,11 @@ DIMENSIONS = {
     "vertical-video": (1080, 1920),
 }
 STORYBOARD_ASSET_IDS = [f"{index:02d}" for index in range(1, 10)]
+STORYBOARD_CLIP_GROUPS = [
+    ["01", "02", "03"],
+    ["04", "05", "06"],
+    ["07", "08", "09"],
+]
 
 
 def _load_manifest(base: Path) -> dict | None:
@@ -39,6 +44,53 @@ def _video_mode(data: dict | None) -> str:
 
 def _is_compact_reference(data: dict | None) -> bool:
     return _video_mode(data) == "compact-reference"
+
+
+def _is_three_clip_storyboard(data: dict | None) -> bool:
+    return _video_mode(data) == "storyboard-three-clips"
+
+
+def _validate_three_clip_storyboard_job(data: dict) -> list[str]:
+    errors: list[str] = []
+    video = video_job.video_section(data)
+    groups = video.get("clip_groups")
+    actual_groups = [
+        item.get("frames")
+        for item in groups
+        if isinstance(item, dict)
+    ] if isinstance(groups, list) else []
+    if actual_groups != STORYBOARD_CLIP_GROUPS:
+        errors.append(
+            "storyboard-three-clips groups must be exactly 01-03, 04-06, 07-09"
+        )
+    generation = video.get("generation")
+    generation = generation if isinstance(generation, dict) else {}
+    if generation.get("duration") != 6:
+        errors.append("storyboard-three-clips duration must be 6 seconds")
+    if generation.get("ratio") != "9:16":
+        errors.append("storyboard-three-clips ratio must be 9:16")
+    if generation.get("resolution") != "1080p":
+        errors.append("storyboard-three-clips resolution must be 1080p")
+    if generation.get("generate_audio") is not False:
+        errors.append("storyboard-three-clips must generate without audio")
+    brand = video.get("brand")
+    brand = brand if isinstance(brand, dict) else {}
+    if brand.get("strategy") != "storyboard-physical-prop":
+        errors.append(
+            "storyboard-three-clips brand strategy must be storyboard-physical-prop"
+        )
+    workflow = data.get("video_workflow")
+    workflow = workflow if isinstance(workflow, dict) else {}
+    clips = workflow.get("clips")
+    if not isinstance(clips, dict) or list(clips) != [
+        "clip-01",
+        "clip-02",
+        "clip-03",
+    ]:
+        errors.append(
+            "storyboard-three-clips workflow must track clip-01, clip-02, clip-03"
+        )
+    return errors
 
 
 def _validate_compact_job(base: Path, data: dict) -> list[str]:
@@ -168,9 +220,16 @@ def validate_delivery(
     base = Path(root)
     errors = []
     generated_dir = base / "generated"
-    generated = sorted(generated_dir.glob("*.png")) if generated_dir.exists() else []
+    if generated_dir.exists():
+        pattern = "page-*.png" if platform in {"video", "vertical-video"} else "*.png"
+        generated = sorted(generated_dir.glob(pattern))
+    else:
+        generated = []
     data = _load_manifest(base)
     compact_reference = platform == "vertical-video" and _is_compact_reference(data)
+    three_clip_storyboard = (
+        platform == "vertical-video" and _is_three_clip_storyboard(data)
+    )
     language = caption_language or (
         "zh" if platform == "xiaohongshu" else "en"
     )
@@ -195,6 +254,14 @@ def validate_delivery(
             required.extend(
                 base / "analysis" / "page-prompts" / f"page-{index:02d}.md"
                 for index in range(1, 10)
+            )
+        if three_clip_storyboard:
+            required.extend(
+                base
+                / "analysis"
+                / "seedance-prompts"
+                / f"clip-{index:02d}.md"
+                for index in range(1, 4)
             )
     errors.extend(
         f"missing required file: {path}" for path in required if not path.is_file()
@@ -232,6 +299,8 @@ def validate_delivery(
                     )
             if compact_reference:
                 errors.extend(_validate_compact_job(base, data))
+            if three_clip_storyboard:
+                errors.extend(_validate_three_clip_storyboard_job(data))
         incomplete = [
             asset_id
             for asset_id, item in data.get("assets", {}).items()

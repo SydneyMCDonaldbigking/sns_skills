@@ -1,512 +1,186 @@
 ---
 name: viral-social-remix
-description: Use when a user provides a viral social-post link, image, video, or local media folder and wants a branded Xiaohongshu, Instagram, Facebook, or video remix. Also use when the user wants an original branded cooking, recipe, stir-fry, or food process video made with reference assets and a Seedance or OpenRouter Grok video API handoff.
+description: Use when a user provides a viral social-post URL, image, video, local file, local folder, or original food brief and wants a branded Xiaohongshu, Instagram/Facebook, carousel, or Seedance/Grok video remix.
 ---
 
 # Viral Social Remix
 
-Follow the workflow below. Load only the reference files required by the detected platform and media type.
+Keep this file as the route map. Load only the reference needed for the chosen
+output. Do not load the whole vault.
 
-## Local memory
+## 1. Read persistent context
 
-This repository is also an Obsidian vault. Before each task, read
-`docs/memory/viral-social-remix/index.md` after this skill file, then read any
-route-specific memory linked from that index. Treat those notes as persistent
-operator memory, but let explicit current-task user instructions override them.
+Read `docs/memory/viral-social-remix/index.md`, then only the linked memory for
+the active route. Current user instructions override memory.
 
-After a successful run, write `output/<run>/qa/run-notes.md` from
-`docs/memory/viral-social-remix/run-notes-template.md`. Distill reusable lessons
-back into `docs/memory/viral-social-remix/` or run
-`scripts/distill_memory.py --write`. Never store API keys, raw vendor responses,
-base64 payloads, source images, or generated images in the Obsidian notes.
+Read `brand-profile.md` and `references/brand-region-assets.md` before asking
+questions. Reuse completed values; ask only when product or brand is still
+`未填写`. Product and brand are mandatory. Ask only for missing mandatory fields or low-confidence platform.
 
-## Intake
+Search `data/material-index.jsonl` before recollecting known sources or brand
+assets. Use `scripts/query_material_index.py` and
+`scripts/build_remix_context.py` when relevant.
 
-Read `brand-profile.md` and `references/brand-region-assets.md` before asking intake questions. Reuse every completed
-field. Ask for brand or product only when their values remain `未填写`; infer
-other missing fields and label the assumptions. Current-task user input always
-overrides the profile.
+## 2. Classify the route
 
-Accept a public post URL, logged-in browser tab, local file, local folder, or
-original cooking/recipe brief.
-For a local folder, run `scripts/scan_media.py`, show the discovered task list,
-and process each valid group independently. Inspect every local image before
-analysis. Product and brand are mandatory. For original cooking videos, also
-infer or ask for the dish/recipe, core ingredient sequence, target platform,
-duration, and aspect ratio. Infer audience, setting, benefits,
-and theme; label those assumptions. Ask only for missing mandatory fields or low-confidence platform.
+Infer the source platform and target output platform separately.
 
-Do not ask again for values already supplied. A user's explicit platform always
-overrides automatic detection.
+- **Xiaohongshu source to English carousel**: preserve page count and meaning,
+  output natural English `1152x1152`, write `caption-en.txt`.
+- **Chinese Xiaohongshu output**: output `1152x1536`, write
+  `caption-zh.txt`.
+- **Instagram/Facebook carousel**: preserve source page count, output natural
+  English `1152x1152`, write `caption-en.txt`.
+- **General video remix**: select exactly nine narrative frames and create a
+  `1920x1080` storyboard/contact sheet.
+- **Original cooking commercial**: use `vertical-video`, `9:16`,
+  `1080x1920`; follow the nine-frame/three-clip contract below.
 
-Before asking for examples or product visuals, check the local material index at
-`data/material-index.jsonl` when it exists. Use it as a memory of already
-collected Xiaohongshu posts, Instagram/Facebook posts, and official brand-site
-assets. If it is missing or stale, rebuild it from completed output folders with
-`scripts/collect_source_assets.py`. Search it with
-`scripts/query_material_index.py` by platform, keyword, record type, or asset
-kind before doing new browser/OCR collection. When preparing a remix, use
-`scripts/build_remix_context.py` to create a compact source-post plus
-brand-asset context pack before loading full source folders into context. For a
-new generation task, prefer `scripts/prepare_remix_run.py` to create the
-timestamped run directory, analysis skeleton, context pack, caption placeholder,
-selected asset mapping, and manifest before drafting prompts.
-Run `scripts/validate_prepared_run.py output/<run>` before image generation to
-catch missing analysis files, mismatched asset mappings, or leftover `TODO`
-draft placeholders.
+Load `references/platform-profiles.md` and
+`references/breakdown-schema.md`. For `real-talk` Xiaohongshu posts, also load
+`references/xiaohongshu-real-talk-template.md`. For `pantry-essentials`
+Instagram/Facebook posts, load
+`references/instagram-pantry-essentials-template.md`.
 
-## API handoff and autonomy
+## 3. Acquire the source
 
-Codex prepares the local source package, localized copy, page prompts, captions,
-and manifest. The image API still needs the relevant page prompts and local
-reference assets, but that upload must happen from the user's own terminal via
-the local runner, not directly from the Codex environment.
+Accept a post URL, logged-in browser tab, local file, local folder, or original
+brief.
 
-For carousel image generation, hand off to the user's local terminal with
-`scripts/run_openrouter_carousel.py`. The local runner reads the prepared
-`run_dir/analysis/manifest.json`, `run_dir/analysis/page-prompts/page-XX.md`,
-and any manifest-listed local reference image paths, uploads them to OpenRouter
-page by page, and writes generated output back into the same run directory.
-Store page references under `assets[asset_id].reference_paths`; the runner also
-accepts legacy `assets[asset_id].request.reference_images`. Use `--api-only
---concurrency 2` for production runs.
+- Local folder: run `scripts/scan_media.py`; inspect every discovered image.
+- Logged-in social page: reuse the existing Browser/Chrome tab. Do not reload
+  or open a duplicate unless necessary.
+- Xiaohongshu capture: use `scripts/xhs_browser_capture.mjs`, then
+  `scripts/capture_source_package.py`.
+- Other source packages: use `scripts/capture_source_package.py`.
 
-If the Codex environment blocks upload or API access, do not bypass it. Finish
-the run preparation and output the exact local command for the user to run:
+Preserve source order, caption, author, URL, page count, media files, and a
+screenshot fallback. Do not pretend blocked originals were downloaded.
 
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
-```
+## 4. Prepare a resumable run
 
-Only stop before handoff for a real blocker: missing mandatory brand/product
-data, inaccessible logged-in source page, unreadable local source files, or an
-incomplete run directory that cannot be fixed locally.
+Use `scripts/create_run_dir.py` or `scripts/prepare_remix_run.py`. Follow
+`references/output-schema.md`. Store generation state in
+`scripts/manifest.py`; never overwrite a prior run.
 
-For original English vertical cooking video generation, Codex prepares the
-recipe brief, shot-list, compact Seedance prompt, reference asset mapping, and
-manifest. Prefer the official Seedance 2.0 style: a small set of real product,
-packaging, logo/sign, food-scene, and optional source-motion references plus
-three ordered shot beats for a 5-6s preview. Only generate a full GPT Image 2
-nine-frame storyboard when the user explicitly asks for that legacy route or
-the source-remake needs many still anchors. Seedance task creation must happen
-from the user's local terminal via `scripts/run_seedance_video.py`, not directly
-from the Codex environment.
-Load `references/seedance-video.md` before composing the handoff. The runner
-uses BytePlus ModelArk Seedance 2.0 by default, reads `BYTEPLUS_ARK_API_KEY`,
-`BYTEPLUS_API_KEY`, `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, or
-`SEEDANCE_API_KEY` from `.env.local` or the local environment, creates an async
-video task, polls it, downloads `content.video_url`, and writes
-`generated/seedance-video.mp4`.
-For this route, the required publishing ratio is vertical short-video `9:16`,
-the default `visual-preview` profile is `1080p`, 5 seconds,
-`generate_audio: false`, `return_last_frame: true`, and `watermark: false`.
-Use `native-audio-final` only after the visual pass is accepted. Any script,
-platform caption, or voiceover plan should be natural English.
-Do not place subtitles, captions, title cards, lower-thirds, labels, or any
-on-screen text in generated reference frames or the final video; the rule is no
-visible text. Voiceover and natural
-cooking audio are allowed when the selected Seedance model supports audio.
-Use the fixed cooking-video structure: ingredient/product close-ups, cooking
-process, then plated finished dish with company table sign, logo prop, or
-packaging. Company branding may appear only as a real physical prop in the
-opening setup or final hero, never as a screen subtitle, sticker, overlay, or ad
-banner.
-For English-region deliverables, that physical prop must use the `ASIAN GROCER
-ONLINE` lockup with small `powered by UMALL`, from
-`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`. Do not
-use the Chinese-region UMALL logo for English videos or English carousels.
-
-For a Seedance dry run:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview --dry-run
-```
-
-For production:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/xxx --profile visual-preview
-```
-
-Store image/video/audio inputs in manifest `video.references` with stable IDs.
-Author prompts with `{{ref:<id>}}`; the runner compiles those placeholders to
-the official `[Image 1]`, `[Video 1]`, and `[Audio 1]` request labels. It must
-reject `@Image1`, unknown references, audio-only jobs, unsupported dimensions,
-durations outside 4-15 seconds, and reference counts over the provider limits
-before task submission.
-Honor `video.budget.retry_limit` and `stop_before_final`. A final profile
-requires `--approve-final-spend`, and a manifest already marked
-`preflight_validated`, `submitted`, or `succeeded` must not create a second
-paid task unless the operator deliberately passes `--force`.
-
-For low-cost Grok/OpenRouter vertical video tests, load
-`references/openrouter-video.md` and use `scripts/run_openrouter_video.py`
-instead of the Seedance runner. This route is still video-only and must not
-change the carousel or Xiaohongshu image workflow. It reads
-`GROK_OPENROUTER_API_KEY`, then `VSR_OPENROUTER_VIDEO_API_KEY`,
-`OPENROUTER_VIDEO_API_KEY`, or `OPENROUTER_API_KEY` from `.env.local` or the
-local environment. Default test settings are model `x-ai/grok-imagine-video`,
-`9:16`, `720p`, `duration: 5`, and `generate_audio: false`. Start with a
-one-second smoke test when spend matters:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_openrouter_video.py --run output/xxx --allow-data-url --duration 1 --resolution 720p --ratio 9:16 --no-generate-audio --output generated/openrouter-grok-1s-test-720p.mp4
-```
-
-## Source capture
-
-For Xiaohongshu, Instagram, or Facebook posts, treat a user-opened logged-in
-browser tab as the preferred source when the page is not publicly readable.
-This skill is browser-assisted, not an anonymous crawler. If the user says the
-post is open in a browser, claim that existing tab with the available Browser or
-Chrome control skill; do not open a duplicate URL, reload the page, or switch
-browsers unless the visible tab cannot be reached.
-
-Before analysis, materialize the source into a local source package, then
-continue through the normal local-folder path. The package must preserve enough
-evidence to resume without the live page:
-
-- `metadata.json` with platform, source URL, page title, author, captured time,
-  detected page count, and ordered media list.
-- `caption.txt` or platform-specific caption files with the visible source
-  copy, hashtags, and date/location when visible.
-- `source_urls.txt` for observed media URLs when available.
-- `images/01.*`, `images/02.*`, ... in source order for every carousel page or
-  video key source frame that can be exported.
-- `screenshot.png` or `screenshots/` as visual proof and fallback when original
-  media cannot be exported.
-
-For carousel posts, verify the visible page count indicator when present (for
-example `1/9`) and preserve that count. Use page assets, visible DOM media URLs,
-or authenticated browser context to export media. If originals are blocked,
-save ordered screenshots of each slide and record the limitation in
-`metadata.json`; do not pretend the original files were downloaded.
-
-For Chinese Xiaohongshu 搬运/remix tasks, guard against source drift before
-analysis. If the user says the original post is already open, use that live tab
-first and capture the ordered source carousel before writing prompts. When the
-user supplies a phone screenshot and says it is for the final page, treat it as
-the final CTA/search/app reference only; do not use it as the main source for
-cover or list pages. Build a source contact sheet, inspect it visually, and map
-each generated page to a specific source page before preparing copy. Do not
-judge Chinese text quality from PowerShell console mojibake; verify Chinese via
-UTF-8 file reads, browser text, OCR, or visual image inspection.
-
-For speed and repeatability, export the browser-observed source data to a JSON
-file and run `scripts/capture_source_package.py`. For Xiaohongshu profile,
-search, or home pages, use `scripts/xhs_browser_capture.mjs` from the browser
-control runtime to search from the Xiaohongshu home page or reuse an open
-profile/search page. Do not manually browse one post at a time to decide
-whether it is usable. First collect and rank visible `/explore/` cards in bulk:
-prefer reusable formats such as recommendations, lists, guides, reviews,
-recipes, tutorials, and "what to buy" posts; reject ads, livestreams, giveaways,
-recruiting, rentals, and obvious commerce-only cards. Open only the highest
-ranked candidate unless the user explicitly names a source. Then save
-`capture.json` and record `observedImageUrls` after the carousel has loaded.
-This lets the package script replace preview URLs such as `nd_prv` with
-higher-quality `nd_dft` URLs when both are visible.
-The helper should use the DOM-first carousel path: collect non-duplicate swiper
-slides in page order without clicking when all pages are present. Fall back to
-one right/left warm-up click when a preview URL needs a higher-quality observed
-match. Use full active-slide clicking only when DOM media is incomplete or the
-preview URL still cannot be upgraded from observed images.
-
-Prefer this JSON shape for carousels so duplicate swiper slides cannot reorder
-the media:
-
-```json
-{
-  "platform": "xiaohongshu",
-  "sourceUrl": "https://...",
-  "title": "...",
-  "author": "...",
-  "description": "...",
-  "pageCount": 6,
-  "slides": [
-    {"indicator": "1/6", "url": "https://..."},
-    {"indicator": "2/6", "url": "https://..."}
-  ]
-}
-```
-
-Then run:
-
-```powershell
-python viral-social-remix/scripts/capture_source_package.py capture.json --output-dir samples/<source-slug>
-```
-
-## Route
-
-Infer source platform and target output platform separately. Source domain,
-page metadata, media dimensions, language, UI traces, and folder naming identify
-the capture workflow; they do not automatically decide the output language or
-publishing target. Load `references/platform-profiles.md`, then load the
-relevant fields from `references/breakdown-schema.md`.
-
-- Xiaohongshu source to English carousel: when the user says English, overseas,
-  搬运, translate, localize, Instagram, or Facebook, treat Xiaohongshu as the
-  source platform only. Preserve the source page count, use natural English,
-  output 1152x1152, and write `caption-en.txt`.
-- Xiaohongshu target carousel: use Chinese, 1152×1536, and `caption-zh.txt` only
-  when the user explicitly asks to publish on Xiaohongshu or produce Chinese
-  Xiaohongshu assets.
-- Instagram/Facebook target carousel: preserve source page count, use natural
-  English, output 1152×1152, and write `caption-en.txt`.
-- Video: identify the target publishing platform and language, then produce a
-  1920×1080 storyboard and 16:9 contact sheet.
-
-- Original cooking video: load `references/cooking-video-workflow.md`, use
-  platform `vertical-video`, prepare a compact three-shot Seedance prompt and
-  real reference asset pack, then hand off to Seedance with
-  `analysis/seedance-prompt.md`. Use `9:16`; do not reuse carousel sizing.
-
-## Analyze
-
-For image posts, preserve source page count and assign each page a role. Record
-composition, subject, text hierarchy, palette, hook, transition, and replacement
-mapping.
-
-For each source image, preserve that image's own format. Do not force a format
-learned from a different page onto the current page. If the source page is an
-8-combo cover, localize it as one 8-combo cover. If it is an app-entry guide,
-localize it as an app-entry guide. If it is a ranked list, recipe step, product
-comparison, tutorial, quote card, or detail page, preserve that exact page role,
-count, layout logic, and copy rhythm.
-
-For commerce-oriented image/carousel work, the final shopping guide is
-mandatory unless the user explicitly waives it. If the source/original contains
-a final app-entry, category, search, or purchase guide page, preserve that page
-role and layout structure in English-region output. Use real English app/search
-screenshots inside the phone/app area when supplied, and use the English-region
-`ASIAN GROCER ONLINE powered by UMALL` logo. Do not simply paste a raw phone
-screenshot as the whole page, do not forget this page, and do not invent prices,
-product cards, UI, or unrelated CTA copy. If the search/app screenshot needed
-for the final page is missing, ask for it before declaring the carousel done.
-
-For cross-platform localization, translate and rewrite the source post's own
-visible copy and caption into natural target-platform language. Do not invent a
-new marketing angle when the source copy already provides the angle. Keep the
-source meaning, claims, examples, warnings, and sequence; localize wording,
-brand, products, units, and platform tone only. If source text is unreadable or
-missing, mark the gap in `analysis/copy.md` and infer conservatively from the
-visible page, instead of writing unrelated promotional copy.
-
-For the first creative draft, do not decompose one source poster into many
-separate generated sub-assets unless the user explicitly asks for that. Use the
-source page itself as the main structural reference and make one localized
-version of that page first. Only split into ingredient cutouts, product cards,
-or local overlays after the whole-page direction is accepted or when the user
-asks for a production-accuracy pass.
-
-For video, run `scripts/extract_keyframes.py` to export candidate frames. Inspect
-the candidates and select exactly nine timestamps mapped to Hook, setup, pain,
-product, mechanism, benefit, proof, result, and CTA. Export those selected
-frames. Do not treat evenly spaced candidates as the final narrative selection.
-
-For original cooking videos, do not run keyframe extraction. Load
-`references/cooking-video-workflow.md`. Plan the recipe with the fixed
-ingredient/product close-up -> cooking process -> plated finished dish arc, then
-compress it into three ordered Seedance shots for a 5-6s preview:
-opening setup, middle cooking transformation, and final texture/plating/hero.
-Use `[0-2s]`, `[2-4s]`, and `[4-6s]` only as soft pacing labels; do not hard
-force exact timing unless the user is testing timing obedience. Record cooking
-state, one camera movement per shot, motion intent, continuity anchors,
-reference assets, product/brand cue, voiceover/audio plan, and text policy. Keep
-the same kitchen, cookware, dish, lighting, product packaging, and physical
-brand prop across the whole video.
-
-Preserve source composition, hierarchy, rhythm, and copy structure while
-replacing the product, brand, and specific expression.
-
-For a Xiaohongshu source whose hook is a first-person return report, hidden
-detail, candid warning, concrete mistake, or exact cost, classify it as
-`real-talk` and load `references/xiaohongshu-real-talk-template.md`. Apply its
-structure only when the source evidence supports it; never invent first-hand
-experience for the user.
-
-For an Instagram/Facebook source whose hook is a ranked list, pantry essential,
-haul, restock, or "what to buy" post, classify it as `pantry-essentials` and
-load `references/instagram-pantry-essentials-template.md`. Preserve the
-education-first rhythm: one item per page, one practical use case, and one soft
-brand reason.
-
-## Prepare the run
-
-Run `scripts/create_run_dir.py` so each task writes to a new local-system-time
-directory. Follow `references/output-schema.md`; never overwrite a previous run.
-
-For original cooking videos, use the no-source preparation path:
-
-```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_pipeline.py prepare-original-video --brief "brand/product/dish brief" --task-name vertical-cooking-video
-```
-
-Before generation, write:
+Required analysis files:
 
 - `analysis/breakdown.md`
 - `analysis/copy.md`
 - `analysis/prompts.md`
-- `analysis/page-prompts/page-XX.md` for every carousel page
-- `analysis/manifest.json` using `scripts/manifest.py`
-- `analysis/caption-zh.txt` for Xiaohongshu
-- `analysis/caption-en.txt` for Instagram/Facebook
+- `analysis/page-prompts/page-XX.md`
+- `analysis/manifest.json`
+- the required `caption-zh.txt` or `caption-en.txt`
 
-Prefer using `scripts/prepare_remix_run.py` to create these files when the task
-starts from local indexed examples and brand assets.
+Run `scripts/validate_prepared_run.py` before paid generation.
 
-For commerce-oriented carousels, include the final shopping guide page in those
-files as a normal deliverable page. Record the source reference screenshot(s),
-the English-region logo asset, and whether the page was API-generated or a
-deterministic reference-based composite. The final contact sheet must show this
-shopping guide page before the run is reported complete.
+## 5. Carousel workflow
 
-For video, write the caption file required by its target publishing platform.
-The caption must be ready to paste into the platform, including a hook, body,
-CTA, and relevant hashtags. Keep the Chinese natural for Xiaohongshu and the
-English natural for Instagram/Facebook.
+Preserve each source page's role, layout logic, copy meaning, and page count.
+For commerce posts, retain the final shopping/search guide unless the user
+waives it. Use real supplied UI/screenshots; do not invent prices, products, or
+app screens.
 
-For Xiaohongshu source posts remixed into English, write `caption-en.txt`; do
-not write or require `caption-zh.txt` unless the target output is explicitly
-Chinese Xiaohongshu.
+Load `references/prompt-patterns.md` and
+`references/image-provider.md`. Resolve the provider through
+`scripts/image_provider.py`. GPT Image 2 production uses the configured image
+API; `openai/gpt-5.4-image-2` remains the explicit legacy chat-completions
+route. If a warehouse scene is required, load
+`references/fixed-brand-scenes.md`.
 
-For original cooking videos, also write `analysis/brief.md`,
-`analysis/shot-list.md`, and `analysis/seedance-prompt.md`. The shot list should
-use three ordered Seedance shots by default. Put GPT Image 2 storyboard prompts
-in `analysis/page-prompts/` only when a still-reference or legacy nine-frame
-storyboard route is explicitly selected.
-
-When visible packaged products matter, load
-`references/product-reference-cache.md` and use cached or official SKU images
-before image generation.
-
-## Generate
-
-Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
-the redacted provider defaults with `scripts/image_provider.py`, but do not call
-OpenRouter directly from Codex for carousel generation. Default local runner
-configuration is OpenRouter's dedicated Images API with `openai/gpt-image-2` at
-medium quality when `OPENROUTER_API_KEY` is available in the user's
-`.env.local` or environment. Treat this as the GPT Image 2 generation path for
-carousel assets. The legacy chat-completions image route is available only when
-explicitly requested with `--api-mode chat_completions --model
-openai/gpt-5.4-image-2`.
-
-When a generated scene includes an Umall warehouse or fulfilment background,
-load `references/fixed-brand-scenes.md` and use its warehouse image as the
-mandatory scene reference. Do not invent or substitute a different warehouse.
-
-Write one complete prompt per page in `analysis/page-prompts/page-XX.md`.
-Generate the exact Chinese or English text directly in the image; do not default
-to local text overlay. Use each source page or selected source frame as a
-structural reference while locking product, packaging, recurring people, palette,
-lighting, and typography across the group.
-
-For `vertical-video`, override the general image-text rule: every generated
-reference still and the final video prompt must say no visible text, no
-subtitles, no title cards, no lower-thirds, and no ingredient labels. Company
-logos/signage/packaging may appear only as real physical props in the scene. For
-English-region output, use the `ASIAN GROCER ONLINE` physical prop with
-`powered by UMALL`; reserve the Chinese-region UMALL logo for Chinese-region or
-Chinese Xiaohongshu deliverables.
-
-For carousel output, instruct the user to run the local API-only runner:
+When the image API is available, run it; do not stop at writing prompts:
 
 ```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/<run> --api-only --concurrency 2
 ```
 
-The runner saves `raw/page-XX-response.json`, `generated/page-XX.png`, and
-`qa/openrouter-cost.json`. It uses at most two concurrent requests, defaults
-carousel generation to OpenRouter's `/api/v1/images` endpoint with the target
-aspect ratio, skips pages already generated at the correct platform size,
-updates `analysis/manifest.json`, and stops on the first missing-page API
-failure when `--api-only` is set. There is no local-composite fallback in
-API-only mode.
+## 6. Original cooking commercial: fixed contract
 
-For legacy English vertical storyboard output, use the same local runner on a
-platform `vertical-video` manifest:
+Load `references/cooking-video-workflow.md`. Do not load the general
+`references/seedance-video.md` unless the runner/API needs troubleshooting; its
+provider examples do not override this production contract.
+
+The production unit is:
+
+`9 individual storyboard frames -> 3 groups -> 3 silent Seedance clips of 6s -> ChatCut finish at the natural coherent duration`
+
+Hard rules:
+
+1. Use our configured image API to generate all nine individual
+   `1080x1920` storyboard frames. Do not send a text-only prompt directly to
+   Seedance.
+2. Create frame 01 from the product, official logo, and art direction.
+   Generate every later frame by editing the previous frame while reusing the
+   same product and logo references. Lock the kitchen, pan, hands, clothing,
+   lighting, dumpling shape/count, packaging, and camera language.
+3. Draw the official `ASIAN GROCER ONLINE` with small `powered by UMALL`
+   directly on the same company table sign as a real physical prop in the
+   storyboard. Use
+   `viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
+   Do not substitute the Chinese-region UMALL logo. The physical sign is
+   established during storyboard generation, not added as a default floating
+   post overlay.
+4. Produce nine separate PNGs; the 3x3 contact sheet is review-only.
+5. Submit exactly three ordered storyboard images per Seedance request:
+   frames `01-03` -> clip 1, `04-06` -> clip 2, `07-09` -> clip 3.
+   Each clip is 6 seconds, `9:16`, `1080p`, and `generate_audio: false`.
+6. Never send one frame per clip, all nine frames to one request, or only one
+   three-frame request for the whole commercial.
+7. In ChatCut, place the three clips in order. If the 18-second sequence is
+   coherent, keep it; trim only failed motion, repeated action, or dead time.
+   Never force the edit to 15 seconds.
+8. Add the user's recorded Voiceover. Generate the BGM and cooking SFX
+   yourself, then place and mix them as separate editable tracks.
+9. Add editable English captions that state the current cooking step. Put each
+   caption in the visual center of the video, white, with a subtle dark
+   stroke/shadow and no colored box. Time captions to the actual action.
+10. No face. Storyboards and Seedance output enforce `no visible text`: no
+   generated subtitles, title cards, lower-thirds, labels, watermarks, or other
+   added text. Product packaging and the real logo sign remain allowed scene
+   objects. Final step captions are added only in ChatCut.
+
+Prepare the run with:
 
 ```powershell
-.\.venv\python.exe viral-social-remix\scripts\run_openrouter_carousel.py --run output/xxx --api-only --concurrency 2
+.\.venv\python.exe viral-social-remix\scripts\run_pipeline.py prepare-original-video --brief "brand/product/dish brief" --task-name cooking-commercial
 ```
 
-For legacy `vertical-video` storyboards, the runner uses OpenRouter's dedicated Image API with
-`openai/gpt-image-2` and a portrait intermediate size, then locally reframes the
-delivered storyboard files to final `1080x1920`. Do not reuse square carousel
-sizing for this video route. It saves `generated/page-01.png` through
-`page-09.png` at 1080x1920 and writes a vertical 3x3
-`overview/contact-sheet.png`. After visual review, load
-`references/seedance-video.md` and hand off to `scripts/run_seedance_video.py`.
-For cheaper Grok testing, load `references/openrouter-video.md` and hand off to
-`scripts/run_openrouter_video.py`; keep the storyboard image generation path
-unchanged.
+After the nine frames validate, dry-run and then submit each group separately:
 
-## Validate and resume
-
-Visually review every generated image for product fidelity, brand spelling,
-product spelling, numbers, language, CTA, anatomy, perspective, and continuity.
-Run `scripts/validate_output.py asset` for deterministic per-asset checks and
-retry only failed assets. For API-only carousel runs, do not use local text
-overlay as a fallback.
-
-Build the carousel overview or legacy nine-frame storyboard with
-`scripts/make_contact_sheet.py`, then run `scripts/validate_output.py delivery`
-to write `qa/validation.json` and check the complete delivery contract. After
-successful local runner completion, confirm its generated
-`overview/contact-sheet.png`, `qa/validation.json`, and any
-`qa/openrouter-cost.json`. On restart, read the manifest and skip assets already
-marked `validated` or already present at the correct generated size.
-
-After a successful source collection run, register the result into the local
-material index:
-
-```bash
-python viral-social-remix/scripts/collect_source_assets.py --platform rednote --run-dir output/<run>
-python viral-social-remix/scripts/collect_source_assets.py --platform instagram --run-dir output/<run>
-python viral-social-remix/scripts/collect_source_assets.py --platform brand-site --run-dir output/<run>
+```powershell
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/<run> --storyboard-group 1 --allow-data-url --dry-run
+.\.venv\python.exe viral-social-remix\scripts\run_seedance_video.py --run output/<run> --storyboard-group 1 --allow-data-url --approve-final-spend
 ```
 
-For official brand-site assets, run
-`scripts/enrich_brand_assets.py --run-dir output/<run>` before registering the
-run. This creates `brand_asset_catalog.json` with searchable `title`, `tags`,
-`use_case`, and `quality` fields, then `collect_source_assets.py` will ingest
-those enriched fields.
+Repeat only the group number for groups 2 and 3. The runner selects `01-03`,
+`04-06`, or `07-09` and writes separate clip, request-lock, and QA files.
 
-Keep `data/material-index.jsonl` local and ignored by Git. Commit the collector
-script and workflow documentation, not downloaded media or private indexes. The
-collector writes stable `record_id` values and skips duplicates when the same
-run is registered again.
+Use `scripts/run_openrouter_carousel.py` for the nine storyboard images and
+`scripts/run_seedance_video.py` for Seedance. Use
+`scripts/run_openrouter_video.py` only for an explicitly selected Grok test.
+Load `references/openrouter-video.md` for the Grok route.
 
-For commerce/image carousel runs, visually confirm the final shopping guide
-page exists in `overview/contact-sheet.png`. It should follow the original guide
-page's structure when one exists, use English-region branding, and contain real
-app/search/category UI instead of invented screenshots. If it is missing, the
-carousel is not finished.
+## 7. Validate and finish
 
-For Seedance output, check `qa/seedance-video.json`, confirm
-`generated/seedance-video.mp4` exists, then run
-`scripts/video_qa.py prepare output/<run>`. Review
-`qa/video-review-strip.jpg` for cooking continuity, food state changes,
-product/brand fidelity, unsafe actions, absence of subtitles/on-screen text,
-duration, aspect ratio, and platform fit. Record `approve` or `reject --reason`;
-only `video_workflow.status: visual_qa_passed` may proceed to ChatCut/export.
-Voiceover is acceptable in an audio-enabled final; burned-in subtitles are not.
-After ChatCut export, run `scripts/video_qa.py prepare-export` against the
-actual final file and record `approve-export` or `reject-export --reason`.
-Delivery is complete only at `video_workflow.status: export_qa_passed`.
+Run `scripts/validate_output.py` and visually inspect the contact sheet. Retry
+only failed assets.
 
-For OpenRouter Grok video output, check `qa/openrouter-video.json`, confirm the
-configured MP4 exists, and verify duration, 720x1280 or chosen resolution,
-9:16 framing, no subtitles/on-screen text, and enough cooking continuity for a
-cheap preview. Use the Grok path for quick smoke tests or draft previews; use
-Seedance when higher-fidelity 1080p food motion is required.
+For each generated video, inspect representative frames and run
+`scripts/video_qa.py prepare`; record `approve` or `reject --reason`. Do not
+send rejected clips to ChatCut.
 
-## Boundaries and recovery
+After ChatCut export, run `scripts/video_qa.py prepare-export`, inspect the
+actual final file, then record `approve-export` or `reject-export --reason`.
+Check duration, aspect ratio, continuity, food state, hand anatomy, exact
+product/logo fidelity, audio balance, and audio tail.
 
-Do not bypass login or anti-scraping restrictions. If a post URL cannot be read
-anonymously but the user can open it in a logged-in browser, use the source
-capture workflow above. If no readable browser tab, upload, or local folder is
-available, ask the user to open the post in a controllable browser or provide a
-local source package. Continue past damaged files while recording their errors.
-Do not reproduce source watermarks, unauthorized logos, or a real person's
-identity. Keep final deliverables in the project workspace.
+Write `output/<run>/qa/run-notes.md` from the memory template only after a
+successful run. Distill only reusable lessons; never store keys, raw provider
+responses, signed URLs, or base64 payloads in Obsidian.
+
+## 8. Boundaries
+
+Do not bypass authentication or anti-scraping controls. Do not reproduce source
+watermarks, unauthorized logos, or real-person identity. If API access is
+blocked, finish the resumable run package and give the exact local command
+instead of inventing a fallback result.

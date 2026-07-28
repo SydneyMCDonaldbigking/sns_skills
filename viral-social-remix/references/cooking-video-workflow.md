@@ -1,134 +1,149 @@
 # Cooking Video Workflow
 
-Use this reference when the user asks for an original cooking, recipe, stir-fry,
-meal-prep, sauce, pantry, or kitchen-process video instead of remixing an
-existing source post.
+Use this reference for original no-face cooking commercials.
 
-## Creative Contract
+## Fixed production contract
 
-Create one coherent short English vertical cooking video from a
-brand/product/recipe brief. The required structure is fixed:
-ingredients/product close-ups -> cooking process -> plated finished dish with a
-company table sign, logo prop, or packaging. The preferred Seedance 2.0 path is
-a compact multimodal prompt with a small set of real references, not a forced
-nine-still storyboard. Use product/package images, an English-region physical
-logo/sign reference, and a source/motion reference video when available; then
-ask Seedance to generate the final `9:16` cooking video with three ordered shot
-beats.
+The recipe arc is:
 
-The output should feel like a real social cooking clip, not a slideshow. Keep
-food physics, heat, steam, oil, sauce thickness, utensil movement, and ingredient
-state changes plausible.
+`ingredients/product close-ups -> cooking process -> plated finished dish`
 
-The final video must be Douyin/TikTok vertical at `9:16`. If reference stills
-are generated for this route, they must be portrait `1080x1920` and must not
-reuse square carousel sizing.
+The generation chain is:
 
-## Recipe Beat Map
+`9 separate storyboard PNGs -> 3 groups of 3 frames -> 3 silent Seedance clips x 6s -> ChatCut finish at the coherent duration`
 
-Use these nine beats as planning material for the recipe logic. Do not force
-all nine beats into a 5-6 second Seedance clip.
+Each 6-second Seedance clip gets exactly three ordered storyboard images:
 
-01 Ingredient, seasoning, and product close-up on a clean prep table; company logo/signage or packaging may appear only as a real physical prop.
-02 Main ingredient prep or cutting.
-03 Cookware, hot oil, and aromatics starting.
-04 Main ingredient goes into the pan.
-05 Core cooking action: stir-fry, sear, simmer, or boil.
-06 Seasoning, sauce, or product is added to show the flavor mechanism.
-07 Doneness and texture close-up proving the dish is appetizing.
-08 Plating process.
-09 Finished dish hero shot with company table sign, logo prop, or packaging beside it; no visible subtitles or on-screen text.
+- Frames `01-03` -> clip 1: product hook and pan setup.
+- Frames `04-06` -> clip 2: fry, steam, and browning.
+- Frames `07-09` -> clip 3: reveal, plating, and brand hero.
 
-## Preferred 6-Second Seedance Shot Plan
+Never use one frame per clip, one three-frame request for the whole commercial,
+or all nine frames in one Seedance request.
 
-For a short Seedance preview, compress the recipe beat map into three soft
-shots. Use timing labels only as pacing guidance:
+## Draw the nine frames
 
-Shot 1, opening third / approximately 0-2s: ingredient, seasoning, product, and
-physical brand prop close-up in one clean cooking setup; begin the first food
-action.
+Use the configured image API, normally GPT Image 2, to create nine individual
+portrait images at `1080x1920`. The contact sheet is only for human review; it
+is not a Seedance input.
 
-Shot 2, middle third / approximately 2-4s: main cooking transformation, such as
-oil shimmering, aromatics blooming, ingredient entering the pan, sauce pouring,
-or a gentle stir-fry. Use one camera movement only.
+Frame 01 establishes the visual world from the product image, official logo,
+and art direction. Create frames 02-09 as controlled edits of the preceding
+frame while also supplying the product and official logo references. Keep the
+same:
 
-Shot 3, final third / approximately 4-6s: appetizing texture close-up, plating,
-or finished dish hero. The physical English-region logo/sign/packaging may
-appear beside the dish. Hold the final hero long enough for review.
+- kitchen surface, pan, plate, light direction, and color grade;
+- hand model, sleeves, skin tone, and manicure;
+- dumpling shape, scale, count, and cooked-state progression;
+- product package, tabletop sign, and camera language.
 
-For this original vertical video route, do not put any text in the generated
-frames or final video: no subtitles, captions, title cards, lower-thirds, labels,
-or ingredient callouts. Write any platform caption, script, or voiceover plan in
-natural English outside the video file. Voiceover and natural cooking audio are
-allowed when the selected video model supports audio.
+Do not show a face. Hands and torso below the shoulders are allowed.
 
-Company branding may appear in frames 01 and 09 only as a real object in the
-scene: a table sign, printed logo prop, product packaging, apron patch, or
-similar physical item. Do not turn the logo into a screen subtitle, floating
-sticker, overlay, or ad banner.
+Use this nine-frame story:
 
-For English-region cooking videos, the physical brand prop must use the
-`ASIAN GROCER ONLINE` lockup with small `powered by UMALL`, from
-`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
-Do not use the Chinese-region UMALL logo in English-region videos. The logo's
-real printed lockup is allowed only as part of the physical prop; no added
-subtitles, ingredient labels, title cards, lower-thirds, stickers, or screen
-text are allowed.
+01 Ingredient, seasoning, and product close-up; frozen dumplings and package,
+with the physical company table sign already present.
 
-Important brand-fidelity rule: do not expect a video model to redraw the exact
-company logo. Product packaging may be generated from references. When final
-brand accuracy matters, composite the official PNG onto a real scene surface
-in ChatCut/post as a perspective-matched table card, package face, sign, or
-other physical prop. Preserve scene perspective, motion tracking, occlusion,
-lighting, and texture so it remains part of the photographed world. A clean
-brand end card is a separate explicit strategy. Never solve logo accuracy with
-a floating corner bug or sticker-like overlay. AI-rendered physical logo signs
-are acceptable only for rough review, and fail QA if the logo shape or wording
-does not match the source asset.
+02 The same hands arrange dumplings in the same pan.
 
-## Storyboard Image Prompt Rules
+03 Oil begins to sizzle; low macro angle, first appetizing movement.
 
-Use this section only when still reference frames are needed. The default
-Seedance 2.0 route should use a compact prompt plus real product/logo/motion
-references.
+04 Water enters the pan and steam rises naturally.
 
-Each `analysis/page-prompts/page-XX.md` prompt should specify vertical
-composition at `1080x1920`:
+05 The same lid covers the pan; condensation and heat are plausible.
 
-- Continuity anchors: dish, kitchen, cookware, surface, lighting, plate, product packaging, hand model if used.
-- The frame's exact cooking state and food transformation.
-- Camera: angle, lens feel, motion intention for Seedance, and whether it is a macro, overhead, medium, or hero shot.
-- Text: always "no in-image text".
-- Negative constraints: no subtitles, captions, title cards, lower-thirds,
-  labels, floating logo overlays, sticker-like ad badges, impossible ingredient
-  jumps, extra brand names, deformed hands, floating utensils, or unreadable
-  packaging.
+06 Lid lifts to reveal cooked dumplings; steam direction remains consistent.
 
-Prefer one consistent kitchen environment over unrelated beauty images.
-Lock recurring props and packaging. Avoid fake flames, unsafe handling, and
-unrealistic amounts of steam or splatter.
+07 Dumplings turn to reveal an even golden crisp base.
 
-## Seedance Prompt Rules
+08 The same hands plate the dumplings with a clean, controlled motion.
 
-Write `analysis/seedance-prompt.md` as one direct video-generation prompt:
+09 Finished dish hero shot with company table sign and product package.
 
-- Start with the finished intent: dish, platform, pacing, visual style, and duration.
-- Specify vertical short-video delivery: `9:16`, `1080x1920` storyboard,
-  usually 5s for the first pass.
-- Include three shot beats in order for a 5-6s preview. Use the nine recipe
-  beats only as source planning.
-- Describe one camera movement per shot: fixed close-up, slow push-in, smooth
-  lateral tracking, overhead cut, gentle handheld follow, or final hold.
-- Ask for continuity across cookware, ingredients, product packaging, lighting,
-  and physical brand prop.
-- Refer to manifest assets with semantic placeholders such as
-  `{{ref:product-pack}}`; let the runner compile them to `[Image 1]`,
-  `[Video 1]`, and other final provider labels.
-- Specify realistic food physics and avoid sudden ingredient teleporting.
-- Forbid all visible text overlays and subtitles. If narration is useful,
-  include an English voiceover plan or voiceover tone, but keep the video image
-  clean.
+Every frame prompt must name its prior-frame reference, product reference, logo
+reference, unchanged continuity anchors, exact new food state, camera framing,
+and what must not change. Describe only one meaningful action change per frame.
 
-Do not ask Seedance to invent a different recipe after reference assets have
-been selected. The Seedance prompt should animate the chosen product, logo,
-food, and motion references.
+## Logo as a photographed prop
+
+Use:
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`
+
+The sign must show the English-region lockup `ASIAN GROCER ONLINE` with small
+`powered by UMALL`. Do not use the Chinese-region UMALL logo.
+
+Draw it during storyboard generation as one real physical prop: a small
+premium printed tabletop card on the cooking surface. Keep its proportions,
+wording, placement, material, perspective, lighting, contact shadow, and
+occlusion consistent. It must not become a floating corner logo, screen
+overlay, sticker, subtitle, or end-card graphic.
+
+Place the same sign visibly in at least one anchor of every three-frame group,
+and in frame 09. If the logo is misspelled or the sign changes identity, reject
+and regenerate that storyboard frame before calling Seedance. Perspective or
+occlusion may change naturally with the camera; the prop identity may not.
+
+## Image prompt skeleton
+
+Write one prompt per file in `analysis/page-prompts/page-XX.md`:
+
+```text
+Create storyboard frame XX of 09, vertical 1080x1920, premium no-face food
+commercial. Edit the supplied previous frame; also use the supplied product and
+official logo references.
+
+UNCHANGED: [kitchen, pan, hands/sleeves, lighting, dumpling count/shape,
+package, physical tabletop logo sign, color grade].
+CHANGE ONLY: [one cooking action or food-state transition].
+CAMERA: [shot size, angle, lens feel, static or one simple move intention].
+LOGO PROP: preserve the exact ASIAN GROCER ONLINE / powered by UMALL printed
+tabletop sign as a real object with correct perspective, shadow, and occlusion.
+NEGATIVE: face, extra fingers, warped utensils, floating objects, invented
+packaging, impossible food physics, text overlays, subtitles, captions, title
+cards, lower-thirds, labels, watermarks, or any additional brand.
+```
+
+Product-package text and the exact printed logo on the real sign are allowed.
+All other visible text is forbidden: no subtitles, captions, title cards, lower-thirds, labels, or watermarks.
+
+## Seedance requests
+
+Use image-to-video with three ordered input frames per request. Treat them as
+start, middle, and end anchors for one continuous six-second action.
+
+For every request:
+
+- duration: `6s`
+- aspect ratio: `9:16`
+- resolution: `1080p`
+- audio: off / `generate_audio: false`
+- continuity: preserve the supplied people-free set, food, package, and sign
+- motion: natural hands, oil, steam, lid, utensils, and food physics
+- camera: one restrained commercial movement; no scene teleporting
+
+Do not ask Seedance to invent text, narration, music, or a new logo.
+
+## ChatCut finish
+
+Import the three accepted clips as separate editable items in order. If all
+three clips join coherently, preserve the full sequence even when it is close
+to 18 seconds. Trim only failed motion, duplicated action, awkward joins, or
+dead time; never force the edit to 15 seconds.
+
+Add these as separate editable tracks:
+
+- the user's recorded English voiceover;
+- commercial BGM generated by the agent;
+- frying, sizzling, steam, lid, plating, and plate-contact SFX generated by
+  the agent.
+
+Add editable English step captions describing the action currently visible,
+for example `PAN-FRY`, `ADD WATER`, `COVER & STEAM`, and `CRISP & SERVE`.
+Place them at the visual center of the video in white, with a subtle dark
+stroke or shadow, no colored box, and exact timing to the cooking step.
+
+The no-text rule applies to storyboard and Seedance generation. These required
+step captions are created only in ChatCut, so they remain editable.
+Finish only after visual QA confirms continuity, food progression, hand anatomy,
+package fidelity, exact logo-sign fidelity, duration, framing, and a clean audio
+tail.

@@ -41,11 +41,22 @@ After video generation finishes:
    voiceover, overlays, transitions, or effects unless the user explicitly asks.
 9. Verify the timeline state and return the editor URL for review.
 
+For the company `storyboard-three-clips` cooking route, the finishing contract
+is already explicit: keep the coherent full sequence rather than forcing 15s;
+trim only defects, repetition, awkward joins, or dead time. Add the user's
+voiceover, generate and mix BGM plus cooking SFX, and add editable English
+current-step captions in the visual center—white with a subtle dark
+stroke/shadow and no colored box.
+
 When exact logo placement is requested under
 `post-composited-physical-prop`, place and track the official PNG onto an actual
 scene surface with matching perspective, occlusion, lighting, and texture. Do
 not add it as a floating corner logo. `clean-end-card` is a different explicit
 strategy and should not be silently substituted.
+
+For `storyboard-three-clips`, the official logo tabletop sign was already drawn
+into the nine storyboard frames. Preserve it; do not add or replace it in
+ChatCut unless visual QA explicitly requests a repair.
 
 After export, run `scripts/video_qa.py prepare-export` on the exact delivered
 file, inspect the export review strip, and record `approve-export` or

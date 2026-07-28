@@ -48,16 +48,15 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 ## Video Chain
 
-For original cooking video work, the memory chain is:
+For original cooking video work, read only:
 
-1. [[original-cooking-video]]
-2. [[aesthetic-library/no-face-asian-cooking-style]]
-3. [[seedance-video-generation]]
-4. [[seedance-official-prompting]]
-5. [[openrouter-grok-video-generation]] when a low-cost 720p smoke test is
-   requested
-6. [[chatcut/README|ChatCut editing memory]]
-7. [[chatcut-handoff-workflow]]
+1. [[original-cooking-video]] for the current company contract.
+2. [[aesthetic-library/no-face-asian-cooking-style]] only when defining a new
+   visual direction.
+3. [[chatcut-handoff-workflow]] after the three Seedance clips pass review.
+
+Provider research remains available in [[seedance-video-generation]] and
+[[seedance-official-prompting]], but it does not override the company contract.
 
 Do not treat Seedance as the end of the workflow when the user is talking about
 剪辑, 串视频, BGM, subtitles, labels, review, or export.
@@ -105,10 +104,11 @@ a generic CTA.
 - 2026-07-26: Clear the saved image/carousel taste library. For graphically
   designed posts, reference the original/source or a chosen competitor post
   directly instead of improvising a house style from memory.
-- 2026-07-28: Official Seedance 2.0 guidance favors compact timeline shots over
-  over-detailed still storyboards. For 6s cooking tests, use three soft shot
-  beats, more real product/logo references, one camera move per shot, and no
-  hard second-level timing unless the user explicitly wants a timing experiment.
+- 2026-07-28: Company cooking-commercial production overrides the earlier
+  compact-prompt experiment: draw nine API storyboard frames, group them
+  `01-03`, `04-06`, and `07-09`, then give exactly three ordered frames to each
+  silent 6s Seedance request. Establish the real English logo tabletop sign in
+  those storyboard images before video generation.
 - 2026-07-28: A ChatCut theme is not a font/filter preset. Teach execution
   models each theme as audience promise + emotion + rhythm + proof, and force
   Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export

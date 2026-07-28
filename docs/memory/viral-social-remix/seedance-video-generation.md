@@ -52,10 +52,11 @@ Use semantic prompt placeholders such as `{{ref:product-pack}}`. The runner
 compiles them to the final provider order (`[Image 1]`, `[Video 1]`) and rejects
 unknown, missing, or `@Image1` references before spending money.
 
-`--include-all-frames` remains only for the legacy 9-frame cooking storyboard
-route. For new Seedance 2.0 cooking tests, prefer the official compact prompt
-style in [[seedance-official-prompting]]: 3 soft shot beats, 3-5 real reference
-assets, and one camera movement per shot.
+For the current company cooking-commercial route, use the nine generated
+storyboard frames in three fixed groups: `01-03`, `04-06`, and `07-09`.
+Every 6s Seedance request receives exactly one group of three ordered images.
+The compact-prompt notes below remain provider research, not the active company
+production contract.
 
 Profiles make intent explicit:
 
@@ -161,7 +162,8 @@ For cooking video prompts:
 - Repeat the no-visible-text policy in the Seedance prompt.
 - Prefer controlled, small motions: steam, gentle stirring, sauce pour,
   spooning into a bowl.
-- For a 6-second test, use three soft shots rather than nine forced beats.
+- For a company cooking commercial, use three storyboard anchors for that
+  6-second clip; do not send all nine frames to one request.
 - Avoid asking for too many distinct actions in 5 seconds unless the visual
   references already make the progression obvious.
 

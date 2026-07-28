@@ -38,9 +38,15 @@ DEFAULT_SIZES = {
     "vertical-video": "1080x1920",
 }
 FIXED_COOKING_SHOTS = [
-    "Shot 1, opening third / approximately 0-2s: ingredient, seasoning, product, and physical brand prop close-up in one clean cooking setup; begin the first food action. Use one camera movement only.",
-    "Shot 2, middle third / approximately 2-4s: main cooking transformation such as oil shimmering, aromatics blooming, ingredient entering the pan, sauce pouring, or gentle stir-fry. Use one camera movement only.",
-    "Shot 3, final third / approximately 4-6s: appetizing texture close-up, plating, or finished dish hero with the physical English-region logo/sign/packaging beside the dish. Hold the final hero. No visible subtitles or on-screen text.",
+    "Clip 1 / frames 01-03 / 6s: product hook, dumplings arranged in the pan, first sizzle.",
+    "Clip 2 / frames 04-06 / 6s: water and steam, lid/condensation, cooked reveal.",
+    "Clip 3 / frames 07-09 / 6s: golden-base reveal, plating, finished hero.",
+    "",
+    "Generate nine separate 1080x1920 storyboard PNGs with the configured image API.",
+    "Each later frame edits the preceding frame while reusing product and official logo references.",
+    "Give Seedance exactly three ordered frames per request: 01-03, 04-06, then 07-09.",
+    "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
+    "Keep the same no-face hands, sleeves, kitchen, pan, light, dumplings, package, and physical logo tabletop sign.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -165,10 +171,6 @@ def _asset_ids(platform: str, files: list[Path]) -> list[str]:
     return [f"{index:02d}" for index in range(1, count + 1)]
 
 
-def _compact_video_asset_ids() -> list[str]:
-    return ["01", "02", "03"]
-
-
 def _caption_language(platform: str, value: str | None) -> str:
     if value:
         return value
@@ -184,59 +186,59 @@ def fixed_cooking_shot_list() -> str:
     return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
 
 
-def _mark_compact_reference_mode(
+def _mark_three_clip_storyboard_mode(
     manifest_path: Path,
-    references: list[dict] | None = None,
+    storyboard_references: list[dict] | None = None,
 ) -> None:
     data = manifest.load(manifest_path)
     data["schema_version"] = 2
-    data["video_mode"] = "compact-reference"
+    data["video_mode"] = "storyboard-three-clips"
+    data["storyboard_references"] = storyboard_references or []
     data["video"] = {
-        "mode": "compact-reference",
-        "profile": "visual-preview",
-        "references": references or [],
-        "shots": [
+        "mode": "storyboard-three-clips",
+        "profile": "final-clip",
+        "clip_groups": [
             {
-                "id": "shot-01",
-                "soft_timing": "opening-third",
-                "narrative_role": "ingredient/product setup and first food action",
-                "camera_motion": "one controlled movement",
+                "id": "clip-01",
+                "frames": ["01", "02", "03"],
+                "duration": 6,
             },
             {
-                "id": "shot-02",
-                "soft_timing": "middle-third",
-                "narrative_role": "main cooking transformation",
-                "camera_motion": "one controlled movement",
+                "id": "clip-02",
+                "frames": ["04", "05", "06"],
+                "duration": 6,
             },
             {
-                "id": "shot-03",
-                "soft_timing": "final-third",
-                "narrative_role": "texture, plating, or finished hero",
-                "camera_motion": "final hold or one controlled movement",
+                "id": "clip-03",
+                "frames": ["07", "08", "09"],
+                "duration": 6,
             },
         ],
-          "generation": {
+        "generation": {
             "ratio": "9:16",
-            "duration": 5,
+            "duration": 6,
             "resolution": "1080p",
             "generate_audio": False,
             "return_last_frame": True,
-              "watermark": False,
-          },
-          "delivery": {
-              "ratio": "9:16",
-              "resolution": "1080p",
-              "duration": None,
-              "expect_audio": None,
-              "text_policy": "editable-post-only",
-          },
+            "watermark": False,
+        },
+        "delivery": {
+            "ratio": "9:16",
+            "resolution": "1080p",
+            "target_duration": None,
+            "duration_policy": "preserve coherent sequence; trim only defects, repetition, awkward joins, or dead time",
+            "expect_audio": True,
+            "audio_policy": "user voiceover plus agent-generated BGM and cooking SFX",
+            "text_policy": "editable white centered current-step captions in ChatCut",
+        },
         "continuity": {
             "last_frame_path": None,
             "available": False,
         },
         "brand": {
-            "strategy": "post-composited-physical-prop",
-            "visible_text": "none",
+            "strategy": "storyboard-physical-prop",
+            "asset": "viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png",
+            "visible_text": "physical-prop-only",
         },
         "budget": {
             "retry_limit": 1,
@@ -249,11 +251,16 @@ def _mark_compact_reference_mode(
         "chatcut": "not_started",
         "export_qa": "not_started",
         "history": [],
+        "clips": {
+            "clip-01": {"frames": ["01", "02", "03"], "status": "prepared"},
+            "clip-02": {"frames": ["04", "05", "06"], "status": "prepared"},
+            "clip-03": {"frames": ["07", "08", "09"], "status": "prepared"},
+        },
     }
     data["assumptions"].append(
         {
             "inferred": True,
-            "value": "Seedance compact-reference mode: three soft shot beats and real reference assets, not a forced nine-frame storyboard.",
+            "value": "Nine storyboard frames, grouped three per silent 6s Seedance clip; ChatCut preserves a coherent full sequence and trims only defects or dead time.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -336,6 +343,7 @@ def _create_run_layout(run_dir: Path, platform: str, caption_language: str | Non
     if platform == "vertical-video":
         _write_if_missing(analysis / "shot-list.md", fixed_cooking_shot_list())
         _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
+        (analysis / "seedance-prompts").mkdir(parents=True, exist_ok=True)
     elif platform in VIDEO_PLATFORMS:
         _write_if_missing(analysis / "shot-list.md", "# Shot List\n\nTODO\n")
         _write_if_missing(analysis / "seedance-prompt.md", "# Seedance Prompt\n\nTODO\n")
@@ -461,11 +469,32 @@ def prepare_original_video_run(
         f"# Brief\n\n{brief_text}\n",
         encoding="utf-8",
     )
+    if platform == "vertical-video":
+        group_actions = {
+            1: "Animate the product hook, pan arrangement, and first natural sizzle.",
+            2: "Animate the water, steam, lid condensation, and cooked reveal.",
+            3: "Animate the golden-base reveal, plating, and final branded dish hero.",
+        }
+        for group, action in group_actions.items():
+            _write_if_missing(
+                run_dir
+                / "analysis"
+                / "seedance-prompts"
+                / f"clip-{group:02d}.md",
+                (
+                    f"# Seedance Clip {group:02d}\n\n"
+                    f"{action} Preserve the supplied no-face hands, pan, "
+                    "dumplings, package, lighting, and the exact physical "
+                    "ASIAN GROCER ONLINE / powered by UMALL tabletop sign. "
+                    "One restrained commercial camera movement, realistic food "
+                    "physics, no new objects, no subtitles or overlay text.\n"
+                ),
+            )
     manifest_path = run_dir / "analysis" / "manifest.json"
     manifest.create(
         manifest_path,
         platform,
-        _compact_video_asset_ids() if platform == "vertical-video" else _asset_ids(platform, []),
+        _asset_ids(platform, []),
         source={
             "kind": "original_brief",
             "paths": [brief_source] if brief_source else [],
@@ -475,7 +504,7 @@ def prepare_original_video_run(
         provider=image_provider.resolve(),
     )
     if platform == "vertical-video":
-        _mark_compact_reference_mode(
+        _mark_three_clip_storyboard_mode(
             manifest_path,
             _prepare_video_references(
                 run_dir,
