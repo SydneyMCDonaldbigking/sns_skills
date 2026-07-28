@@ -1,7 +1,8 @@
 # OpenRouter Grok Video Generation Memory
 
-Use this for low-cost OpenRouter Grok video smoke tests after a nine-frame
-`vertical-video` storyboard has already been generated and validated.
+Use this for low-cost OpenRouter Grok video smoke tests. It supports both the
+legacy nine-frame `vertical-video` storyboard path and the newer compact
+original-video path with text-only or reference-only images.
 
 ## Config
 
@@ -17,7 +18,8 @@ Use this for low-cost OpenRouter Grok video smoke tests after a nine-frame
 
 ## Smoke Test Rule
 
-Run a dry-run first, then a one-second live test:
+Run a dry-run first, then a one-second live test when the prompt/reference
+setup is new or risky:
 
 ```powershell
 .\.venv\python.exe .\viral-social-remix\scripts\run_openrouter_video.py --run output/xxx --allow-data-url --duration 1 --resolution 720p --ratio 9:16 --no-generate-audio --dry-run
@@ -29,9 +31,17 @@ Observed on 2026-07-25: a one-second 720p vertical Grok test completed at
 OpenRouter returned an AAC audio stream even with `generate_audio: false`, so
 the runner now strips audio after download when no audio was requested.
 
+For simple low-risk 5-second compact tests, a direct 5s run is acceptable after
+the dry-run confirms the payload is short enough and the image/reference count
+is intentional.
+
 ## Prompting
 
-- Grok testing uses the first storyboard frame as the video `first_frame`.
+- Legacy storyboard Grok testing uses the selected storyboard frame as the
+  video `first_frame`.
+- Compact original Grok testing may be text-only (`image_count: 0`) or use
+  `--reference-only-images` so product/logo images are sent as
+  `input_references` without stealing the first frame.
 - Do not rely on nine images as hard visual constraints unless the selected
   model is confirmed to support extra references.
 - On the 2026-07-25 spicy soft tofu soup test, sending frame 01 as
