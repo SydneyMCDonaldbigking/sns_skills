@@ -9,6 +9,10 @@ ChatCut is already installed locally. Do not start by reinstalling it.
 ## Memory Links
 
 - Start from [[index]] for the route map.
+- Read [[chatcut/README|ChatCut editing memory]] before a finishing pass.
+- Use [[chatcut/editor-capability-map]] for confirmed product behavior.
+- Use [[chatcut/low-model-editing-contract]] and [[chatcut/theme-playbooks]]
+  when the task needs creative editing rather than a plain import.
 - Comes after [[seedance-video-generation]] when MP4 clips are ready.
 - For original recipe structure and brand/no-text rules, also read
   [[original-cooking-video]].

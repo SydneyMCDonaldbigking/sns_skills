@@ -31,6 +31,9 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 - [[seedance-video-generation]]: Seedance video cost, preview, and QA rules.
 - [[openrouter-grok-video-generation]]: low-cost Grok/OpenRouter 720p video
   smoke tests using `GROK_OPENROUTER_API_KEY`.
+- [[chatcut/README|ChatCut editing memory]]: confirmed editor capability map,
+  low-model execution contract, theme playbooks, Agent prompt recipes, and QA
+  discipline.
 - [[chatcut-handoff-workflow]]: after Seedance/video generation, import
   generated MP4 segments into ChatCut as an editable timeline; then handle BGM,
   subtitle labels, review, and export when requested.
