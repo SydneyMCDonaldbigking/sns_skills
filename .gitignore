@@ -22,3 +22,11 @@ data/material-index*.jsonl
 .obsidian/plugins/
 .trash/
 .codex_tmp/
+.cleanup-archive/
+
+# Local generation/review artifacts
+frame_review/
+pork_frames/
+preview-sites/
+*-asr.ogg
+*-asr-small.ogg

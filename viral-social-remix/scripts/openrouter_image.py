@@ -39,6 +39,14 @@ class OpenRouterImageError(RuntimeError):
         super().__init__(message)
 
 
+def request_timeout_seconds() -> int:
+    raw = os.environ.get("VSR_OPENROUTER_TIMEOUT_SECONDS", "420")
+    try:
+        return max(30, int(raw))
+    except ValueError:
+        return 420
+
+
 def load_env(path: Path | None = None) -> dict[str, str]:
     values: dict[str, str] = {}
     path = path or LOCAL_ENV
@@ -72,7 +80,7 @@ def post_json(payload: dict, api_key: str, endpoint: str = ENDPOINT) -> dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=180) as response:
+        with urlopen(request, timeout=request_timeout_seconds()) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
@@ -122,7 +130,7 @@ def save_images(response: dict, out_dir: Path, stem: str) -> list[Path]:
                 header, encoded = url.split(",", 1)
                 out_path.write_bytes(base64.b64decode(encoded))
             else:
-                with urlopen(url, timeout=180) as response_obj:
+                with urlopen(url, timeout=request_timeout_seconds()) as response_obj:
                     out_path.write_bytes(response_obj.read())
             saved.append(out_path)
     return saved

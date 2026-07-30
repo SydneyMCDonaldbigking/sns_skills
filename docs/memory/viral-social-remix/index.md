@@ -6,6 +6,9 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 - If the user says the original post is already open, use the live browser tab
   first and capture the source package before analysis.
+- Default company remix/"搬运" output is English-region. A Xiaohongshu URL or
+  Chinese source post is only the source/capture platform unless the user
+  explicitly asks for Chinese-region or Chinese Xiaohongshu target output.
 - Keep source page count, page order, and page role unless the user explicitly
   asks to change them.
 - A supplied phone screenshot is not automatically the source. If the user says
@@ -27,7 +30,7 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 - [[video-production-map]]: relationship map for the current Seedance video
   chain, transition anchors, provider notes, visual taste, and ChatCut handoff.
-- `chinese-xhs-remix.md`: Chinese Xiaohongshu 搬运/source-drift rules.
+- `chinese-xhs-remix.md`: Chinese Xiaohongshu target-only/source-drift rules.
 - [[openrouter-image-generation]]: current image API/model/cost rules.
 - [[original-cooking-video]]: original cooking video structure and text policy.
 - [[seedance-video-generation]]: Seedance video cost, preview, and QA rules.
@@ -71,6 +74,11 @@ For image/carousel posts, do not rely on a saved taste library. Use the user's
 source post, supplied screenshots, or a clearly selected competitor/reference
 post as the visual and pacing reference, then rebuild it with our product
 assets, English-region logo, and platform size.
+
+For default company remix/"搬运" from a Xiaohongshu or Chinese source, rebuild
+as an English-region carousel: `1152x1152`, `caption-en.txt`, and the
+`ASIAN GROCER ONLINE / powered by UMALL` lockup. Do not use the Chinese UMALL
+logo or `caption-zh.txt` unless the requested target is explicitly Chinese.
 
 Preserve source page count, page order, and page roles unless the user asks for
 a new structure. If the source ends with a shopping/category/search/app-entry

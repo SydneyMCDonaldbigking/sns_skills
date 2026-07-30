@@ -1,9 +1,15 @@
-# Chinese Xiaohongshu Remix Memory
+# Chinese Xiaohongshu Target Remix Memory
+
+Use this note only when the user explicitly asks for Chinese-region or Chinese
+Xiaohongshu target output. For default company remix/"搬运" from a Xiaohongshu
+source, use the English-region carousel route instead: `1152x1152`,
+`caption-en.txt`, and `ASIAN GROCER ONLINE / powered by UMALL`.
 
 ## Source Order
 
-When the user asks to 搬运 a Xiaohongshu post, the source post is the structure.
-Capture it first, then write copy and prompts.
+When the target is explicit Chinese Xiaohongshu and the user asks to 搬运 a
+Xiaohongshu post, the source post is the structure. Capture it first, then
+write copy and prompts.
 
 Correct sequence:
 
