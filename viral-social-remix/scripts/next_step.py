@@ -55,11 +55,20 @@ def seedance_command(run_dir: Path, args: str = "") -> str:
     return f"python scripts/run_seedance_video.py --run {run_dir}{suffix}"
 
 
+def openrouter_frame_command(run_dir: Path, asset_id: str) -> str:
+    return (
+        "python scripts/run_openrouter_carousel.py "
+        f"--run {run_dir} --api-only --asset-id {asset_id}"
+    )
+
+
 def file_state(run_dir: Path) -> dict[str, bool]:
     cue_dir = run_dir / "analysis" / "caption-cues"
     return {
         "manifest": (run_dir / "analysis" / "manifest.json").is_file(),
         "page_01": (run_dir / "generated" / "page-01.png").is_file(),
+        "page_02": (run_dir / "generated" / "page-02.png").is_file(),
+        "page_03": (run_dir / "generated" / "page-03.png").is_file(),
         "clip_01": (run_dir / "generated" / "seedance-clip-01.mp4").is_file(),
         "clip_02": (run_dir / "generated" / "seedance-clip-02.mp4").is_file(),
         "clip_03": (run_dir / "generated" / "seedance-clip-03.mp4").is_file(),
@@ -84,8 +93,8 @@ def recommend_three_clip(run_dir: Path, states: dict[str, bool]) -> dict[str, An
     if not states["page_01"]:
         return {
             "stage": "opening-frame",
-            "action": "generate clip-01 opening frame before paid video",
-            "command": "generate generated/page-01.png from analysis/page-prompts/page-01.md",
+            "action": "generate clip-01 exact 1080x1920 opening frame before paid video",
+            "command": openrouter_frame_command(run_dir, "01"),
         }
     for index in range(1, 4):
         clip = f"clip-{index:02d}"
@@ -99,6 +108,16 @@ def recommend_three_clip(run_dir: Path, states: dict[str, bool]) -> dict[str, An
                 if decision == "use-last-frame":
                     args = f"--storyboard-group {index} --continue-from-last-frame"
                 elif decision == "transition-anchor":
+                    asset_id = f"{index:02d}"
+                    if not states[f"page_{index:02d}"]:
+                        return {
+                            "stage": "transition-anchor",
+                            "action": (
+                                f"generate {clip} exact 1080x1920 transition "
+                                "opening anchor before Seedance"
+                            ),
+                            "command": openrouter_frame_command(run_dir, asset_id),
+                        }
                     args = f"--storyboard-group {index}"
                 else:
                     return {

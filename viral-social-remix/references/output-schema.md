@@ -158,6 +158,9 @@ Three-clip route uses mode `director-first-frame-three-clips`. Additional files:
 - `generated/page-02.png` and `generated/page-03.png`: optional on-demand
   designed transition opening anchors. They may be absent when the returned last
   frame is used directly.
+- Opening PNGs must be exact `1080x1920` even when the upstream image provider
+  used a different provider-safe request size. Store any unreframed originals
+  separately; do not mark them `validated` or pass them to Seedance.
 - `generated/seedance-clip-01.mp4` through `clip-03.mp4`: separate silent clips.
 - `analysis/seedance-clip-XX-request.lock.json`, matching `raw/` records, and
   `qa/seedance-clip-XX-video.json`: independent request/QA state per clip.

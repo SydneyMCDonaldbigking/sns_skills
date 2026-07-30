@@ -56,7 +56,8 @@ FIXED_COOKING_SHOTS = [
     "Include at least one cooking-location/heat/steamer/stove beat when the product needs cooking.",
     "Include at least two close-up inserts across the sequence, such as product texture, steam, package opening, pour, utensil movement, sauce, crunch, plating, or final use.",
     "Brand as a commercial through clip 1 opening-frame product/sign visibility only; later clips do not need logo-sign continuity.",
-    "Generate clip 1's 1080x1920 opening frame first with the configured image API.",
+    "Generate clip 1's exact 1080x1920 opening frame first with scripts/run_openrouter_carousel.py --api-only --asset-id 01; do not manually submit provider-size images to Seedance.",
+    "OpenRouter may require provider-safe portrait dimensions; the final local page-XX.png must be reframed to exact 1080x1920 before the manifest is marked validated.",
     "After each accepted clip, inspect its returned last frame and final motion strip. Use it directly only when clean; otherwise generate a transition opening anchor with the image model for a deliberate camera bridge.",
     "After each accepted clip except the final clip, run scripts/handoff_review.py to extract the final motion strip, write qa/handoffs/, and create the next prompt draft.",
     "During Seedance polling, prewrite the next clip prompt draft under analysis/seedance-prompts/drafts/ and leave only OPENING_REFERENCE and HANDOFF_MECHANISM unresolved.",
@@ -273,9 +274,10 @@ def director_opening_frame_prompt(brief_text: str, group: int) -> str:
     return (
         f"# Opening Frame {group:02d}\n\n"
         f"PRODUCT BRIEF:\n{brief_text}\n\n"
-        "Create a single 1080x1920 photorealistic premium grocery/product "
-        "commercial opening reference for Seedance. This is a still-image "
-        "direction prompt, not a finished-video description.\n\n"
+        "Create a single photorealistic premium grocery/product commercial "
+        "opening reference for Seedance. The delivered local PNG must be exact "
+        "1080x1920 after any provider-safe generation/reframe step. This is a "
+        "still-image direction prompt, not a finished-video description.\n\n"
         f"USE CONDITION: {opening_plans[group]}\n"
         "SCENE: choose the exact product-appropriate location, surface, props, "
         "time of day, atmosphere, and commercial mood for this clip's starting "
