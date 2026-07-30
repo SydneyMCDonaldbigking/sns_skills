@@ -46,6 +46,12 @@ Never load the whole vault.
   Before ChatCut caption placement, run `scripts/caption_cues.py` with actual
   trims to compile `timeline.json`, `timeline.srt`, `timeline.csv`, and
   `chatcut-caption-plan.json`.
+- Use the RPA helper scripts before manual judgement when they apply:
+  `scripts/next_step.py` for command choice, `scripts/handoff_review.py` for
+  clip joins, `scripts/edit_plan.py` before ChatCut trimming,
+  `scripts/qa_decision_sheet.py` for one-page review, and
+  `scripts/carousel_cleanup.py` for fake price/mosaic/placeholder white-cover
+  repairs.
 - In the three-clip route, inspect the prior clip's returned last frame and last
   motion strip before the next clip. Use the returned frame only when it is
   clean; generate a transition opening anchor when the frame is weak, malformed,
@@ -139,6 +145,9 @@ overwrite a prior run. Run deterministic validation before paid generation.
 Preserve layout logic and copy meaning. Keep the final shopping/search guide
 unless the user waives it. Use real supplied UI/screenshots; never invent
 prices, products, or app screens.
+When generated output contains fake prices, mosaic placeholders, blurred UI, or
+uncertain shopping widgets, use `scripts/carousel_cleanup.py` to white-cover
+those regions instead of hand-patching them in an image editor.
 
 For English-region carousels, use `1152x1152`, `caption-en.txt`, and
 `viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`. Do

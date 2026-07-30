@@ -23,11 +23,21 @@ coherent one-setting product-use ritual.
 
 Three-clip chain:
 
-`three script beats -> clip 1 designed first frame -> sequential silent 6s Seedance commercial micro-shot clips with handoff/transition-anchor decisions -> ChatCut finish`
+`three script beats -> clip 1 designed first frame -> sequential silent 6s Seedance commercial micro-shot clips with handoff_review.py decisions and next-prompt drafts -> edit_plan.py + caption_cues.py -> ChatCut finish -> qa_decision_sheet.py`
 
 Opening references are generation inputs, not editing assets. They may be a
 director-designed first frame, an accepted prior clip's returned last frame, or
 a generated transition opening anchor/bridge frame.
+
+Default to RPA helpers before manual judgement:
+
+- Run `scripts/next_step.py` after each major stage to write
+  `analysis/next-step.json` and the next command.
+- Run `scripts/handoff_review.py` after each accepted clip except the final
+  clip. It extracts the final motion strip, writes the handoff report, and
+  creates the next prompt draft.
+- Run `scripts/edit_plan.py` after clips are accepted and trims are known.
+- Run `scripts/qa_decision_sheet.py` before handoff or export review.
 
 ## Approved patterns to reuse
 
@@ -280,6 +290,25 @@ join is judged from motion, not only a still:
   motion only when it keeps those anchors consistent; a wider hero is worse than
   a new-looking kitchen.
 
+RPA handoff review:
+
+```bash
+python scripts/handoff_review.py output/YYYYMMDD-HHmmss-task --clip clip-01
+python scripts/handoff_review.py output/YYYYMMDD-HHmmss-task --clip clip-02
+```
+
+Use `qa/handoffs/clip-XX-to-clip-YY/index.html` as the review surface and
+`handoff-review.json` as the decision ledger. If the decision is
+`use-last-frame`, run the next Seedance clip with `--continue-from-last-frame`.
+If the decision is `transition-anchor`, update/generate the relevant
+`page-YY.md`/`page-YY.png` opening anchor first. If the decision is `retry`,
+rerun the source clip before continuing.
+
+During polling, prewrite the next clip prompt from
+`analysis/seedance-prompts/drafts/clip-YY-handoff-draft.md` when present. Leave
+only `OPENING_REFERENCE` and `HANDOFF_MECHANISM` unresolved until the returned
+last frame and motion strip are reviewed.
+
 Do not generate nine storyboard frames by default. Do not import opening frames,
 returned last frames, transition anchors, or other generation references into
 ChatCut.
@@ -458,7 +487,13 @@ This writes `analysis/caption-cues/timeline.json`, `timeline.srt`,
 
 ## Fast review
 
-Review one strip covering all three clips. Check only:
+Build a one-page decision sheet before final handoff:
+
+```bash
+python scripts/qa_decision_sheet.py output/YYYYMMDD-HHmmss-task
+```
+
+Review one strip/sheet covering all three clips. Check only:
 
 - correct product and logo prop;
 - no face or broken hands;
@@ -498,6 +533,21 @@ Keep a natural edit duration; do not force the commercial to exactly 18s or any
 other fixed length when the rhythm works. Place by seconds when available; if
 the tool requires frames, convert from the editor's actual timebase, not the
 source clip fps.
+
+Before ChatCut import, compile an edit plan from the accepted MP4s and actual
+trim choices:
+
+```bash
+python scripts/edit_plan.py output/YYYYMMDD-HHmmss-task \
+  --trim clip-01=0.30:5.70 \
+  --trim clip-02=0.10:5.40 \
+  --trim clip-03=0.00:5.20
+```
+
+Read `analysis/edit-plan.json` first in ChatCut. Import only the accepted MP4s,
+place them by the plan's timeline seconds, then apply the listed trims,
+transitions, punch-ins, reframes, and caption plan. If the edit changes, rerun
+`scripts/edit_plan.py` and `scripts/caption_cues.py` before placing captions.
 
 Add an editable track for agent-generated BGM only when requested or useful,
 matching the target market and product tone. Do not generate, place, or time

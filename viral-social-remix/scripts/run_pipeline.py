@@ -58,10 +58,15 @@ FIXED_COOKING_SHOTS = [
     "Brand as a commercial through clip 1 opening-frame product/sign visibility only; later clips do not need logo-sign continuity.",
     "Generate clip 1's 1080x1920 opening frame first with the configured image API.",
     "After each accepted clip, inspect its returned last frame and final motion strip. Use it directly only when clean; otherwise generate a transition opening anchor with the image model for a deliberate camera bridge.",
+    "After each accepted clip except the final clip, run scripts/handoff_review.py to extract the final motion strip, write qa/handoffs/, and create the next prompt draft.",
+    "During Seedance polling, prewrite the next clip prompt draft under analysis/seedance-prompts/drafts/ and leave only OPENING_REFERENCE and HANDOFF_MECHANISM unresolved.",
+    "After each major stage, run scripts/next_step.py so analysis/next-step.json carries the next deterministic command.",
     "Give Seedance only the selected opening reference for each request.",
     "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
     "While each Seedance clip is polling, draft external editable caption cues in analysis/caption-cues/clip-XX.json with clip-relative start/end/text; never burn captions into Seedance.",
     "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
+    "Before ChatCut import, run scripts/edit_plan.py with accepted MP4s and actual trims; read analysis/edit-plan.json before trimming/reframing.",
+    "Before final handoff, run scripts/qa_decision_sheet.py to build qa/decision-sheet.html.",
     "Keep the same no-face hands, clothing, kitchen/table, light logic, product identity, and package when naturally visible.",
     "Opening references, returned last frames, and transition anchors are generation references and must not be imported into ChatCut.",
 ]
@@ -79,6 +84,7 @@ FIXED_SINGLE_10S_SHOTS = [
     "Every single-10s Seedance clip is 10s, 9:16, 1080p, and silent.",
     "While the Seedance job is polling, draft external editable caption cues in analysis/caption-cues/single-10s.json with clip-relative start/end/text; never burn captions into Seedance.",
     "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
+    "After generation, run scripts/next_step.py, scripts/edit_plan.py, and scripts/qa_decision_sheet.py before ChatCut handoff when editing is needed.",
     "Import the accepted MP4 into ChatCut only if BGM, captions, voiceover, trimming, or digital reframing is needed. Do not generate SFX.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
@@ -343,6 +349,8 @@ def _mark_director_three_clip_mode(
             "expect_audio": True,
             "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
             "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json; place editable white centered current-step captions, subtle dark stroke/shadow, no colored box",
+            "edit_policy": "before ChatCut import run scripts/edit_plan.py with accepted MP4s and actual trims, then follow analysis/edit-plan.json",
+            "qa_policy": "use scripts/handoff_review.py after clip joins and scripts/qa_decision_sheet.py before final handoff",
         },
         "continuity": {
             "last_frame_path": None,
@@ -454,6 +462,8 @@ def _mark_single_10s_mode(
             "expect_audio": True,
             "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place SFX",
             "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json when captions are requested",
+            "edit_policy": "after generation run scripts/edit_plan.py when ChatCut trimming/reframing is needed",
+            "qa_policy": "run scripts/next_step.py and scripts/qa_decision_sheet.py before final handoff when editing is needed",
         },
         "brand": {
             "strategy": "first-frame-product-reference",
@@ -545,10 +555,12 @@ def _create_run_layout(run_dir: Path, platform: str, caption_language: str | Non
         run_dir / "analysis",
         run_dir / "analysis" / "caption-cues",
         run_dir / "analysis" / "page-prompts",
+        run_dir / "analysis" / "seedance-prompts" / "drafts",
         run_dir / "references" / "keyframes",
         run_dir / "generated",
         run_dir / "overview",
         run_dir / "qa",
+        run_dir / "qa" / "handoffs",
     ]:
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -858,6 +870,27 @@ def prepare_original_video_run(
                     "no invented packaging.\n"
                 ),
             )
+        draft_dir = run_dir / "analysis" / "seedance-prompts" / "drafts"
+        for group in (2, 3):
+            source_prompt = (
+                run_dir / "analysis" / "seedance-prompts" / f"clip-{group:02d}.md"
+            )
+            if source_prompt.is_file():
+                _write_if_missing(
+                    draft_dir / f"clip-{group:02d}-handoff-draft.md",
+                    (
+                        f"# Clip {group:02d} Handoff Draft\n\n"
+                        "Prewrite this while the prior Seedance clip is polling. "
+                        "After the prior clip returns, fill only these two fields "
+                        "from `scripts/handoff_review.py`:\n\n"
+                        "OPENING_REFERENCE: <accepted previous last frame OR "
+                        "generated transition opening anchor>\n"
+                        "HANDOFF_MECHANISM: <match action / steam-lid occlusion / "
+                        "pour-object bridge / rack focus / plate move / texture insert>\n\n"
+                        "---\n\n"
+                        + source_prompt.read_text(encoding="utf-8")
+                    ),
+                )
     manifest_path = run_dir / "analysis" / "manifest.json"
     manifest.create(
         manifest_path,

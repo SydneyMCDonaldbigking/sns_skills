@@ -60,9 +60,10 @@ For original English vertical cooking videos, the configured image API creates
 selected director opening references on demand. Start with
 `analysis/page-prompts/page-01.md` and generate only `generated/page-01.png`
 before clip 1. For clips 2 and 3, inspect the accepted prior clip's returned
-last frame first; use that frame directly when it is coherent, or generate the
-corresponding `page-02`/`page-03` transition opening anchor when the last frame
-is visually weak, malformed, blurry, or awkward for the next action.
+last frame first with `scripts/handoff_review.py`; use that frame directly when
+it is coherent, or generate the corresponding `page-02`/`page-03` transition
+opening anchor when the last frame is visually weak, malformed, blurry, or
+awkward for the next action.
 
 Use `scripts/run_openrouter_carousel.py --asset-id 01` for the clip 1 opening.
 Use `--asset-id 02` or `--asset-id 03` only after the handoff decision requires

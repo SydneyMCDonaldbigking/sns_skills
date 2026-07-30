@@ -15,6 +15,10 @@ Use GPT Image 2 to render the text directly in the complete image. After each
 generation, visually verify the brand name, product name, numbers, language,
 and CTA. Retry only the failed asset. Use local text overlay only after repeated
 targeted regeneration fails.
+If a generated carousel page contains fake prices, mosaic placeholders, blurred
+UI, or uncertain shopping widgets, do not invent replacement data. Use
+`scripts/carousel_cleanup.py` to white-cover those regions and keep the layout
+clean.
 
 Preserve the source composition, hierarchy, rhythm, and copy structure while
 replacing the product, brand, source watermarks, and specific expression. Do
