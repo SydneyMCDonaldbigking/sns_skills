@@ -12,7 +12,10 @@ production checklists.
 
 ## Start Here
 
+- `../../00-start-here.md`: vault-level relationship map and authority ladder.
 - `viral-social-remix/index.md`: daily operating memory for the social remix skill.
+- `viral-social-remix/video-production-map.md`: video relationship map for
+  Seedance anchors, transitions, provider notes, visual taste, and ChatCut.
 - `viral-social-remix/chatcut/README.md`: ChatCut product map, editing themes,
   low-model execution contract, prompt recipes, and finishing QA.
 - `../retrospectives/`: incident-level writeups after a painful run.

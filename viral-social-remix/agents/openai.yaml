@@ -1,4 +1,4 @@
 interface:
   display_name: "Viral Social Remix"
-  short_description: "Remix social posts and direct branded cooking videos"
-  default_prompt: "Use $viral-social-remix to remix this social media or direct a branded cooking commercial with three first-frame Seedance clips."
+  short_description: "Remix social posts and direct branded Seedance videos"
+  default_prompt: "Use $viral-social-remix to remix this social media post or direct a branded Seedance product/cooking commercial with the right single-10s or three-clip route."

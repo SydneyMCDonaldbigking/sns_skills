@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 
 from PIL import Image
@@ -29,6 +30,19 @@ STORYBOARD_CLIP_GROUPS = [
 ]
 DIRECTOR_ASSET_IDS = ["01", "02", "03"]
 DIRECTOR_CLIP_GROUPS = [["01"], ["02"], ["03"]]
+SINGLE_10S_COMMERCIAL_MODE = "single-10s-commercial"
+WORKSHOP_PROMPT_FIELDS = {
+    "settings": "settings",
+    "subjects/objects": "subjects/objects",
+    "visual style": "visual style",
+    "lighting": "lighting",
+    "camera": "camera",
+    "action mechanics": "action mechanics",
+    "quality": "quality",
+    "audio": "audio",
+    "constraints": "constraints",
+}
+TIMECODE_RE = re.compile(r"\b0(?:\.0)?\s*[-\u2013]")
 
 
 def _load_manifest(base: Path) -> dict | None:
@@ -45,7 +59,11 @@ def _video_mode(data: dict | None) -> str:
 
 
 def _is_compact_reference(data: dict | None) -> bool:
-    return _video_mode(data) == "compact-reference"
+    return _video_mode(data) in {"compact-reference", SINGLE_10S_COMMERCIAL_MODE}
+
+
+def _is_single_10s_commercial(data: dict | None) -> bool:
+    return _video_mode(data) == SINGLE_10S_COMMERCIAL_MODE
 
 
 def _is_three_clip_storyboard(data: dict | None) -> bool:
@@ -54,6 +72,35 @@ def _is_three_clip_storyboard(data: dict | None) -> bool:
 
 def _is_director_three_clip(data: dict | None) -> bool:
     return _video_mode(data) == "director-first-frame-three-clips"
+
+
+def _is_placeholder_prompt(text: str) -> bool:
+    cleaned = "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    ).strip()
+    return not cleaned or cleaned.upper() == "TODO"
+
+
+def _validate_workshop_prompt_contract(path: Path, label: str) -> list[str]:
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    if _is_placeholder_prompt(text):
+        return []
+    lowered = text.lower()
+    missing = [
+        display
+        for display, needle in WORKSHOP_PROMPT_FIELDS.items()
+        if needle not in lowered
+    ]
+    if not TIMECODE_RE.search(text):
+        missing.append("timed beats")
+    if missing:
+        return [
+            f"{label} must include Seedance workshop prompt fields: "
+            + ", ".join(missing)
+        ]
+    return []
 
 
 def _validate_three_clip_controls(
@@ -119,10 +166,12 @@ def _validate_director_three_clip_job(data: dict) -> list[str]:
 
 def _validate_compact_job(base: Path, data: dict) -> list[str]:
     errors: list[str] = []
+    single_10s = _is_single_10s_commercial(data)
+    mode_name = "single-10s-commercial" if single_10s else "compact-reference"
     try:
         references = video_job.collect_manifest_references(data)
     except video_job.VideoJobError as exc:
-        return [f"invalid compact-reference manifest: {exc}"]
+        return [f"invalid {mode_name} manifest: {exc}"]
 
     counts = video_job.reference_counts(references)
     for kind, limit in video_job.REFERENCE_LIMITS.items():
@@ -166,7 +215,22 @@ def _validate_compact_job(base: Path, data: dict) -> list[str]:
     video = video_job.video_section(data)
     if data.get("schema_version") == 2:
         shots = video.get("shots")
-        if not isinstance(shots, list) or len(shots) != 3:
+        if single_10s:
+            if not isinstance(shots, list) or not 4 <= len(shots) <= 6:
+                errors.append(
+                    "Manifest v2 single-10s video.shots must contain 4-6 timed micro-shots"
+                )
+            generation = video.get("generation")
+            generation = generation if isinstance(generation, dict) else {}
+            if generation.get("duration") != 10:
+                errors.append("single-10s-commercial duration must be 10 seconds")
+            if generation.get("ratio") != "9:16":
+                errors.append("single-10s-commercial ratio must be 9:16")
+            if generation.get("resolution") != "1080p":
+                errors.append("single-10s-commercial resolution must be 1080p")
+            if generation.get("generate_audio") is not False:
+                errors.append("single-10s-commercial must generate without audio")
+        elif not isinstance(shots, list) or len(shots) != 3:
             errors.append(
                 "Manifest v2 compact video.shots must contain exactly three soft shots"
             )
@@ -191,6 +255,7 @@ def _validate_compact_job(base: Path, data: dict) -> list[str]:
     if isinstance(brand, dict):
         allowed_strategies = {
             "product-only",
+            "first-frame-product-reference",
             "physical-prop-rough",
             "post-composited-physical-prop",
             "clean-end-card",
@@ -213,6 +278,13 @@ def _validate_compact_job(base: Path, data: dict) -> list[str]:
                 video_job.compile_prompt(prompt, references)
             except video_job.VideoJobError as exc:
                 errors.append(f"invalid Seedance prompt references: {exc}")
+    if data.get("schema_version") == 2 and single_10s:
+        errors.extend(
+            _validate_workshop_prompt_contract(
+                prompt_path,
+                "single-10s Seedance prompt",
+            )
+        )
     return errors
 
 
@@ -260,7 +332,7 @@ def validate_delivery(
     language = caption_language or (
         "zh" if platform == "xiaohongshu" else "en"
     )
-    if director_three_clip:
+    if director_three_clip or compact_reference:
         required = [base / "analysis" / "manifest.json"]
     else:
         required = [
@@ -297,6 +369,21 @@ def validate_delivery(
     errors.extend(
         f"missing required file: {path}" for path in required if not path.is_file()
     )
+    if (
+        data
+        and data.get("schema_version") == 2
+        and director_three_clip
+    ):
+        for index in range(1, 4):
+            errors.extend(
+                _validate_workshop_prompt_contract(
+                    base
+                    / "analysis"
+                    / "seedance-prompts"
+                    / f"clip-{index:02d}.md",
+                    f"Seedance clip-{index:02d} prompt",
+                )
+            )
     if platform in DIMENSIONS:
         expected = DIMENSIONS[platform]
         for asset in generated:

@@ -292,6 +292,72 @@ def test_manifest_v2_compact_requires_control_sections(tmp_path):
     assert any("video.brand" in error for error in result["errors"])
 
 
+def _write_single_10s_manifest(analysis: Path) -> None:
+    (analysis / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "platform": "vertical-video",
+                "video_mode": "single-10s-commercial",
+                "video": {
+                    "mode": "single-10s-commercial",
+                    "profile": "single-10s-final",
+                    "references": [
+                        {
+                            "id": "product",
+                            "type": "image",
+                            "order": 1,
+                            "url": "https://cdn.example/product.png",
+                        }
+                    ],
+                    "shots": [
+                        {"id": "shot-01", "time": "0-1.2s"},
+                        {"id": "shot-02", "time": "1.2-2.4s"},
+                        {"id": "shot-03", "time": "2.4-4.2s"},
+                        {"id": "shot-04", "time": "4.2-6.2s"},
+                        {"id": "shot-05", "time": "6.2-8.0s"},
+                        {"id": "shot-06", "time": "8.0-10.0s"},
+                    ],
+                    "generation": {
+                        "ratio": "9:16",
+                        "duration": 10,
+                        "resolution": "1080p",
+                        "generate_audio": False,
+                        "return_last_frame": False,
+                        "watermark": False,
+                    },
+                    "delivery": {},
+                    "brand": {"strategy": "first-frame-product-reference"},
+                    "budget": {"retry_limit": 1},
+                },
+                "video_workflow": {
+                    "status": "prepared",
+                    "visual_qa": "not_started",
+                    "chatcut": "not_started",
+                    "export_qa": "user_acceptance",
+                    "history": [],
+                },
+                "assets": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_single_10s_rejects_seedance_prompt_without_workshop_fields(tmp_path):
+    analysis = _write_compact_delivery_files(tmp_path)
+    (analysis / "seedance-prompt.md").write_text(
+        "0-1s show the product, then make a cinematic high quality ad.",
+        encoding="utf-8",
+    )
+    _write_single_10s_manifest(analysis)
+
+    result = validation.validate_delivery(tmp_path, "vertical-video")
+
+    assert result["valid"] is False
+    assert any("Seedance workshop prompt fields" in error for error in result["errors"])
+
+
 def test_delivery_cli_writes_validation_report(tmp_path):
     result = subprocess.run(
         [

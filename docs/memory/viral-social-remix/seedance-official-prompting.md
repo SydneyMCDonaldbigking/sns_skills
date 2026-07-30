@@ -56,6 +56,11 @@ audio-only and text-plus-audio-only are not supported.
 
 In prompts, refer to assets by request order, such as `Image 1`, `Image 2`,
 `Video 1`, and `Audio 1`. Do not refer to the raw Asset ID in the prompt.
+The workshop prompt optimizer teaching note in `new_base/` uses `@Image N`
+syntax as its example bridge, but this repository's local runner compiles
+semantic refs to provider labels like `[Image 1]`. Keep the principle, not the
+literal syntax: map assets by request order, explain each label's referent, and
+never leave raw `asset-xxx` IDs as action subjects.
 
 For our English no-face cooking videos, prefer a 4-6 asset pack:
 
@@ -90,6 +95,21 @@ Treat product/package and logo/sign as visual anchors:
 - describe where the physical object appears in the scene;
 - do not write raw asset IDs inside the prompt.
 
+## Prompt Optimizer Lesson
+
+See [[seedance-prompt-optimizer]] for the Obsidian memory node distilled from
+`new_base/general-sd2-skills (1).md`.
+
+When using the Seedance prompt optimizer pattern, first classify the request as
+new generation, edit, extension/stitching, or text/layout generation. For vague
+requirements, ask only for missing facts that materially affect generation.
+For multimodal JSON, scan non-text entries in request order and map them before
+rewriting. Do not silently modify missing identity, ambiguous reference mapping,
+or conflicting camera motion; ask for confirmation or present concrete choices.
+If the user wants an optimized prompt, return `Optimized prompt`,
+`Optimization`, and `Relevant principles`, and include quality plus
+anti-distortion constraints.
+
 ## Camera And Action Rules
 
 - Specify only one camera movement per shot: fixed close-up, slow push-in,
@@ -116,7 +136,8 @@ For our raw generated video:
 - no extra logos or platform marks;
 - only the explicitly referenced real physical brand prop/package may show.
 
-Add English captions, labels, BGM, and SFX later in ChatCut.
+Add English captions, labels, and BGM later in ChatCut. Add SFX only when the
+user explicitly asks and the visible action supports it.
 
 Avoid asking Seedance to generate subtitles for production cooking videos.
 Model-generated subtitles are burned in, harder to edit, prone to spelling or
@@ -133,12 +154,16 @@ Use the model's strengths:
 - Video references lock cooking rhythm, camera movement, and motion language.
 - Audio references can lock music/ambience/timbre when audio is needed.
 
-For multi-clip generation, request `return_last_frame: true` when supported and
-use the previous clip's last frame as the next clip's first visual reference.
-Still verify joins in post, because official guidance says extension/stitching
-can show frame jumps and may need trimming/alignment in an editor.
+For multi-clip generation, request `return_last_frame: true` when supported.
+Use the previous clip's last frame as the next clip's first visual reference
+only after visual review confirms it is a clean handoff. If the returned last
+frame is weak, blurry, malformed, or awkward for the next action, generate a
+transition opening anchor first. Still verify joins in post, because official
+guidance says extension/stitching can show frame jumps and may need
+trimming/alignment in an editor.
 
 The local runner downloads the returned frame, records it under
 `video.continuity.last_frame_path`, and can prepend it to the next request with
-`--continue-from-last-frame`. This improves control, but it does not replace a
-visual join review.
+`--continue-from-last-frame` only when that frame is visually approved. This
+improves control, but it does not replace a visual join review. See
+[[video-production-map]] for the current three-clip decision graph.

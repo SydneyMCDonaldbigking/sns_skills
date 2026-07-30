@@ -77,15 +77,37 @@ platform's exact dimensions are skipped and marked resumable. Put per-page local
 reference assets in `assets[asset_id].reference_paths`; the runner also accepts
 the legacy `assets[asset_id].request.reference_images` field for existing runs.
 
-For original English vertical cooking video runs, use platform
-`vertical-video` and mode `director-first-frame-three-clips`. Additional files:
+For original English vertical product/cooking video runs, use platform
+`vertical-video` and choose one controlled commercial route before generation.
+
+Single-10s route uses mode `single-10s-commercial`. Additional files:
+
+- `analysis/brief.md`: user/product brief.
+- `analysis/shot-list.md`: 4-6 timed micro-shots for one 10s commercial.
+- `analysis/seedance-prompt.md`: one structured Seedance prompt.
+- `generated/seedance-video.mp4`: accepted silent 10s clip.
+- `analysis/seedance-request.lock.json`, matching `raw/` records, and
+  `qa/seedance-video.json`: request/QA state.
+
+The manifest records `video.mode: single-10s-commercial`,
+`video.references`, timed `video.shots`, silent 10s generation controls, and
+`video_workflow`. Seedance receives the product/page image reference directly as
+the opening visual bible.
+
+Three-clip route uses mode `director-first-frame-three-clips`. Additional files:
 
 - `analysis/brief.md`: user/product/recipe brief.
 - `analysis/shot-list.md`: three directed clip beats and their intended joins.
-- `analysis/page-prompts/page-01.md` through `page-03.md`: opening-frame prompts.
+- `analysis/page-prompts/page-01.md` through `page-03.md`: opening-frame prompt
+  slots. `page-01.md` is generated first. `page-02.md` and `page-03.md` are
+  used only after the prior accepted clip's returned last frame is inspected and
+  a direct handoff or generated transition opening anchor is chosen.
 - `analysis/seedance-prompts/clip-01.md` through `clip-03.md`: one action,
   camera, and endpoint prompt per 6s clip.
-- `generated/page-01.png` through `page-03.png`: `1080x1920` opening frames.
+- `generated/page-01.png`: clip 1 `1080x1920` designed opening frame.
+- `generated/page-02.png` and `generated/page-03.png`: optional on-demand
+  designed transition opening anchors. They may be absent when the returned last
+  frame is used directly.
 - `generated/seedance-clip-01.mp4` through `clip-03.mp4`: separate silent clips.
 - `analysis/seedance-clip-XX-request.lock.json`, matching `raw/` records, and
   `qa/seedance-clip-XX-video.json`: independent request/QA state per clip.
@@ -93,7 +115,9 @@ For original English vertical cooking video runs, use platform
 The manifest records `video.clip_groups`, silent 6s generation controls,
 `video.brand.strategy: first-frame-physical-prop`, per-clip
 `video_generations`, and `video_workflow.clips`. Seedance receives exactly one
-opening frame for the selected clip.
+selected opening reference for each request: a designed first frame, the
+accepted prior clip's returned last frame, or a generated transition opening
+anchor.
 
 Older or non-cooking `compact-reference` jobs may instead record
 product/package/logo/source references in `video.references`. Each entry

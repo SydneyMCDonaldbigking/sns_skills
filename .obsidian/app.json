@@ -4,5 +4,13 @@
   "newFileFolderPath": "docs/memory/inbox",
   "promptDelete": false,
   "showLineNumber": false,
-  "attachmentFolderPath": "docs/memory/attachments"
+  "attachmentFolderPath": "docs/memory/attachments",
+  "userIgnoreFilters": [
+    ".codex_tmp/",
+    ".pytest_cache/",
+    ".venv/",
+    "new_base/",
+    "output/",
+    "samples/"
+  ]
 }

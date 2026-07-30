@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 output/
+new_base/
 tmp/
 *.tmp
 samples/

@@ -9,8 +9,9 @@ Use this only after the generated MP4 clips have passed a visual review.
 3. Place the clips on V1 in script order with no accidental gaps.
 4. Preserve the coherent natural duration. Trim only failed motion,
    repetition, awkward joins, or dead time.
-5. Generate and place BGM and one timed cooking-Foley bed as separate editable
-   tracks. Add voiceover only when supplied or requested.
+5. Generate and place BGM as an editable track when requested. Add voiceover
+   only when supplied or requested. Do not add cooking Foley/SFX unless the user
+   explicitly asks and a visible action justifies it.
 6. Add editable English current-step captions in the visual center: white,
    subtle dark stroke/shadow, no colored box.
 7. Review representative opening, join, and ending frames once; check the
@@ -21,6 +22,7 @@ Use this only after the generated MP4 clips have passed a visual review.
 Never import these into ChatCut:
 
 - director first frames or storyboards;
+- transition opening anchors or returned last-frame references;
 - product/package reference images;
 - logo reference files;
 - contact sheets, review strips, or QA images;
@@ -30,10 +32,12 @@ They are generation references, not timeline media.
 
 ## Brand rule
 
-The official physical `ASIAN GROCER ONLINE / powered by UMALL` tabletop sign is
-designed into each opening frame. Preserve it in the generated clips. Do not
-add a floating logo overlay. Repair the sign in post only when visual review
-finds a real fidelity defect.
+The official physical `ASIAN GROCER ONLINE / powered by UMALL` tabletop sign
+needs to read in clip 1's opening reference / first frame only. Preserve it
+when it naturally remains visible, but do not force it back into later stove,
+steam, pouring, plating, or close-up inserts. Do not add a floating logo
+overlay. Repair the sign in post only when visual review finds a real fidelity
+defect in a frame where the sign is supposed to appear.
 
 ## Verification
 

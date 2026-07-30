@@ -58,6 +58,7 @@ DEFAULT_POLL_INTERVAL = 10
 TERMINAL_FAILURES = {"failed", "cancelled"}
 THREE_CLIP_STORYBOARD_MODE = "storyboard-three-clips"
 DIRECTOR_THREE_CLIP_MODE = "director-first-frame-three-clips"
+SINGLE_10S_COMMERCIAL_MODE = "single-10s-commercial"
 STORYBOARD_GROUPS = {
     1: ["01", "02", "03"],
     2: ["04", "05", "06"],
@@ -228,7 +229,7 @@ def _video_mode(data: dict[str, Any]) -> str:
 
 
 def _is_compact_reference(data: dict[str, Any]) -> bool:
-    return _video_mode(data) == "compact-reference"
+    return _video_mode(data) in {"compact-reference", SINGLE_10S_COMMERCIAL_MODE}
 
 
 def _is_three_clip_storyboard(data: dict[str, Any]) -> bool:
@@ -409,11 +410,18 @@ def compose_prompt(
         if director_first_frame:
             frame_id = DIRECTOR_GROUPS[storyboard_group][0]
             prompt = (
-                f"{prompt}\n\nBegin exactly from the one supplied opening frame "
-                f"{frame_id}. Treat it as the composition and continuity anchor, "
-                "then create the intermediate action and camera movement. Reach "
-                "the director-specified endpoint without repeating the full "
-                "recipe or introducing actions from another clip."
+                f"{prompt}\n\nBegin exactly from the one supplied opening "
+                f"reference for clip {storyboard_group} (planned frame "
+                f"{frame_id}, accepted previous last frame, or generated "
+                "transition opening anchor). Treat it as the composition and "
+                "continuity anchor, "
+                "then create a compact food-commercial micro-sequence with 2-3 "
+                "motivated shot beats inside the 6 seconds: establishing/action, "
+                "close-up insert or cooking-location move, then endpoint bridge. "
+                "Use match action, rack focus, steam/lid/pour/object occlusion, or "
+                "another explicit transition handle. Do not flatten the clip into "
+                "one continuous tabletop camera drift, repeat the full recipe, or "
+                "introduce actions from another clip."
             )
         else:
             frame_ids = STORYBOARD_GROUPS[storyboard_group]
@@ -774,13 +782,42 @@ def _legacy_generated_references(
     )
 
 
-def _continuity_reference_from_manifest(data: dict[str, Any]) -> str | None:
+def _last_frame_value(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    last_frame = value.get("last_frame_url") or value.get("last_frame_path")
+    return str(last_frame) if last_frame else None
+
+
+def _previous_generation_key(generation_key: str | None) -> str | None:
+    if not generation_key:
+        return None
+    match = re.fullmatch(r"clip-(\d{2})", generation_key)
+    if not match:
+        return None
+    index = int(match.group(1))
+    if index <= 1:
+        return None
+    return f"clip-{index - 1:02d}"
+
+
+def _continuity_reference_from_manifest(
+    data: dict[str, Any],
+    *,
+    generation_key: str | None = None,
+) -> str | None:
     video = video_job.video_section(data)
     continuity = video.get("continuity")
     if not isinstance(continuity, dict):
         return None
-    value = continuity.get("last_frame_url") or continuity.get("last_frame_path")
-    return str(value) if value else None
+    previous_key = _previous_generation_key(generation_key)
+    if previous_key:
+        clips = continuity.get("clips")
+        clips = clips if isinstance(clips, dict) else {}
+        value = _last_frame_value(clips.get(previous_key))
+        if value:
+            return value
+    return _last_frame_value(continuity)
 
 
 def _request_digest(payload: dict[str, Any]) -> str:
@@ -869,7 +906,7 @@ def run_seedance_video(
         if video_urls or audio_urls:
             raise SeedanceRunnerError(
                 "The three-clip cooking route accepts only its image anchor(s); "
-                "BGM, voiceover, and SFX are added later in ChatCut."
+                "BGM and voiceover are added later in ChatCut. Do not add SFX by default."
             )
         selected_storyboard_ids = selected_groups[storyboard_group]
         generation_key = f"clip-{storyboard_group:02d}"
@@ -878,6 +915,28 @@ def run_seedance_video(
         generations = data.get("video_generations")
         generations = generations if isinstance(generations, dict) else {}
         job_data["video_generation"] = generations.get(generation_key, {})
+    continuity_value = continuity_reference
+    if continue_from_last_frame:
+        if continuity_value:
+            raise SeedanceRunnerError(
+                "Use either --continuity-reference or --continue-from-last-frame, not both"
+            )
+        continuity_value = _continuity_reference_from_manifest(
+            job_data,
+            generation_key=generation_key,
+        )
+        if not continuity_value:
+            raise SeedanceRunnerError(
+                "Manifest does not contain the previous clip last frame in "
+                "video.continuity.clips, video.continuity.last_frame_path, or "
+                "video.continuity.last_frame_url"
+            )
+    if continuity_value and grouped_three_clip and not director_three_clip:
+        raise SeedanceRunnerError(
+            "Continuity last-frame replacement is supported for director "
+            "three-clip runs. Older storyboard-three-clips jobs should use their "
+            "prepared three-frame group anchors."
+        )
 
     config = resolve_config(model=model, endpoint=endpoint)
     try:
@@ -919,15 +978,27 @@ def run_seedance_video(
         director_first_frame=director_three_clip,
     )
 
-    if not compact_reference and not dry_run:
+    skip_storyboard_validation = grouped_three_clip and bool(
+        [value for value in image_urls or [] if value] or continuity_value
+    )
+    if not compact_reference and not dry_run and not skip_storyboard_validation:
         if not asset_ids:
             raise SeedanceRunnerError("Manifest does not contain storyboard assets")
+        validation_asset_ids = (
+            selected_storyboard_ids
+            if grouped_three_clip
+            else asset_ids
+        )
         _validate_storyboard_ready(
             run,
             data,
             platform,
-            asset_ids,
-            expected_ids=["01", "02", "03"] if director_three_clip else None,
+            validation_asset_ids,
+            expected_ids=(
+                selected_storyboard_ids
+                if grouped_three_clip
+                else (["01", "02", "03"] if director_three_clip else None)
+            ),
         )
 
     try:
@@ -942,7 +1013,17 @@ def run_seedance_video(
             explicit_references,
         )
         if grouped_three_clip:
-            sources = [value for value in image_urls or [] if value]
+            explicit_image_sources = [value for value in image_urls or [] if value]
+            if director_three_clip and continuity_value and explicit_image_sources:
+                raise video_job.VideoJobError(
+                    f"{generation_key} needs one selected opening reference. "
+                    "Use either --image-ref/--image-url or "
+                    "--continuity-reference/--continue-from-last-frame, not both."
+                )
+            if director_three_clip and continuity_value:
+                sources = [continuity_value]
+            else:
+                sources = explicit_image_sources
             if not sources:
                 sources = _manifest_storyboard_urls(
                     data,
@@ -980,15 +1061,7 @@ def run_seedance_video(
                 include_all_frames=include_all_frames,
             )
 
-        continuity_value = continuity_reference
-        if continue_from_last_frame:
-            continuity_value = _continuity_reference_from_manifest(job_data)
-            if not continuity_value:
-                raise video_job.VideoJobError(
-                    "Manifest does not contain video.continuity.last_frame_path "
-                    "or last_frame_url"
-                )
-        if continuity_value:
+        if continuity_value and not grouped_three_clip:
             references = video_job.add_continuity_reference(
                 references,
                 continuity_value,

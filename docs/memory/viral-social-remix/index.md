@@ -25,6 +25,8 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 ## Route Memory
 
+- [[video-production-map]]: relationship map for the current Seedance video
+  chain, transition anchors, provider notes, visual taste, and ChatCut handoff.
 - `chinese-xhs-remix.md`: Chinese Xiaohongshu 搬运/source-drift rules.
 - [[openrouter-image-generation]]: current image API/model/cost rules.
 - [[original-cooking-video]]: original cooking video structure and text policy.
@@ -32,6 +34,9 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 - [[seedance-official-prompting]]: official Seedance 2.0 prompt-writing notes:
   compact shot sequencing, multimodal references, camera motion, and text/logo
   constraints.
+- [[seedance-prompt-optimizer]]: distilled `new_base` lesson for optimizing
+  vague prompts, multimodal asset mapping, no-silent-modification rules, and
+  editing/stitching prompt structure.
 - [[openrouter-grok-video-generation]]: low-cost Grok/OpenRouter 720p video
   smoke tests using `GROK_OPENROUTER_API_KEY`.
 - [[aesthetic-library/README]]: English-region IG/Reels food taste memory,
@@ -50,9 +55,9 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 
 For original cooking video work, use
 `../../../viral-social-remix/references/cooking-video-workflow.md` as the only
-production contract. Read aesthetic memory only when defining a new visual
-direction and [[chatcut-handoff-workflow]] only after the three clips pass
-review.
+production contract. Use [[video-production-map]] as the Obsidian relationship
+map. Read aesthetic memory only when defining a new visual direction and
+[[chatcut-handoff-workflow]] only after the generated MP4 clips pass review.
 
 Provider research remains available in [[seedance-video-generation]] and
 [[seedance-official-prompting]], but it does not override the company contract.
@@ -103,10 +108,10 @@ a generic CTA.
 - 2026-07-26: Clear the saved image/carousel taste library. For graphically
   designed posts, reference the original/source or a chosen competitor post
   directly instead of improvising a house style from memory.
-- 2026-07-28: Company cooking-commercial production uses three
-  director-designed opening frames, one per silent 6s Seedance clip. Direct the
-  angle, starting action, camera move, and endpoint; let Seedance create the
-  intermediate motion. Opening frames stay outside ChatCut.
+- 2026-07-28: Company cooking-commercial production uses the three-clip
+  director route. Generate clip 1's opening anchor first; for clips 2 and 3,
+  inspect the prior last frame and final motion strip before choosing the next
+  opening anchor. Opening anchors stay outside ChatCut.
 - 2026-07-28: A ChatCut theme is not a font/filter preset. Teach execution
   models each theme as audience promise + emotion + rhythm + proof, and force
   Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export
@@ -116,12 +121,17 @@ a generic CTA.
   official-limit preflight before spend, save a sanitized request lock/hash,
   use no-audio preview profiles, persist returned last frames for continuation,
   and require explicit human visual approval before ChatCut/export.
+- 2026-07-30: For the three-clip Seedance route, do not use a bad returned last
+  frame literally. Inspect the last motion strip; use a clean last frame
+  directly, generate a transition opening anchor when the endpoint is weak, and
+  retry the prior clip only when no honest bridge can be made.
 
 ## Useful Links
 
 - `../../retrospectives/2026-07-23-chinese-remix-source-drift.md`
 - `../../../viral-social-remix/references/image-provider.md`
 - `../../../viral-social-remix/references/cooking-video-workflow.md`
+- [[video-production-map]]
 - [[seedance-video-generation]]
 - [[seedance-official-prompting]]
 - [[openrouter-grok-video-generation]]

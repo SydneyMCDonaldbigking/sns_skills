@@ -58,6 +58,13 @@ PROFILE_DEFAULTS = {
         "watermark": False,
         "return_last_frame": True,
     },
+    "single-10s-final": {
+        "duration": 10,
+        "resolution": "1080p",
+        "generate_audio": False,
+        "watermark": False,
+        "return_last_frame": False,
+    },
     "native-audio-final": {
         "duration": 6,
         "resolution": "1080p",
@@ -73,7 +80,7 @@ PROFILE_DEFAULTS = {
         "return_last_frame": False,
     },
 }
-FINAL_SPEND_PROFILES = {"final-clip", "native-audio-final"}
+FINAL_SPEND_PROFILES = {"final-clip", "single-10s-final", "native-audio-final"}
 SUPPORTED_RATIOS = {"21:9", "16:9", "4:3", "1:1", "3:4", "9:16", "adaptive"}
 SUPPORTED_RESOLUTIONS = {"480p", "720p", "1080p"}
 SEMANTIC_REFERENCE_RE = re.compile(r"\{\{ref:([A-Za-z0-9_.-]+)\}\}")
@@ -105,6 +112,8 @@ def default_profile(data: dict[str, Any]) -> str:
     explicit = video.get("profile") or data.get("video_profile")
     if explicit:
         name = str(explicit)
+    elif video_mode(data) == "single-10s-commercial":
+        name = "single-10s-final"
     elif video_mode(data) == "compact-reference":
         name = "visual-preview"
     else:

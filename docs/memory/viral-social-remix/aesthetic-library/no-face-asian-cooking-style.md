@@ -21,8 +21,9 @@ For a 10-17s reel, favor this rhythm:
 2. 2-6s: fastest prep or sauce mechanism.
 3. 6-11s: heat transformation, bubbling, stir-fry, sear, or sauce coating.
 4. 11-15s: plating, garnish, chopstick/spoon lift.
-5. Last 1-2s: final hero with physical brand sign, package, or grocery product
-   in the scene.
+5. Last 1-2s: final hero with the package or grocery product when it fits the
+   scene. Use the physical brand sign only when it naturally belongs; do not
+   force sign continuity after clip 1.
 
 For 3 x 5s API video segments:
 
@@ -52,7 +53,8 @@ For 3 x 5s API video segments:
   subtle shadow, placed near the visual middle so upload UI does not hide it.
 - Keep subtitle lines short: 2-5 words or one compact sentence.
 - BGM should be trimmed to exact video duration. Add light food SFX only when
-  it matches visible action: chopping, sizzling, bubbling, pouring, plating.
+  the user asks and it matches visible action: chopping, sizzling, bubbling,
+  pouring, plating.
 
 ## Product And Brand Integration
 

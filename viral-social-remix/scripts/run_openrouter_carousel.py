@@ -263,6 +263,30 @@ def _preflight_storyboard_prompts(run_dir: Path, asset_ids: list[str]) -> None:
         _read_prompt(run_dir, asset_id)
 
 
+def _selected_asset_ids(
+    all_asset_ids: list[str],
+    requested_asset_ids: list[str] | None,
+    *,
+    director_first_frames: bool,
+) -> list[str]:
+    if requested_asset_ids:
+        selected: list[str] = []
+        seen: set[str] = set()
+        for asset_id in requested_asset_ids:
+            if asset_id in seen:
+                continue
+            if asset_id not in all_asset_ids:
+                raise CarouselRunnerError(
+                    f"--asset-id {asset_id} is not present in the manifest"
+                )
+            seen.add(asset_id)
+            selected.append(asset_id)
+        return selected
+    if director_first_frames:
+        return all_asset_ids[:1]
+    return all_asset_ids
+
+
 def _list_from_value(value: Any) -> list[str]:
     if value is None:
         return []
@@ -557,6 +581,8 @@ def _finalize_run(
     platform: str,
     asset_ids: list[str],
     manifest_data: dict[str, Any],
+    *,
+    partial: bool = False,
 ) -> dict[str, Any]:
     generated = [_generated_path(run_dir, asset_id) for asset_id in asset_ids]
     if all(path.is_file() for path in generated):
@@ -582,6 +608,20 @@ def _finalize_run(
     validation_path.parent.mkdir(parents=True, exist_ok=True)
     if not validation_path.exists():
         validation_path.write_text("{}", encoding="utf-8")
+    if partial:
+        result = {
+            "valid": True,
+            "errors": [],
+            "partial": True,
+            "platform": platform,
+            "asset_ids": asset_ids,
+            "note": (
+                "Partial image generation only. Run full validation after the "
+                "remaining required assets or accepted video clips are ready."
+            ),
+        }
+        _write_json(validation_path, result)
+        return result
     result = validate_output.validate_delivery(run_dir, platform)
     _write_json(validation_path, result)
     return result
@@ -622,6 +662,7 @@ def run_carousel(
     max_attempts: int = 2,
     model: str | None = None,
     quality: str | None = None,
+    asset_ids: list[str] | None = None,
     request_fn=None,
     api_mode: str | None = None,
 ) -> dict[str, Any]:
@@ -635,8 +676,8 @@ def run_carousel(
     data = manifest.load(manifest_path)
     platform = data.get("platform", "")
     expected_size = _expected_size(platform)
-    asset_ids = list(data.get("assets", {}).keys())
-    if not asset_ids:
+    manifest_asset_ids = list(data.get("assets", {}).keys())
+    if not manifest_asset_ids:
         raise CarouselRunnerError("Manifest does not contain carousel assets")
     director_first_frames = (
         data.get("video_mode") == "director-first-frame-three-clips"
@@ -646,15 +687,20 @@ def run_carousel(
     expected_storyboard_count = 3 if director_first_frames else 9
     if (
         platform in STORYBOARD_PLATFORMS
-        and len(asset_ids) != expected_storyboard_count
+        and len(manifest_asset_ids) != expected_storyboard_count
     ):
         raise CarouselRunnerError(
             f"{platform} storyboard requires exactly {expected_storyboard_count} "
             "assets before API generation; "
-            f"found {len(asset_ids)}"
+            f"found {len(manifest_asset_ids)}"
         )
+    selected_asset_ids = _selected_asset_ids(
+        manifest_asset_ids,
+        asset_ids,
+        director_first_frames=director_first_frames,
+    )
     if platform in STORYBOARD_PLATFORMS:
-        _preflight_storyboard_prompts(run, asset_ids)
+        _preflight_storyboard_prompts(run, selected_asset_ids)
 
     config = _apply_platform_image_config(
         openrouter_image.resolve_generation_config(model=model, quality=quality),
@@ -667,7 +713,7 @@ def run_carousel(
     manifest_lock = threading.Lock()
 
     pending: list[str] = []
-    for asset_id in asset_ids:
+    for asset_id in selected_asset_ids:
         output = _generated_path(run, asset_id)
         _normalize_image_size(
             output,
@@ -762,7 +808,14 @@ def run_carousel(
     if errors:
         raise CarouselRunnerError(f"Generation finished with {len(errors)} error(s)")
 
-    validation = _finalize_run(run, platform, asset_ids, manifest.load(manifest_path))
+    partial = selected_asset_ids != manifest_asset_ids
+    validation = _finalize_run(
+        run,
+        platform,
+        selected_asset_ids,
+        manifest.load(manifest_path),
+        partial=partial,
+    )
     ledger["validation"] = validation
     _write_json(cost_path, ledger)
     return {
@@ -802,6 +855,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model")
     parser.add_argument("--quality")
     parser.add_argument(
+        "--asset-id",
+        action="append",
+        default=[],
+        help=(
+            "Generate only this manifest asset id. Repeat for multiple ids. "
+            "Director three-clip runs default to asset 01 only."
+        ),
+    )
+    parser.add_argument(
         "--api-mode",
         choices=sorted(API_MODES),
         default=None,
@@ -820,6 +882,7 @@ def main(argv: list[str] | None = None) -> int:
             max_attempts=args.max_attempts,
             model=args.model,
             quality=args.quality,
+            asset_ids=args.asset_id or None,
             api_mode=args.api_mode,
         )
     except CarouselRunnerError as exc:

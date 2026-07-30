@@ -26,6 +26,7 @@ import validate_output
 
 VIDEO_PLATFORMS = {"video", "vertical-video"}
 PLATFORMS = {"xiaohongshu", "instagram-facebook"} | VIDEO_PLATFORMS
+COMMERCIAL_ROUTES = {"three-clip", "single-10s"}
 VIDEO_REFERENCE_EXTENSIONS = {
     "image": {".jpg", ".jpeg", ".png", ".webp", ".heic"},
     "video": {".mp4", ".mov", ".webm", ".m4v"},
@@ -38,16 +39,43 @@ DEFAULT_SIZES = {
     "vertical-video": "1080x1920",
 }
 FIXED_COOKING_SHOTS = [
-    "Clip 1 / first frame 01 / 6s: product hook and first preparation action.",
-    "Clip 2 / first frame 02 / 6s: main cooking or assembly transformation.",
-    "Clip 3 / first frame 03 / 6s: finish, pack/plate, and branded result.",
+    "Clip 1 / first frame 01 / opening reference / 6s: product hook, package/prep, and first close-up insert.",
+    "Clip 2 / first frame 02 / opening reference / 6s: move to real cooking location; show heat, stove, steamer, steam, or appliance action.",
+    "Clip 3 / first frame 03 / opening reference / 6s: plate, serve, use, or present the finished product state and final hero.",
     "",
-    "Direct the angle, composition, starting action, camera move, and intended endpoint for each clip.",
-    "Generate exactly three 1080x1920 opening frames with the configured image API.",
-    "Give Seedance only the matching opening frame for each request: 01, 02, then 03.",
+    "Seedance workshop contract: write instruction, not description. Every prompt must name SETTINGS, SUBJECTS/OBJECTS, VISUAL STYLE, LIGHTING/TONE, CAMERA, ACTION MECHANICS, TIMED BEATS, QUALITY, AUDIO, and CONSTRAINTS.",
+    "Use the core formula subject + action + scene, then expand it into physical action details, explicit camera verbs, consistent visual style, concrete technical quality, and negative constraints.",
+    "Direct each 6s Seedance clip as 2-3 commercial micro-shots, not one long camera move.",
+    "Use timed beats: 0-2s establishing/action, 2-4s close-up insert or location move, 4-6s endpoint and transition handle.",
+    "Official camera rule: write each micro-shot as a shot-order storyboard: subject + location + action + how the camera shoots it.",
+    "Official lens rule: camera movement = starting frame composition + movement verb + direction/amplitude/speed + ending frame composition.",
+    "Name shot size, camera angle, lens/focus feel, start frame, camera movement, and end frame. Prefer one camera move per micro-shot; combine only compatible moves deliberately.",
+    "Use precise camera vocabulary: wide, medium, close-up, extreme close-up; eye-level, high angle, low angle, bird view; dolly-in/out, pan, track/follow, tilt, rise/fall, rotate/surround, zoom, rack focus, locked-off.",
+    "Define physical lighting and emotional tone together; do not combine contradictory lighting and mood.",
+    "Use one visual style across all references and clips. If references differ in style, make a consistent image reference before Seedance.",
+    "Include at least one cooking-location/heat/steamer/stove beat when the product needs cooking.",
+    "Include at least two close-up inserts across the sequence, such as product texture, steam, package opening, pour, utensil movement, sauce, crunch, plating, or final use.",
+    "Brand as a commercial through clip 1 opening-frame product/sign visibility only; later clips do not need logo-sign continuity.",
+    "Generate clip 1's 1080x1920 opening frame first with the configured image API.",
+    "After each accepted clip, inspect its returned last frame and final motion strip. Use it directly only when clean; otherwise generate a transition opening anchor with the image model for a deliberate camera bridge.",
+    "Give Seedance only the selected opening reference for each request.",
     "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
-    "Keep the same no-face hands, clothing, kitchen, light, product, package, and physical logo tabletop sign.",
-    "Opening frames are generation references and must not be imported into ChatCut.",
+    "Keep the same no-face hands, clothing, kitchen/table, light logic, product identity, and package when naturally visible.",
+    "Opening references, returned last frames, and transition anchors are generation references and must not be imported into ChatCut.",
+]
+FIXED_SINGLE_10S_SHOTS = [
+    "Single 10s route: one Seedance request, one coherent environment, 5-6 motivated commercial micro-shots.",
+    "Use this for drinks, snacks, pantry, shelf-stable products, office rituals, and other products where the whole story can happen in one scene.",
+    "Use the supplied product/page image as product bible and opening reference. Product/logo/package readability is required only in the first shot.",
+    "Do not force logo, package text, or brand props to remain visible after the opening shot.",
+    "Seedance workshop contract: write instruction, not description. The prompt must name SETTINGS, SUBJECTS/OBJECTS, VISUAL STYLE, LIGHTING/TONE, CAMERA, ACTION MECHANICS, QUALITY, AUDIO, and CONSTRAINTS.",
+    "Write timed beats such as 0-1.2s product hero, 1.2-2.4s hand/use action, 2.4-4.2s preparation/pour, 4.2-6.2s macro texture/liquid/steam, 6.2-8.0s user ritual, 8.0-10.0s final hero.",
+    "Use Shot 1 / Shot 2 / Shot 3 style ordering inside the 10s prompt when needed; each shot must state who/what, where, action, and camera.",
+    "For each camera move, state start frame, movement verb, direction/amplitude/speed, and end frame. Use motivated cuts, macro inserts, push-ins, rack focus, object wipes, pour/steam motion bridges, and reframing.",
+    "Keep camera movement simple, smooth, stable, and attached to the action's purpose. Do not make a single continuous camera drift.",
+    "Keep visual style consistent across references; avoid style mixtures from mismatched source images.",
+    "Every single-10s Seedance clip is 10s, 9:16, 1080p, and silent.",
+    "Import the accepted MP4 into ChatCut only if BGM, captions, voiceover, trimming, or digital reframing is needed. Do not generate SFX.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -187,6 +215,86 @@ def fixed_cooking_shot_list() -> str:
     return "# Shot List\n\n" + "\n".join(FIXED_COOKING_SHOTS) + "\n"
 
 
+def fixed_single_10s_shot_list() -> str:
+    return "# Shot List\n\n" + "\n".join(FIXED_SINGLE_10S_SHOTS) + "\n"
+
+
+def director_opening_frame_prompt(brief_text: str, group: int) -> str:
+    opening_plans = {
+        1: (
+            "Design the clip 1 opening reference. Start the commercial with a "
+            "readable product/package hero, the official physical tabletop brand "
+            "sign, and the first no-face hand action implied by the brief."
+        ),
+        2: (
+            "This is the clip 2 on-demand transition opening slot. Generate it "
+            "only after clip 1 has an accepted returned last frame and only if "
+            "that last frame is too weak to use directly for the next action. "
+            "Do not copy a damaged endpoint literally; design a cleaner camera "
+            "bridge into cooking/preparation. When a prior last-frame or last "
+            "motion-strip reference is supplied, preserve its usable food state, "
+            "hands, lighting, camera angle, and action direction."
+        ),
+        3: (
+            "This is the clip 3 on-demand transition opening slot. Generate it "
+            "only after clip 2 has an accepted returned last frame and only if "
+            "that last frame is too weak to use directly for the next action. "
+            "Do not copy a damaged endpoint literally; design a cleaner camera "
+            "bridge into serving or the final hero. When a prior last-frame or "
+            "last motion-strip reference is supplied, preserve its usable "
+            "product state, hands, lighting, camera angle, and action direction."
+        ),
+    }
+    transition_plans = {
+        1: "The frame must be able to move into clip 1's first action.",
+        2: "The frame must bridge from clip 1's usable endpoint into the main transformation through match action, steam/lid/pour/object occlusion, rack focus, texture insert, or another motivated camera transition.",
+        3: "The frame must bridge from clip 2's usable endpoint into serving, use, or final presentation through match action, steam/lid/pour/object occlusion, rack focus, texture insert, plate movement, or another motivated camera transition.",
+    }
+    brand_plan = (
+        "Render the official ASIAN GROCER ONLINE / powered by UMALL logo only "
+        "as a real printed tabletop sign with perspective, shadow, and partial "
+        "scene occlusion. It must be readable in clip 1's opening frame."
+        if group == 1
+        else (
+            "Do not force the physical logo sign into this later opening. Include "
+            "the product package only when it naturally supports the composition."
+        )
+    )
+    return (
+        f"# Opening Frame {group:02d}\n\n"
+        f"PRODUCT BRIEF:\n{brief_text}\n\n"
+        "Create a single 1080x1920 photorealistic premium grocery/product "
+        "commercial opening reference for Seedance. This is a still-image "
+        "direction prompt, not a finished-video description.\n\n"
+        f"USE CONDITION: {opening_plans[group]}\n"
+        "SCENE: choose the exact product-appropriate location, surface, props, "
+        "time of day, atmosphere, and commercial mood for this clip's starting "
+        "state.\n"
+        "SUBJECTS/OBJECTS: no-face hands, the exact product from the brief, "
+        "package only when useful, cookware/tableware/props, and the current "
+        "food/product state. Keep hands, clothing, product identity, lighting, "
+        "and color grade consistent with the sequence.\n"
+        "COMPOSITION: vertical 9:16 frame with a clear action start, product "
+        "readability where needed, and negative space only when it serves the "
+        "shot. No floating graphics.\n"
+        "FRAMING/LENS: name the shot size, camera angle, lens/focus feel, focal "
+        "plane, and subject placement. The still must clearly imply the first "
+        "motion's start frame and the intended end frame.\n"
+        "BRAND: "
+        f"{brand_plan}\n"
+        "MOTION READINESS: "
+        f"{transition_plans[group]} Show the hand/tool/object position that can "
+        "continue into motion with a matched action, steam/lid/object occlusion, "
+        "pour/mix/plate movement, texture insert, or rack-focus bridge.\n"
+        "QUALITY: sharp focus, believable food/product texture, realistic hands, "
+        "natural steam/liquid/material behavior, premium controlled lighting, "
+        "coherent commercial color grade.\n"
+        "NEGATIVE: face, extra fingers, warped hands/tools, invented packaging, "
+        "floating logo, overlay text, captions, title cards, lower-thirds, "
+        "watermarks, unrelated props, scene teleporting.\n"
+    )
+
+
 def _mark_director_three_clip_mode(
     manifest_path: Path,
     storyboard_references: list[dict] | None = None,
@@ -227,14 +335,15 @@ def _mark_director_three_clip_mode(
             "ratio": "9:16",
             "resolution": "1080p",
             "target_duration": None,
-            "duration_policy": "preserve coherent sequence; trim only defects, repetition, awkward joins, or dead time",
+            "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
             "expect_audio": True,
-            "audio_policy": "user voiceover plus agent-generated BGM and cooking SFX",
+            "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
             "text_policy": "editable white centered current-step captions in ChatCut",
         },
         "continuity": {
             "last_frame_path": None,
             "available": False,
+            "handoff_policy": "inspect accepted prior clip's returned last frame and final motion strip; use a clean last frame directly or generate a transition opening anchor when the last frame is weak",
         },
         "brand": {
             "strategy": "first-frame-physical-prop",
@@ -250,7 +359,7 @@ def _mark_director_three_clip_mode(
         "status": "prepared",
         "visual_qa": "not_started",
         "chatcut": "not_started",
-        "export_qa": "not_started",
+        "export_qa": "user_acceptance",
         "history": [],
         "clips": {
             "clip-01": {"frames": ["01"], "status": "prepared"},
@@ -261,7 +370,110 @@ def _mark_director_three_clip_mode(
     data["assumptions"].append(
         {
             "inferred": True,
-            "value": "Three director-designed opening frames, one per silent 6s Seedance clip; ChatCut imports only accepted MP4 clips and preserves a coherent full sequence.",
+            "value": "Director-led sequential handoff: generate clip 1 opening first; for clips 2 and 3 inspect the accepted prior clip's returned last frame and final motion strip before using it directly or generating a transition opening anchor for the next camera bridge. ChatCut imports only accepted MP4 clips.",
+        }
+    )
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _mark_single_10s_mode(
+    manifest_path: Path,
+    references: list[dict] | None = None,
+) -> None:
+    image_references = [
+        item for item in references or [] if item.get("type") == "image"
+    ]
+    if not image_references:
+        raise ValueError(
+            "single-10s commercial route needs at least one product/page image reference"
+        )
+    data = manifest.load(manifest_path)
+    data["schema_version"] = 2
+    data["video_mode"] = "single-10s-commercial"
+    data["storyboard_references"] = references or []
+    data["assets"] = {}
+    data["video"] = {
+        "mode": "single-10s-commercial",
+        "profile": "single-10s-final",
+        "references": references or [],
+        "shots": [
+            {
+                "id": "shot-01",
+                "time": "0-1.2s",
+                "purpose": "product identity",
+                "note": "Readable product/package opening reference only.",
+            },
+            {
+                "id": "shot-02",
+                "time": "1.2-2.4s",
+                "purpose": "convenience action",
+                "note": "Hand opens, takes, places, tears, scoops, or prepares the product.",
+            },
+            {
+                "id": "shot-03",
+                "time": "2.4-4.2s",
+                "purpose": "real use or preparation",
+                "note": "Pour, brew, heat, mix, plate, or otherwise show practical use.",
+            },
+            {
+                "id": "shot-04",
+                "time": "4.2-6.2s",
+                "purpose": "premium texture",
+                "note": "Macro insert: steam, liquid bloom, gloss, crunch, texture, or ingredient detail.",
+            },
+            {
+                "id": "shot-05",
+                "time": "6.2-8.0s",
+                "purpose": "lifestyle payoff",
+                "note": "User ritual in the selected setting, no face.",
+            },
+            {
+                "id": "shot-06",
+                "time": "8.0-10.0s",
+                "purpose": "final hero",
+                "note": "Settled product/use-state hero. Package may return only if natural.",
+            },
+        ],
+        "generation": {
+            "ratio": "9:16",
+            "duration": 10,
+            "resolution": "1080p",
+            "generate_audio": False,
+            "return_last_frame": False,
+            "watermark": False,
+        },
+        "delivery": {
+            "ratio": "9:16",
+            "resolution": "1080p",
+            "target_duration": None,
+            "duration_policy": "single coherent 10s Seedance multi-shot; ChatCut may trim/reframe when useful but should not force a fixed final length",
+            "expect_audio": True,
+            "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place SFX",
+            "text_policy": "editable white centered current-step captions in ChatCut when captions are requested",
+        },
+        "brand": {
+            "strategy": "first-frame-product-reference",
+            "visible_text": "opening-product-or-package-only",
+        },
+        "budget": {
+            "retry_limit": 1,
+            "stop_before_final": True,
+        },
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "chatcut": "not_started",
+        "export_qa": "user_acceptance",
+        "history": [],
+        "clips": {
+            "single-10s": {"status": "prepared", "duration": 10},
+        },
+    }
+    data.setdefault("assumptions", []).append(
+        {
+            "inferred": True,
+            "value": "Single-10s commercial route: use product/page image reference as visual bible, generate one 10s multi-shot Seedance clip, and use ChatCut only for trim/reframe/BGM/captions/handoff.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -454,6 +666,7 @@ def prepare_original_video_run(
     brief: str | None = None,
     brief_file: str | Path | None = None,
     platform: str = "vertical-video",
+    commercial_route: str = "three-clip",
     output_root: str | Path = "output",
     task_name: str | None = None,
     caption_language: str | None = None,
@@ -463,6 +676,12 @@ def prepare_original_video_run(
 ) -> Path:
     if platform not in VIDEO_PLATFORMS:
         raise ValueError(f"Original video platform must be one of: {', '.join(sorted(VIDEO_PLATFORMS))}")
+    if commercial_route not in COMMERCIAL_ROUTES:
+        raise ValueError(
+            f"Commercial route must be one of: {', '.join(sorted(COMMERCIAL_ROUTES))}"
+        )
+    if platform != "vertical-video" and commercial_route != "three-clip":
+        raise ValueError("single-10s commercial route is only supported for vertical-video")
     brief_text, brief_source = _read_brief(brief, brief_file)
     name = task_name or _safe_stem(brief_text.splitlines()[0][:48])
     run_dir = create_run_dir.create(output_root, name)
@@ -472,11 +691,111 @@ def prepare_original_video_run(
         f"# Brief\n\n{brief_text}\n",
         encoding="utf-8",
     )
-    if platform == "vertical-video":
+    video_references_prepared = _prepare_video_references(
+        run_dir,
+        image_references=image_references,
+        video_references=video_references,
+        audio_references=audio_references,
+    )
+    if platform == "vertical-video" and commercial_route == "single-10s":
+        (run_dir / "analysis" / "shot-list.md").write_text(
+            fixed_single_10s_shot_list(),
+            encoding="utf-8",
+        )
+        (run_dir / "analysis" / "seedance-prompt.md").write_text(
+            (
+                "# Seedance Prompt\n\n"
+                f"PRODUCT BRIEF:\n{brief_text}\n\n"
+                "Create a premium 10-second vertical product commercial. This is an "
+                "instruction prompt, not a description of an already finished video. "
+                "Use [Image 1] as the opening product/package reference and visual "
+                "product bible. The product/package/logo must be readable in the first "
+                "shot only; do not force logo, package text, or product-pack visibility "
+                "after the opening shot.\n\n"
+                "SETTINGS: choose one practical real-life setting implied by the brief "
+                "(office desk, home kitchen, pantry counter, beverage table, or another "
+                "product-appropriate location) and keep it continuous for the whole "
+                "clip. Name the environment, time of day, atmosphere, and commercial "
+                "mood.\n"
+                "SUBJECTS/OBJECTS: no-face human hands interact with the exact product "
+                "from [Image 1]. Keep the product shape, pack color, key ingredients, "
+                "props, tabletop, and hands/clothing consistent.\n"
+                "VISUAL STYLE: photorealistic premium grocery/product commercial with "
+                "one coherent color grade. Do not mix 3D/cartoon/stylized looks with "
+                "real product photography.\n"
+                "LIGHTING/TONE: specify a physical light source, direction, intensity, "
+                "shadow behavior, contrast, and matching emotional tone. Avoid "
+                "contradictory lighting and mood.\n"
+                "CAMERA: for each micro-shot name shot size, angle, lens/focus feel, "
+                "start frame, movement verb, direction/amplitude/speed, and end frame. "
+                "Use simple purposeful moves such as locked-off product hero, stable "
+                "dolly-in/push-in, cut-in, rack focus, object wipe, slight pan, or "
+                "subtle follow. Smooth and stable, no jitter, no conflicting camera "
+                "commands.\n"
+                "ACTION MECHANICS: tie every action to hands, package, liquid, spoon, "
+                "cup, bowl, plate, steam, wrapper, or product texture. State speed, "
+                "force, range, and continuity between beats; prefer slow, gentle, "
+                "continuous small movements.\n\n"
+                "Commercial multi-shot rhythm:\n"
+                "0-1.2s: product/package hero shot in the chosen real-life setting.\n"
+                "1.2-2.4s: close-up hand action showing the product is easy to use.\n"
+                "2.4-4.2s: practical preparation or serving action with a motivated cut.\n"
+                "4.2-6.2s: macro premium texture insert: steam, liquid bloom, gloss, "
+                "ingredient detail, or product texture.\n"
+                "6.2-8.0s: no-face lifestyle payoff in the same setting.\n"
+                "8.0-10.0s: final refined hero shot; product pack may appear only if it "
+                "fits naturally.\n\n"
+                "QUALITY: rich product detail, sharp focus, detailed food or packaging "
+                "texture, natural steam/liquid/material behavior, realistic hands and "
+                "props, controlled depth of field, clean premium color grading.\n"
+                "AUDIO: generate_audio is false for this workflow. Do not ask Seedance "
+                "for SFX, dialogue, music, subtitles, or voiceover; audio is finished "
+                "later in ChatCut unless the user explicitly selects native audio.\n"
+                "CONSTRAINTS: no face, no subtitles, no captions, no title cards, no "
+                "lower-thirds, no burned-in text, no overlay graphics, no floating "
+                "logo, no watermarks, no extra logos, no warped hands, no invented "
+                "packaging, no scene teleporting.\n"
+            ),
+            encoding="utf-8",
+        )
+    elif platform == "vertical-video":
+        for group in range(1, 4):
+            _write_if_missing(
+                run_dir
+                / "analysis"
+                / "page-prompts"
+                / f"page-{group:02d}.md",
+                director_opening_frame_prompt(brief_text, group),
+            )
         group_actions = {
-            1: "Begin exactly from first frame 01. Animate the product hook and first preparation action.",
-            2: "Begin exactly from first frame 02. Animate the main cooking or assembly transformation.",
-            3: "Begin exactly from first frame 03. Animate the finish, pack or plate action, and branded result.",
+            1: (
+                "0-2s establish the product pack, physical brand sign, setting, "
+                "and the first no-face hand action from the brief. 2-4s cut or "
+                "push into a close-up insert of package opening, ingredient "
+                "texture, hand placement, pour, spoon, wrapper, or product surface. "
+                "4-6s move toward the next preparation/cooking location and create "
+                "a deliberate hand, object, steam, lid, pour, or rack-focus bridge "
+                "for clip 2."
+            ),
+            2: (
+                "0-2s begin from the selected clip 2 opening reference, chosen "
+                "after inspecting clip 1's accepted returned last frame, and arrive "
+                "at the main cooking/preparation action. 2-4s show the transformation "
+                "that proves the product: heat, steamer, stove, appliance, pour, mix, "
+                "sizzle, steam, liquid bloom, texture close-up, or assembly detail as "
+                "appropriate to the brief. 4-6s use steam, lid lift, hand match, "
+                "plate move, pour motion, or object occlusion as the bridge toward "
+                "serving."
+            ),
+            3: (
+                "0-2s begin from the selected clip 3 opening reference, chosen "
+                "after inspecting clip 2's accepted returned last frame, and plate, "
+                "serve, pour, scoop, lift, or present the finished product state. "
+                "2-4s cut into the strongest texture/usage insert from the brief. "
+                "4-6s settle on a refined final hero with the finished food or "
+                "product-use state; include the product pack only if it fits "
+                "naturally, and do not force the logo sign to return."
+            ),
         }
         for group, action in group_actions.items():
             _write_if_missing(
@@ -486,20 +805,63 @@ def prepare_original_video_run(
                 / f"clip-{group:02d}.md",
                 (
                     f"# Seedance Clip {group:02d}\n\n"
-                    f"{action} Use one restrained commercial camera movement "
-                    "and finish at the director-specified endpoint. Preserve "
-                    "the supplied no-face hands, clothing, kitchen, food, "
-                    "product package, lighting, and the exact physical "
-                    "ASIAN GROCER ONLINE / powered by UMALL tabletop sign. "
-                    "Realistic food physics, no new objects, no subtitles or "
-                    "overlay text.\n"
+                    f"PRODUCT BRIEF:\n{brief_text}\n\n"
+                    "Begin exactly from the selected opening reference for this "
+                    "clip. This is an instruction prompt, not a description of a "
+                    "finished video.\n\n"
+                    "SETTINGS: name the exact product-appropriate location, "
+                    "environment, time of day, atmosphere, and commercial mood. "
+                    "Keep it continuous with the accepted prior clip when this is "
+                    "clip 2 or 3.\n"
+                    "SUBJECTS/OBJECTS: no-face hands, the product from the brief, "
+                    "its package when naturally visible, cookware/tableware/props, "
+                    "and the current food/product state. Keep hands, clothing, "
+                    "kitchen/table, product identity, and color grade consistent.\n"
+                    "VISUAL STYLE: photorealistic premium grocery food commercial "
+                    "with one coherent visual style; no style mixing from mismatched "
+                    "references.\n"
+                    "LIGHTING/TONE: physical light source, direction, intensity, "
+                    "shadow behavior, contrast, and matching emotional tone.\n"
+                    "CAMERA: direct a compact Shot 1 / Shot 2 / Shot 3 montage. "
+                    "For each shot, name shot size, angle, lens/focus feel, start "
+                    "frame composition, movement verb, direction/amplitude/speed, "
+                    "and ending frame composition. Use simple purposeful moves such "
+                    "as locked-off, stable dolly-in/push-in, cut-in, rack focus, "
+                    "slight pan, track/follow, object wipe, steam/lid occlusion, or "
+                    "match-action cut. Smooth, stable, no jitter, no conflicting "
+                    "moves.\n"
+                    "ACTION MECHANICS: tie actions to hands, package, liquid, heat, "
+                    "steam, utensil, lid, plate, cup, wrapper, or product texture. "
+                    "State speed, force, range, inertia, and how the action continues "
+                    "into the next beat.\n\n"
+                    f"TIMED BEATS: {action}\n\n"
+                    "QUALITY: rich food/product detail, sharp focus, detailed texture, "
+                    "natural steam/liquid/heat behavior, realistic hands and cookware, "
+                    "controlled depth of field, premium believable color grading.\n"
+                    "AUDIO: generate_audio is false for this workflow. Do not ask "
+                    "Seedance for SFX, music, dialogue, voiceover, or subtitles; audio "
+                    "is finished later in ChatCut unless the user explicitly selects "
+                    "native audio.\n"
+                    "BRAND: the physical ASIAN GROCER ONLINE / powered by UMALL "
+                    "tabletop sign must read only in clip 1's opening reference / "
+                    "first frame. Later clips do not need to preserve or repeat it; "
+                    "food texture, cooking, plating, and usage can naturally push it "
+                    "out of frame.\n"
+                    "CONSTRAINTS: no face, no new objects, no scene teleporting, no "
+                    "subtitles, no overlay text, no title cards, no lower-thirds, no "
+                    "floating logo, no watermarks, no extra logos, no warped hands, "
+                    "no invented packaging.\n"
                 ),
             )
     manifest_path = run_dir / "analysis" / "manifest.json"
     manifest.create(
         manifest_path,
         platform,
-        ["01", "02", "03"] if platform == "vertical-video" else _asset_ids(platform, []),
+        (
+            ["01", "02", "03"]
+            if platform == "vertical-video" and commercial_route == "three-clip"
+            else ([] if platform == "vertical-video" else _asset_ids(platform, []))
+        ),
         source={
             "kind": "original_brief",
             "paths": [brief_source] if brief_source else [],
@@ -508,15 +870,12 @@ def prepare_original_video_run(
         },
         provider=image_provider.resolve(),
     )
-    if platform == "vertical-video":
+    if platform == "vertical-video" and commercial_route == "single-10s":
+        _mark_single_10s_mode(manifest_path, video_references_prepared)
+    elif platform == "vertical-video":
         _mark_director_three_clip_mode(
             manifest_path,
-            _prepare_video_references(
-                run_dir,
-                image_references=image_references,
-                video_references=video_references,
-                audio_references=audio_references,
-            ),
+            video_references_prepared,
         )
     return run_dir
 
@@ -604,6 +963,7 @@ def cmd_prepare_original_video(args: argparse.Namespace) -> int:
         brief=args.brief,
         brief_file=args.brief_file,
         platform=args.platform,
+        commercial_route=args.commercial_route,
         output_root=args.output_root,
         task_name=args.task_name,
         caption_language=args.caption_language,
@@ -673,6 +1033,7 @@ def build_parser() -> argparse.ArgumentParser:
     original.add_argument("--brief")
     original.add_argument("--brief-file")
     original.add_argument("--platform", choices=sorted(VIDEO_PLATFORMS), default="vertical-video")
+    original.add_argument("--commercial-route", choices=sorted(COMMERCIAL_ROUTES), default="three-clip")
     original.add_argument("--output-root", default="output")
     original.add_argument("--task-name")
     original.add_argument("--caption-language", choices=["zh", "en"])

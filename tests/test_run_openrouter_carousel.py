@@ -209,7 +209,7 @@ def test_run_openrouter_carousel_generates_english_vertical_storyboard(tmp_path,
     assert result["validation"]["valid"] is True
 
 
-def test_run_openrouter_carousel_generates_three_director_opening_frames(
+def test_run_openrouter_carousel_director_defaults_to_first_opening_frame(
     tmp_path,
     monkeypatch,
 ):
@@ -266,10 +266,29 @@ def test_run_openrouter_carousel_generates_three_director_opening_frames(
         ),
     )
 
-    assert len(result["generated"]) == 3
+    assert len(result["generated"]) == 1
     assert (run_dir / "generated" / "page-01.png").is_file()
-    assert (run_dir / "generated" / "page-03.png").is_file()
+    assert not (run_dir / "generated" / "page-02.png").exists()
+    assert not (run_dir / "generated" / "page-03.png").exists()
     assert result["validation"]["valid"] is True
+    assert result["validation"]["partial"] is True
+    assert result["validation"]["asset_ids"] == ["01"]
+
+    repair_result = runner.run_carousel(
+        run_dir,
+        api_only=True,
+        concurrency=1,
+        asset_ids=["03"],
+        request_fn=lambda payload, api_key, endpoint: _image_api_response(
+            (1024, 1536),
+            cost=0.01,
+        ),
+    )
+
+    assert len(repair_result["generated"]) == 1
+    assert (run_dir / "generated" / "page-03.png").is_file()
+    assert repair_result["validation"]["partial"] is True
+    assert repair_result["validation"]["asset_ids"] == ["03"]
 
 
 def test_run_openrouter_carousel_rejects_square_output_for_vertical_video(

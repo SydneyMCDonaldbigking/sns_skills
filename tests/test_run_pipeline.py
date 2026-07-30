@@ -75,16 +75,54 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
         "first frame 01",
         "first frame 02",
         "first frame 03",
+        "Seedance workshop contract",
+        "direction/amplitude/speed",
+        "transition opening anchor",
         "must not be imported into ChatCut",
     ]:
         assert phrase in shot_list
     for index in range(1, 4):
-        assert (
+        opening_prompt_path = (
+            run_dir
+            / "analysis"
+            / "page-prompts"
+            / f"page-{index:02d}.md"
+        )
+        assert opening_prompt_path.is_file()
+        opening_prompt = opening_prompt_path.read_text(encoding="utf-8")
+        assert "1080x1920" in opening_prompt
+        assert "MOTION READINESS" in opening_prompt
+        assert "FRAMING/LENS" in opening_prompt
+        prompt_path = (
             run_dir
             / "analysis"
             / "seedance-prompts"
             / f"clip-{index:02d}.md"
-        ).is_file()
+        )
+        assert prompt_path.is_file()
+        prompt = prompt_path.read_text(encoding="utf-8")
+        for phrase in [
+            "PRODUCT BRIEF",
+            "SETTINGS",
+            "SUBJECTS/OBJECTS",
+            "VISUAL STYLE",
+            "LIGHTING/TONE",
+            "CAMERA",
+            "direction/amplitude/speed",
+            "ending frame composition",
+            "ACTION MECHANICS",
+            "TIMED BEATS",
+            "QUALITY",
+            "AUDIO",
+            "CONSTRAINTS",
+        ]:
+            assert phrase in prompt
+    page_two_prompt = (
+        run_dir / "analysis" / "page-prompts" / "page-02.md"
+    ).read_text(encoding="utf-8")
+    assert "on-demand transition opening slot" in page_two_prompt
+    assert "only after clip 1" in page_two_prompt
+    assert "Do not copy a damaged endpoint literally" in page_two_prompt
 
     data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
     assert data["platform"] == "vertical-video"
@@ -99,13 +137,14 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
     ]
     assert data["video"]["generation"]["generate_audio"] is False
     assert data["video"]["generation"]["return_last_frame"] is True
+    assert "transition opening anchor" in data["video"]["continuity"]["handoff_policy"]
     assert data["video"]["delivery"] == {
         "ratio": "9:16",
         "resolution": "1080p",
         "target_duration": None,
-        "duration_policy": "preserve coherent sequence; trim only defects, repetition, awkward joins, or dead time",
+        "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
         "expect_audio": True,
-        "audio_policy": "user voiceover plus agent-generated BGM and cooking SFX",
+        "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
         "text_policy": "editable white centered current-step captions in ChatCut",
     }
     assert data["storyboard_references"] == []
@@ -113,6 +152,47 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
     assert data["source"]["kind"] == "original_brief"
     assert data["source"]["brief_path"] == "analysis/brief.md"
     assert list(data["assets"]) == ["01", "02", "03"]
+    assert "transition opening anchor" in data["assumptions"][-1]["value"]
+
+
+def test_prepare_original_video_run_single_10s_prompt_uses_workshop_contract(
+    tmp_path: Path,
+):
+    image = tmp_path / "product.png"
+    image.write_bytes(b"image")
+
+    run_dir = pipeline.prepare_original_video_run(
+        brief="Brand: UMall. Product: bottled chrysanthemum tea for office break.",
+        commercial_route="single-10s",
+        output_root=tmp_path / "output",
+        task_name="tea",
+        image_references=[str(image)],
+    )
+
+    prompt = (run_dir / "analysis" / "seedance-prompt.md").read_text(
+        encoding="utf-8"
+    )
+    for phrase in [
+        "SETTINGS",
+        "SUBJECTS/OBJECTS",
+        "VISUAL STYLE",
+        "LIGHTING/TONE",
+        "CAMERA",
+        "direction/amplitude/speed",
+        "ACTION MECHANICS",
+        "QUALITY",
+        "AUDIO",
+        "CONSTRAINTS",
+        "0-1.2s",
+    ]:
+        assert phrase in prompt
+
+    data = json.loads(
+        (run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert data["video_mode"] == "single-10s-commercial"
+    assert data["video"]["generation"]["duration"] == 10
+    assert data["video"]["generation"]["generate_audio"] is False
 
 
 def test_prepare_original_video_run_records_structured_references(tmp_path: Path):

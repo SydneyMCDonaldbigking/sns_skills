@@ -52,10 +52,15 @@ Use semantic prompt placeholders such as `{{ref:product-pack}}`. The runner
 compiles them to the final provider order (`[Image 1]`, `[Video 1]`) and rejects
 unknown, missing, or `@Image1` references before spending money.
 
-For the current company cooking-commercial route, use three director-designed
-opening frames. Every 6s Seedance request receives only its own opening frame.
-The director specifies the angle, starting action, one camera move, and intended
-endpoint; Seedance creates the intermediate motion.
+For the current company cooking-commercial route, follow
+[[video-production-map]] and the production contract in
+`../../../viral-social-remix/references/cooking-video-workflow.md`. Generate
+clip 1's opening anchor first. For clips 2 and 3, inspect the prior clip's
+returned last frame and final motion strip before choosing the next opening
+anchor. Use a clean returned last frame directly; if it is weak, blurry,
+malformed, or awkward for the next action, generate a transition opening anchor
+with the image model. Every 6s Seedance request receives only one selected
+opening anchor.
 
 Profiles make intent explicit:
 
@@ -161,9 +166,10 @@ For cooking video prompts:
 - Repeat the no-visible-text policy in the Seedance prompt.
 - Prefer controlled, small motions: steam, gentle stirring, sauce pour,
   spooning into a bowl.
-- For a company cooking commercial, use one director-designed opening frame for
-  that 6-second clip. Add another still only when an exact transition requires
-  it.
+- For a company cooking commercial, use one selected opening anchor for that
+  6-second clip. It can be the designed clip 1 opening, a clean returned last
+  frame, or a generated transition opening anchor. Do not send extra stills for
+  reassurance.
 - Avoid asking for too many distinct actions in 5 seconds unless the visual
   references already make the progression obvious.
 

@@ -15,13 +15,17 @@ known product and brand values. Product and brand are mandatory.
 Ask only for missing mandatory fields or low-confidence platform when a value
 is still `未填写`.
 
-For an original cooking commercial, skip the memory index and read only
+For an original product/cooking commercial, skip the memory index and read only
 `references/cooking-video-workflow.md`. For other routes, read
 `docs/memory/viral-social-remix/index.md`, then only the linked route note.
 
 Search `data/material-index.jsonl` before recollecting known sources or assets.
 Use `scripts/query_material_index.py` or `scripts/build_remix_context.py` only
 when needed.
+When searching known materials, use a hybrid retrieval mindset: combine exact
+product/platform keywords with visual scene terms, modality clues, and natural
+language intent. For vague visual requests, ask or infer a narrower scene,
+style, use case, or product need before generating new assets.
 
 ## Choose one route
 
@@ -36,8 +40,9 @@ Infer the source platform and target output platform separately.
   natural English `1152x1152` and `caption-en.txt`.
 - **General video remix**: select exactly nine narrative frames and build the
   requested storyboard/contact sheet.
-- **Original cooking commercial**: use `vertical-video`, `9:16`,
-  `1080x1920`, and the director-first-frame route below.
+- **Original product/cooking commercial**: use `vertical-video`, `9:16`,
+  `1080x1920`, then choose either the single-10s route or the three-clip
+  director-first-frame route below.
 
 For carousel and general video routes, load `references/platform-profiles.md`
 and `references/breakdown-schema.md`. Load
@@ -74,46 +79,118 @@ configured image API; `openai/gpt-5.4-image-2` is the explicit legacy route.
 Load `references/fixed-brand-scenes.md` only when a warehouse scene is required.
 When the API is available, generate the assets; do not stop at prompts.
 
-## Original cooking commercial
+## Original product/cooking commercial
 
 Load `references/cooking-video-workflow.md` as the single production authority.
-Load `references/seedance-video.md` only after a runner/API failure.
+It already includes the Seedance workshop rules needed for food/product
+commercial prompting. Load `references/seedance-video.md` for non-cooking
+Seedance generation, provider/API controls, video extension, native-audio
+experiments, prompt-quality repair, or after a runner/API failure.
 
-Default:
+Choose the route before generation:
 
-`3 director-designed first frames -> 3 silent Seedance clips x 6s -> ChatCut finish`
+- **Single-10s commercial**: use for drinks, snacks, pantry products,
+  shelf-stable products, office rituals, and other products where one coherent
+  environment can carry the whole ad. Feed the product/page image directly as
+  the visual bible and opening product reference. Generate one silent `10s`,
+  `9:16`, `1080p` Seedance multi-shot clip with 4-6 timed beats. Product/logo
+  readability is required only in the opening shot; do not force logo or package
+  continuity later. Use ChatCut only for trim/reframe/BGM/captions/voiceover
+  handoff when needed.
+- **Three-clip 6s director route**: use for cooked products, big location
+  changes, stove/heat/steamer action, complex transformations, or when the user
+  wants more reroll/control. Chain:
+  `script beats -> clip 1 first frame -> commercial micro-shot Seedance clips with handoff/transition-anchor decisions -> ChatCut finish`.
 
-- Direct three script beats. For each clip choose the angle, composition,
-  starting action, one camera move, and intended endpoint.
-- Generate exactly three `1080x1920` first frames containing the supplied
-  product and official physical `ASIAN GROCER ONLINE / powered by UMALL`
-  company table sign as a real physical prop.
-- Give each Seedance request only its own opening frame. Use a designed or
-  returned last frame only when a join needs exact control.
+Default to three-clip for actual cooking. Prefer single-10s when the story is a
+simple product-use ritual in one place, such as an office product break.
+
+For the three-clip route:
+
+- Direct three script beats. For each 6s clip choose a 2-3 shot commercial
+  rhythm: establishing/action shot, close-up insert or scene move, and endpoint
+  bridge. Do not write one-camera-move prompts unless the user explicitly asks
+  for a single-take film.
+- Use official camera structure for every micro-shot: shot size, camera angle,
+  lens/focus feel, starting frame composition, movement verb with
+  direction/amplitude/speed, and ending frame composition. Prefer one purposeful
+  camera move per micro-shot.
+- Include real cooking-film grammar when the product requires heat: move from
+  prep counter to stove, show active flame/heat/steamer or cooking appliance,
+  cut into food texture, and use steam/lid/pour/object occlusion as transitions.
+- Generate the clip 1 `1080x1920` first frame first. For clips 2 and 3, inspect
+  the accepted prior clip's returned last frame before choosing the next opening
+  reference. Use that returned last frame directly when it is the most coherent
+  handoff. If the returned last frame is visually weak, malformed, too blurry,
+  awkwardly composed, or unable to begin the next action, generate a new
+  transition opening anchor with the image model instead of using the bad frame
+  literally. The transition anchor must design the camera bridge: match action,
+  steam/lid/pour/object occlusion, plate movement, rack focus, or another
+  motivated lens transition. Retry the prior clip only when no honest bridge can
+  be made.
+- Brand the sequence as a commercial, not every frame as a billboard. The
+  supplied product and official physical `ASIAN GROCER ONLINE / powered by
+  UMALL` table sign must read in clip 1's opening reference / first frame only.
+  Later clips do not need to preserve, repeat, or match the logo sign; close-up
+  food, stove, heat, pour, plating, or texture inserts may leave it out of
+  frame naturally.
+- Give each Seedance request only its selected opening reference: a designed
+  first frame, an accepted returned last frame, or a generated transition
+  opening anchor.
 - Use `6s`, `9:16`, `1080p`, silent generation, no face, and no generated
-  subtitles or overlays.
-- Review all three clips once and retry only a visible failure.
+  subtitles or overlays. Write the prompt as timed shot beats such as
+  `0-2s`, `2-4s`, `4-6s`.
+- Review each clip's last 8-12 frames before approving the next clip. The next
+  prompt must name the handoff mechanism: same object/action match, steam/lid
+  occlusion, pour/object motion bridge, or another deliberate bridge.
+- Review all three clips once and retry any visible failure, bad join, damaged
+  product/sign, or endpoint that cannot support the planned handoff.
 - Import only accepted MP4 clips into ChatCut. Never import first frames,
   storyboards, product/logo references, contact sheets, or QA images.
-- Keep the coherent natural duration. Generate editable BGM and cooking SFX;
-  add the user's voiceover when supplied; add centered white editable
-  current-step captions with a subtle dark stroke/shadow and no colored box.
+- Treat ChatCut as a second editing pass, not an assembler. Split each accepted
+  MP4 into usable beats when needed; trim weak starts/ends; punch in on texture,
+  steam, pour, utensils, packaging, or plating; reframe with subtle
+  digital push-ins, pull-backs, pans, and rack-focus-like zooms; add match cuts
+  or motivated short transitions only where they improve rhythm.
+- Keep a natural edit duration. Do not force the final commercial to a fixed
+  length when the visual rhythm works. In ChatCut, place clips by actual seconds
+  or convert durations with the editor's real timebase; never assume that source
+  fps equals timeline framebase. Generate and place editable BGM only; do not
+  generate or place cooking SFX. Add the user's voiceover when supplied; add
+  centered white editable current-step captions with a subtle dark stroke/shadow
+  and no colored box.
 
-Prepare with `scripts/run_pipeline.py prepare-original-video`. Generate each
-clip with `scripts/run_seedance_video.py --storyboard-group 1`, then repeat for
-groups 2 and 3. Use `scripts/run_openrouter_video.py` and
-`references/openrouter-video.md` only for an explicitly selected Grok route.
+Prepare three-clip with
+`scripts/run_pipeline.py prepare-original-video --commercial-route three-clip`.
+Generate clips sequentially with
+`scripts/run_seedance_video.py --storyboard-group 1`, inspect the returned last
+frame and last motion strip, then either use it directly or generate the group 2
+transition opening anchor; repeat this handoff check before group 3.
+
+Prepare single-10s with
+`scripts/run_pipeline.py prepare-original-video --commercial-route single-10s`
+and pass at least one product/page `--image-reference`. Submit one Seedance job
+with `scripts/run_seedance_video.py --profile single-10s-final`.
+
+Use `scripts/run_openrouter_video.py` and `references/openrouter-video.md` only
+for an explicitly selected Grok route.
 
 ## Finish
 
-After generation, make one representative visual pass across all clips. After
-export, verify the actual file's duration, dimensions, streams, opening, joins,
-ending, and audio tail. Use deeper QA or troubleshooting only after a concrete
-failure.
+After generation and ChatCut editing, do not run an agent-owned acceptance pass.
+The user is the reviewer. Stop after the requested handoff is available: an
+editable ChatCut project link, an export job, or a downloaded/exported file. Do
+not extract proof frames, inspect opening/joins/ending, or judge whether the cut
+is good unless the user explicitly asks for review or troubleshooting. Only do
+minimal tool-state checks needed to know that the handoff exists.
 
-Write a run note only after success and only when it contains a reusable
-lesson. Never store keys, raw provider responses, signed URLs, or base64
-payloads in Obsidian.
+When the user says a commercial is good, satisfying, approved, or ready to post,
+distill the reusable lesson immediately into
+`references/cooking-video-workflow.md`: route choice, action chain, reference
+strategy, logo policy, and why the result worked. Keep it concise and reusable,
+not a chat-only memory. Write a run note only after success and only when it
+contains a reusable lesson. Never store keys, raw provider responses, signed
+URLs, or base64 payloads in Obsidian.
 
 Do not bypass authentication or anti-scraping controls. Do not reproduce source
 watermarks, unauthorized logos, or real-person identity.

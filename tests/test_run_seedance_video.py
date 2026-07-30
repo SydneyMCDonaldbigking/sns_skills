@@ -409,7 +409,53 @@ def test_director_three_clip_dry_run_uses_only_matching_first_frame(
     assert result["image_count"] == 1
     assert result["generation"]["duration"] == 6
     assert result["generation"]["generate_audio"] is False
-    assert "opening frame 02" in result["payload"]["content"][0]["text"]
+    assert "planned frame 02" in result["payload"]["content"][0]["text"]
+    assert "generated transition opening anchor" in result["payload"]["content"][0]["text"]
+    assert "continuity repair frame" not in result["payload"]["content"][0]["text"]
+    assert [
+        item["image_url"]["url"]
+        for item in result["payload"]["content"][1:]
+    ] == ["<redacted data URL>"]
+
+
+def test_director_three_clip_can_use_previous_last_frame_without_page_two(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    run_dir = _prepared_director_three_clip_run(tmp_path)
+    (run_dir / "generated" / "page-02.png").unlink()
+    previous = run_dir / "generated" / "clip-01-last-frame.png"
+    Image.new("RGB", (1080, 1920), "white").save(previous)
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    data = manifest.load(manifest_path)
+    data["video"]["continuity"] = {
+        "clips": {
+            "clip-01": {
+                "last_frame_path": "generated/clip-01-last-frame.png",
+                "available": True,
+            }
+        }
+    }
+    manifest_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    result = runner.run_seedance_video(
+        run_dir,
+        storyboard_group=2,
+        allow_data_url=True,
+        continue_from_last_frame=True,
+        dry_run=True,
+    )
+
+    assert result["video_mode"] == "director-first-frame-three-clips"
+    assert result["storyboard_group"] == 2
+    assert result["image_count"] == 1
+    assert result["preflight"]["references"][0]["source"] == (
+        "generated/clip-01-last-frame.png"
+    )
     assert [
         item["image_url"]["url"]
         for item in result["payload"]["content"][1:]
