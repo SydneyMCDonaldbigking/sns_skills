@@ -50,6 +50,21 @@ product; copy the route choice, action chain, and prompt structure.
   `office product hero -> sachet/serving action -> hot water pour -> amber bloom
   macro -> hand pause beside laptop -> final desk hero`. Do not default these
   products to breakfast; choose the usage occasion that creates a buying reason.
+- **Pork belly vermicelli casserole / braised noodle pot pattern**: use the
+  three-clip 6s route for pork belly strips, braised meat casseroles, sweet
+  potato vermicelli dishes, and similar products where the sale depends on raw
+  meat becoming a glossy hot dish. The approved chain is `package identity and
+  prep board -> blanch or first heat action -> aromatics and soy-rich braise ->
+  soaked vermicelli enters near the end -> glossy pork and noodles lift -> hot
+  casserole hero`. Build clip 1's opening frame from the real product image,
+  cover/product reference, and English physical logo sign; reject and regenerate
+  the opening frame if the product or sign is cropped. For clips 2 and 3,
+  inspect the prior returned last frame and last motion strip, then continue
+  from that frame only when the pot, hands, lighting, and food state are clean.
+  Do not force the logo sign after the opening. Keep the recipe logic physical:
+  soaked vermicelli should enter late, steam and sauce should bridge the cuts,
+  and the final payoff should be chopsticks lifting translucent sauced noodles
+  with tender pork belly above the simmering pot.
 
 Reusable lesson: user approval came from route fit and physical commercial
 logic, not from generic "cinematic" styling. Good outputs had visible cause and
@@ -126,6 +141,12 @@ Apply these rules to both commercial routes:
   subject labels.
 - Use `first_frame` / opening reference for exact starting state. Use returned
   `last_frame` only when it creates a cleaner handoff than a designed frame.
+- For final-clip extensions, extra ending shots, or pull-back hero shots from a
+  returned `last_frame`, treat scene/background continuity as a hard constraint.
+  Preserve the same kitchen/stove/table, cookware placement, visible background
+  props, lighting direction, color grade, and camera height. If the pull-back
+  reveals more space, extrapolate only from the already established set; do not
+  invent a new window, shelf wall, counter layout, burner type, or room style.
 - If packaging or brand text must be readable, provide a high-resolution
   reference and spell the exact text in the prompt. Still expect small generated
   text to drift; critical logo text should be in the opening physical prop or
@@ -251,6 +272,13 @@ join is judged from motion, not only a still:
   clip provides no usable motion cue for a transition anchor.
 - Reject or retry a clip when its endpoint cannot support the next transition
   handle. Do not hide an incoherent handoff with a plain cross-dissolve.
+- If the user asks to extend the final clip or add a standalone ending shot,
+  begin from the accepted final returned last frame and lock the set. The prompt
+  must name the visible background anchors from that frame, such as stovetop or
+  table surface, burner/flame, pot position, window direction, shelf/counter
+  shape, background blur, and warm practical light. Use pull-back or settle
+  motion only when it keeps those anchors consistent; a wider hero is worse than
+  a new-looking kitchen.
 
 Do not generate nine storyboard frames by default. Do not import opening frames,
 returned last frames, transition anchors, or other generation references into
@@ -339,7 +367,11 @@ steam/lid occlusion].
 4-6s: [endpoint shot] with [specific bridge] so the next clip can begin cleanly
 from the same visual logic.
 End with [specific composition/action state].
-Preserve the food identity, kitchen, hands/clothing, lighting, and color grade.
+Preserve the food identity, exact kitchen/stove/table set, visible background
+anchors, cookware placement, hands/clothing, lighting direction, and color
+grade. When extending or pulling back from a returned last frame, reveal only
+more of the same established room; do not change the window, shelf, counter,
+burner, pot, room style, or background prop layout.
 Preserve the product pack when it naturally remains in frame. Preserve the
 physical logo sign only for clip 1's opening frame; later clips should not force
 the sign back into stove, steam, pouring, plating, or close-up inserts. Natural
@@ -356,6 +388,73 @@ opening. Use the returned last frame directly only when it is clean. If it is
 bad or weak for the next action, generate a transition opening anchor first and
 give Seedance that anchor as the sole reference. Do not add extra still anchors
 merely for reassurance.
+
+## Caption cue planning
+
+Do not wait until ChatCut to invent captions. During each Seedance polling wait,
+draft external editable current-step captions for the submitted clip and store
+them under `analysis/caption-cues/`. This uses otherwise idle time and makes
+later editing read prepared timing instead of creating captions from scratch.
+
+Use clip-relative timing first:
+
+- Three-clip route: write `clip-01.json`, `clip-02.json`, and `clip-03.json`
+  with times in each source clip's own `0.0-6.0s` range.
+- Single-10s route: write `single-10s.json` with times in `0.0-10.0s`.
+- After final trimming decisions, run `scripts/caption_cues.py` to write
+  `timeline.json` with actual timeline-relative placement before placing
+  captions in ChatCut.
+
+JSON cue format:
+
+```json
+{
+  "schema_version": 1,
+  "language": "en",
+  "source_clip": "clip-02",
+  "timing_basis": "clip-relative",
+  "style": "editable centered white text with subtle dark stroke/shadow, no colored box",
+  "cues": [
+    {"start": 0.4, "end": 1.8, "text": "Aromatics hit the heat"},
+    {"start": 2.2, "end": 3.8, "text": "Soy-rich braise builds"},
+    {"start": 4.2, "end": 5.6, "text": "Noodles soak up flavor"}
+  ]
+}
+```
+
+Keep cue text short and useful: 2-6 words, natural English for English-region,
+one idea per cue, no prices, no claims, no hashtags, no recipe paragraphs. For
+food commercials, prefer captions tied to visible action: `Blanch for clean
+flavor`, `Aromatics hit the heat`, `Sauce turns glossy`, `Noodles soak up
+flavor`, `Ready to serve`. If a clip may be trimmed, keep cues away from the
+first and last 0.3 seconds.
+
+When useful, also write a matching `clip-XX.srt` for quick manual preview, but
+the JSON is the source of truth for ChatCut placement. Captions are external
+editing data only: Seedance prompts must still say no subtitles, no captions,
+no title cards, and no burned-in text.
+
+RPA handoff: use `scripts/caption_cues.py` whenever cue JSON exists. During
+Seedance polling, run it without trims to validate cue files and write per-clip
+SRT previews:
+
+```bash
+python scripts/caption_cues.py output/YYYYMMDD-HHmmss-task
+```
+
+Before ChatCut caption placement, run it again with actual edit trims so the
+timeline math is deterministic:
+
+```bash
+python scripts/caption_cues.py output/YYYYMMDD-HHmmss-task \
+  --trim clip-01=0.30:5.70 \
+  --trim clip-02=0.10:5.40 \
+  --trim clip-03=0.00:5.20
+```
+
+This writes `analysis/caption-cues/timeline.json`, `timeline.srt`,
+`timeline.csv`, and `chatcut-caption-plan.json`. Treat
+`chatcut-caption-plan.json` as the editor placement contract.
 
 ## Fast review
 
@@ -403,9 +502,12 @@ source clip fps.
 Add an editable track for agent-generated BGM only when requested or useful,
 matching the target market and product tone. Do not generate, place, or time
 cooking SFX; the user will handle sound effects later when desired. Add the
-user's voiceover only when supplied. Add editable English
-current-step captions at the visual center: white, subtle dark stroke/shadow,
-no colored box.
+user's voiceover only when supplied. Before creating captions in ChatCut, run
+`scripts/caption_cues.py` with the actual trims unless
+`analysis/caption-cues/chatcut-caption-plan.json` already matches the current
+edit. Read that plan first and place those editable current-step captions;
+adjust manually only when the edit changes after compilation. Captions stay at
+the visual center: white, subtle dark stroke/shadow, no colored box.
 
 Do not run an agent-owned final acceptance pass. The user reviews the cut. After
 the requested handoff is available, stop: provide the editable ChatCut project

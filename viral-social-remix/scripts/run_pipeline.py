@@ -60,6 +60,8 @@ FIXED_COOKING_SHOTS = [
     "After each accepted clip, inspect its returned last frame and final motion strip. Use it directly only when clean; otherwise generate a transition opening anchor with the image model for a deliberate camera bridge.",
     "Give Seedance only the selected opening reference for each request.",
     "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
+    "While each Seedance clip is polling, draft external editable caption cues in analysis/caption-cues/clip-XX.json with clip-relative start/end/text; never burn captions into Seedance.",
+    "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
     "Keep the same no-face hands, clothing, kitchen/table, light logic, product identity, and package when naturally visible.",
     "Opening references, returned last frames, and transition anchors are generation references and must not be imported into ChatCut.",
 ]
@@ -75,6 +77,8 @@ FIXED_SINGLE_10S_SHOTS = [
     "Keep camera movement simple, smooth, stable, and attached to the action's purpose. Do not make a single continuous camera drift.",
     "Keep visual style consistent across references; avoid style mixtures from mismatched source images.",
     "Every single-10s Seedance clip is 10s, 9:16, 1080p, and silent.",
+    "While the Seedance job is polling, draft external editable caption cues in analysis/caption-cues/single-10s.json with clip-relative start/end/text; never burn captions into Seedance.",
+    "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
     "Import the accepted MP4 into ChatCut only if BGM, captions, voiceover, trimming, or digital reframing is needed. Do not generate SFX.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
@@ -338,7 +342,7 @@ def _mark_director_three_clip_mode(
             "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
             "expect_audio": True,
             "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
-            "text_policy": "editable white centered current-step captions in ChatCut",
+            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json; place editable white centered current-step captions, subtle dark stroke/shadow, no colored box",
         },
         "continuity": {
             "last_frame_path": None,
@@ -449,7 +453,7 @@ def _mark_single_10s_mode(
             "duration_policy": "single coherent 10s Seedance multi-shot; ChatCut may trim/reframe when useful but should not force a fixed final length",
             "expect_audio": True,
             "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place SFX",
-            "text_policy": "editable white centered current-step captions in ChatCut when captions are requested",
+            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json when captions are requested",
         },
         "brand": {
             "strategy": "first-frame-product-reference",
@@ -539,6 +543,7 @@ def _copy_sources(input_path: Path, files: list[Path], run_dir: Path) -> list[st
 def _create_run_layout(run_dir: Path, platform: str, caption_language: str | None) -> None:
     for directory in [
         run_dir / "analysis",
+        run_dir / "analysis" / "caption-cues",
         run_dir / "analysis" / "page-prompts",
         run_dir / "references" / "keyframes",
         run_dir / "generated",

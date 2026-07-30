@@ -1,12 +1,65 @@
 ---
 name: viral-social-remix
-description: Use when a user provides a viral social-post URL, image, video, local file, local folder, or original food brief and wants a branded Xiaohongshu, Instagram/Facebook, carousel, or Seedance/Grok video remix.
+description: |
+  Use when a user provides a viral social-post URL, active Chrome tab, image,
+  video, local file/folder, product image, or original food brief and wants a
+  branded English-region or Chinese-region social remix: Xiaohongshu capture,
+  Instagram/Facebook carousel, shopping-guide image, or Seedance/Grok product
+  and cooking commercial. Also use for UMALL / Asian Grocer Online workflows,
+  English-region logo/size decisions, Chrome MCP capture, OpenRouter image
+  generation, Seedance three-clip cooking videos, 10s product commercials,
+  final-frame video extensions, and fixing generated carousel artifacts such as
+  fake prices, blurred/mosaic UI, wrong logo, or wrong target region.
 ---
 
 # Viral Social Remix
 
 Use this file only as a route map. Current user instructions override memory.
 Never load the whole vault.
+
+## Critical defaults
+
+- Default company output is English-region unless the user explicitly asks for
+  Chinese-region or Chinese Xiaohongshu target output. A Chinese source post is
+  source/capture context only; it must not flip the target region.
+- English-region carousel output is `instagram-facebook`, natural English,
+  `1152x1152`, `caption-en.txt`, and the official English lockup:
+  `viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
+  Never use the Chinese `umall_logo.png` unless the user explicitly chooses
+  Chinese-region output.
+- Preserve source page count, order, role, and meaning. Do not invent prices,
+  discounts, app claims, fake UI, fake product availability, or fake screens.
+  If generated shopping-card prices/placeholders are uncertain, remove them,
+  cover them cleanly in white, or leave the space blank; never keep blurred or
+  mosaic UI artifacts.
+- If the user mentions Chrome, Chrome MCP, or links `chrome:control-chrome`,
+  control the user's existing logged-in Chrome tab. Do not silently use the
+  in-app browser or a fresh unauthenticated tab.
+- For original cooking commercials, use `vertical-video`, `9:16`, `1080x1920`.
+  Default actual cooking to the three-clip 6s director route; use single-10s
+  only for simple one-setting product rituals. Seedance cooking clips are
+  silent, no subtitles/overlays, no cooking SFX, and use accepted MP4s only.
+- While a Seedance clip is polling, use the wait time to draft external editable
+  caption cues in `analysis/caption-cues/`. Store clip-relative JSON such as
+  `clip-02.json` with `start`, `end`, and `text`; add SRT only when useful.
+  These cues are for later ChatCut/editor placement, never burned into Seedance.
+  Before ChatCut caption placement, run `scripts/caption_cues.py` with actual
+  trims to compile `timeline.json`, `timeline.srt`, `timeline.csv`, and
+  `chatcut-caption-plan.json`.
+- In the three-clip route, inspect the prior clip's returned last frame and last
+  motion strip before the next clip. Use the returned frame only when it is
+  clean; generate a transition opening anchor when the frame is weak, malformed,
+  blurry, awkward, or cannot begin the next action.
+- Product/logo branding is commercial context, not a billboard. The physical
+  `ASIAN GROCER ONLINE / powered by UMALL` sign must read in clip 1's opening
+  reference only. Do not force logo/sign continuity in later cooking clips.
+- For final-frame extensions, extra ending shots, or slow pull-back hero shots,
+  begin from the accepted final last frame and lock the exact kitchen/stove/table
+  set: cookware position, visible background props, window/shelf/counter layout,
+  burner/flame, light direction, color grade, and camera height. Pull back only
+  into the same established room; do not invent a new kitchen.
+- Stop at the user's requested handoff. If they say no editing, do not enter
+  ChatCut. The user is the reviewer.
 
 ## Context
 
@@ -31,11 +84,20 @@ style, use case, or product need before generating new assets.
 
 Infer the source platform and target output platform separately.
 
+Default company remix output is English-region unless the user explicitly asks
+for Chinese-region or Chinese Xiaohongshu target output. A Xiaohongshu URL or
+Chinese source copy identifies capture/localization work only; it must not flip
+the target to Chinese. For default "搬运" from Xiaohongshu, use the English
+carousel profile: `instagram-facebook`, natural English, `1152x1152`,
+`caption-en.txt`, and the English-region `ASIAN GROCER ONLINE / powered by
+UMALL` logo.
+
 - **Xiaohongshu source to English carousel**: preserve page count, order,
   meaning, and page roles; output natural English `1152x1152` and
   `caption-en.txt`.
 - **Chinese Xiaohongshu output**: preserve the source structure; output
-  `1152x1536` and `caption-zh.txt`.
+  `1152x1536` and `caption-zh.txt`; choose only for explicit Chinese-region or
+  Chinese Xiaohongshu target requests.
 - **Instagram/Facebook carousel**: preserve page count and roles; output
   natural English `1152x1152` and `caption-en.txt`.
 - **General video remix**: select exactly nine narrative frames and build the
@@ -54,6 +116,11 @@ and `references/breakdown-schema.md`. Load
 Accept a post URL, active logged-in tab, local file, local folder, or original
 brief.
 
+- If the user explicitly mentions Chrome, Chrome MCP, or links
+  `chrome:control-chrome`, use Chrome control to connect to the user's existing
+  logged-in Chrome tab. Claim the current/open source tab and capture from that
+  state; do not silently fall back to the in-app browser or a fresh unauthenticated
+  tab.
 - Scan a local folder with `scripts/scan_media.py`.
 - Capture Xiaohongshu with `scripts/xhs_browser_capture.mjs`, then
   `scripts/capture_source_package.py`.
@@ -73,6 +140,11 @@ Preserve layout logic and copy meaning. Keep the final shopping/search guide
 unless the user waives it. Use real supplied UI/screenshots; never invent
 prices, products, or app screens.
 
+For English-region carousels, use `1152x1152`, `caption-en.txt`, and
+`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`. Do
+not use `viral-social-remix/umall_logo/umall_logo.png` unless the user
+explicitly requests a Chinese-region or Chinese Xiaohongshu target.
+
 Load `references/prompt-patterns.md` and `references/image-provider.md`. Resolve
 the provider with `scripts/image_provider.py`. Production GPT Image 2 uses the
 configured image API; `openai/gpt-5.4-image-2` is the explicit legacy route.
@@ -85,7 +157,10 @@ Load `references/cooking-video-workflow.md` as the single production authority.
 It already includes the Seedance workshop rules needed for food/product
 commercial prompting. Load `references/seedance-video.md` for non-cooking
 Seedance generation, provider/API controls, video extension, native-audio
-experiments, prompt-quality repair, or after a runner/API failure.
+experiments, prompt-quality repair, or after a runner/API failure. For cooking
+commercial final-clip extensions, keep `references/cooking-video-workflow.md`
+as the continuity authority and apply its exact kitchen/background lock before
+using any generic Seedance extension guidance.
 
 Choose the route before generation:
 
