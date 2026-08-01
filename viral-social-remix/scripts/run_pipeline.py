@@ -310,9 +310,17 @@ def _mark_director_three_clip_mode(
     storyboard_references: list[dict] | None = None,
 ) -> None:
     data = manifest.load(manifest_path)
+    image_reference_paths = [
+        str(item["path"])
+        for item in storyboard_references or []
+        if item.get("type") == "image" and item.get("path")
+    ]
     data["schema_version"] = 2
     data["video_mode"] = "director-first-frame-three-clips"
     data["storyboard_references"] = storyboard_references or []
+    if image_reference_paths:
+        asset = data.setdefault("assets", {}).setdefault("01", {})
+        asset["reference_paths"] = image_reference_paths
     data["video"] = {
         "mode": "director-first-frame-three-clips",
         "profile": "final-clip",

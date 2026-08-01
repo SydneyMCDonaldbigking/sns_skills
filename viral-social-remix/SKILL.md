@@ -39,6 +39,16 @@ Never load the whole vault.
   Default actual cooking to the three-clip 6s director route; use single-10s
   only for simple one-setting product rituals. Seedance cooking clips are
   silent, no subtitles/overlays, no cooking SFX, and use accepted MP4s only.
+- For product commercials, the product package and the English-region logo
+  opening frame are identity-critical. Generate product/logo opening references
+  with OpenRouter Image API model `openai/gpt-image-2` at high quality, pass the
+  supplied product image and official logo as actual image references, and
+  verify the runner reports non-empty `references`. If the package, product
+  shape, or `ASIAN GROCER ONLINE / powered by UMALL` prop is hallucinated,
+  cropped, misspelled, or replaced by a different brand, reject the frame before
+  Seedance and regenerate; do not continue with a wrong-product clip. Never use
+  local logo workarounds: do not paste, composite, mask, track, or overlay the
+  logo/sign in local tools, ChatCut, Photoshop, scripts, or post.
 - While a Seedance clip is polling, use the wait time to draft external editable
   caption cues in `analysis/caption-cues/`. Store clip-relative JSON such as
   `clip-02.json` with `start`, `end`, and `text`; add SRT only when useful.
@@ -59,6 +69,11 @@ Never load the whole vault.
 - Product/logo branding is commercial context, not a billboard. The physical
   `ASIAN GROCER ONLINE / powered by UMALL` sign must read in clip 1's opening
   reference only. Do not force logo/sign continuity in later cooking clips.
+- Product identity still must remain stable after the opening. If Seedance
+  changes the product family, package, ingredient shape, filling, or serving
+  identity across clips, stop and retry or create a corrected transition anchor;
+  never hand off a raw concat where the advertised product becomes a different
+  product.
 - For final-frame extensions, extra ending shots, or slow pull-back hero shots,
   begin from the accepted final last frame and lock the exact kitchen/stove/table
   set: cookware position, visible background props, window/shelf/counter layout,

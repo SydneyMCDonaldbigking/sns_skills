@@ -326,6 +326,13 @@ def _references_for_asset(run_dir: Path, data: dict[str, Any], asset_id: str) ->
     return resolved
 
 
+def _is_director_identity_opening(data: dict[str, Any], asset_id: str) -> bool:
+    return asset_id == "01" and (
+        data.get("video_mode") == "director-first-frame-three-clips"
+        or (data.get("video") or {}).get("mode") == "director-first-frame-three-clips"
+    )
+
+
 def _first_image_url(response: dict[str, Any]) -> str:
     for choice in response.get("choices", []):
         message = choice.get("message", {})
@@ -465,6 +472,12 @@ def _generate_page(
     output = _generated_path(run_dir, asset_id)
     raw_path = _raw_response_path(run_dir, asset_id)
     references = _references_for_asset(run_dir, manifest_data, asset_id)
+    if _is_director_identity_opening(manifest_data, asset_id) and len(references) < 2:
+        raise CarouselRunnerError(
+            "Director clip-01 identity frame requires explicit product and logo "
+            "reference_paths/references on asset 01; automatic storyboard "
+            "reference inference is disabled."
+        )
     request_size = _provider_request_size(platform, expected_size)
     request_size_text = f"{request_size[0]}x{request_size[1]}"
     if config.get("api_mode") == "images":

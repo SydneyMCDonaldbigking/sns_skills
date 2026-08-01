@@ -29,6 +29,17 @@ Opening references are generation inputs, not editing assets. They may be a
 director-designed first frame, an accepted prior clip's returned last frame, or
 a generated transition opening anchor/bridge frame.
 
+Identity gate before paid video: clip 1's opening frame must be generated with
+high-quality `openai/gpt-image-2` through the OpenRouter Image API, using the
+supplied product image and official English logo as actual image references.
+Check the runner output and manifest: references must not be empty. Reject the
+frame before Seedance if the package, product form, official logo sign, or
+target region is wrong; never continue with a hallucinated or wrong-package
+opening, and never try to rescue a wrong opening with later clips. Do not use
+local logo workarounds: no paste, compositing, masking, tracking, post-repair,
+or hand-built logo overlays. A bad or cropped logo means rewrite the
+prompt/reference placement and regenerate the whole high-quality first frame.
+
 Default to RPA helpers before manual judgement:
 
 - Run `scripts/next_step.py` after each major stage to write
@@ -75,6 +86,42 @@ product; copy the route choice, action chain, and prompt structure.
   soaked vermicelli should enter late, steam and sauce should bridge the cuts,
   and the final payoff should be chopsticks lifting translucent sauced noodles
   with tender pork belly above the simmering pot.
+- **Steamed buns / custard buns / kids-meal pattern**: use the three-clip 6s
+  route for custard buns, bao, tangyuan, and other products where the ad must
+  prove package-to-cooked convenience. Do not keep the whole sequence on one
+  tabletop. The required chain is `package identity with official English
+  physical logo sign -> pack opens and buns are removed -> buns move onto a
+  real stovetop steamer or cooking appliance -> lid/steam heat beat -> lid
+  opens and buns are lifted out -> plated kids-meal hero with milk`. Clip 1
+  must show the pack opening and a motivated move toward the stove/steamer.
+  Clip 2 must show active steaming, lid condensation, and a clean open-lid
+  reveal. Clip 3 must show out-of-pot plating, one appetizing custard reveal
+  when appropriate, and the milk cup entering the final same-kitchen hero.
+  Build at least five distinct commercial views across the sequence: package
+  hero, hand/pack close-up, stove or steamer medium shot, steam/lid macro, and
+  final plate pull-back. If the generated opening frame damages, crops, or
+  misspells the `ASIAN GROCER ONLINE / powered by UMALL` sign, regenerate the
+  whole first frame before Seedance instead of accepting a fake logo or trying
+  to patch the sign locally.
+  Keep the advertised product family stable all the way through: custard buns
+  must stay smooth round custard buns with golden custard filling, not pleated
+  soup dumplings, xiaolongbao, meat buns, tangyuan, or a generic bao basket.
+  If Seedance drifts the food shape or filling, mark that clip failed and retry
+  or create a corrected transition anchor before continuing.
+- **Japanese pan-fried salmon / pan-seared fish pattern**: use the three-clip
+  6s route for salmon portions, fish fillets, and similar products where the
+  sale depends on raw freshness becoming a glossy plated meal. The approved
+  chain is `product identity and prep board -> tongs move fish to the same pan
+  -> oil sear and glaze -> clean returned last-frame handoff -> plate with rice
+  and garnish -> slow pull-back in the same kitchen`. Build clip 1's opening
+  frame from the real fish texture, product-pack context, and English physical
+  logo sign; reject and regenerate the opening frame when the sign is cropped
+  or a fake brand appears. Continue clips 2 and 3 from returned last
+  frames when the pan, tongs, hand, window/shelf/counter anchors, and warm light
+  remain clean. If the fish is still visibly underdone at a handoff, write the
+  next prompt to continue searing briefly before plating instead of pretending
+  it is finished. Final pull-backs must reveal only the established window,
+  shelf, pan, counter, and light direction.
 
 Reusable lesson: user approval came from route fit and physical commercial
 logic, not from generic "cinematic" styling. Good outputs had visible cause and
@@ -159,8 +206,9 @@ Apply these rules to both commercial routes:
   invent a new window, shelf wall, counter layout, burner type, or room style.
 - If packaging or brand text must be readable, provide a high-resolution
   reference and spell the exact text in the prompt. Still expect small generated
-  text to drift; critical logo text should be in the opening physical prop or
-  repaired/tracked in post, not trusted to mid-clip generation.
+  text to drift; critical logo text must be generated correctly in the opening
+  physical prop from the official logo reference. If it is wrong, regenerate the
+  full opening frame; do not repair, paste, track, or overlay the logo in post.
 - If a reference object is embedded in a busy image, first create or request a
   clean object-only reference. This is especially useful for clothing, bags,
   packaging, utensils, and hero products that Seedance might deform.
@@ -318,7 +366,9 @@ Use the official English logo:
 Render it as a real printed tabletop sign with scene perspective, lighting,
 shadow, and occlusion. Its visible text is
 `ASIAN GROCER ONLINE / powered by UMALL`. Never use the Chinese-region logo or a
-floating overlay.
+floating overlay. Never paste or composite the logo/sign manually; if the model
+does not generate the complete physical sign, reject the first frame and
+regenerate it with a stricter prompt.
 The physical sign only needs to read in clip 1's opening reference / first
 frame. Do not force the logo sign to remain consistent or visible in later
 clips; stove, heat, steam, pour, plating, and food-texture inserts should
@@ -496,6 +546,9 @@ python scripts/qa_decision_sheet.py output/YYYYMMDD-HHmmss-task
 Review one strip/sheet covering all three clips. Check only:
 
 - correct product and logo prop;
+- product/package identity remains consistent across all clips; reject if the
+  product mutates into another SKU, package, dumpling/bun type, filling, or
+  serving style;
 - no face or broken hands;
 - real commercial shot variety: no more than one clip may feel like a single
   continuous tabletop shot;
