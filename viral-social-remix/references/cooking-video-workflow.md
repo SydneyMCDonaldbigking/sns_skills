@@ -12,8 +12,10 @@ Choose one commercial route before paid generation:
   one-setting product-use stories. Pass the product/page image directly as the
   visual bible and opening product reference. Write 4-6 timed micro-shots in one
   prompt. Product/logo/package readability is required only in the first shot.
-  Do not force logo or package continuity later. ChatCut is optional for
-  trim/reframe/BGM/captions/voiceover handoff.
+  Do not create a separate OpenRouter first-frame Identity Gate unless the user
+  explicitly asks for a still-frame review. Do not force logo or package
+  continuity later. ChatCut is optional for trim/reframe/BGM/captions/voiceover
+  handoff.
 - **Three-clip 6s director route**: three silent `6s`, `9:16`, `1080p`
   Seedance requests. Use for actual cooking, large scene changes, stove/heat,
   steamer/fire, transformation beats, or when reroll control matters.
@@ -29,16 +31,17 @@ Opening references are generation inputs, not editing assets. They may be a
 director-designed first frame, an accepted prior clip's returned last frame, or
 a generated transition opening anchor/bridge frame.
 
-Identity gate before paid video: clip 1's opening frame must be generated with
-high-quality `openai/gpt-image-2` through the OpenRouter Image API, using the
-supplied product image and official English logo as actual image references.
-Check the runner output and manifest: references must not be empty. Reject the
-frame before Seedance if the package, product form, official logo sign, or
-target region is wrong; never continue with a hallucinated or wrong-package
-opening, and never try to rescue a wrong opening with later clips. Do not use
-local logo workarounds: no paste, compositing, masking, tracking, post-repair,
-or hand-built logo overlays. A bad or cropped logo means rewrite the
-prompt/reference placement and regenerate the whole high-quality first frame.
+Three-clip Identity Gate before paid video: clip 1's opening frame must be
+generated with high-quality `openai/gpt-image-2` through the OpenRouter Image
+API, using the supplied product image and official English logo as actual image
+references. Check the runner output and manifest: references must not be empty.
+Reject the frame before Seedance if the package, product form, official logo
+sign, or target region is wrong; never continue with a hallucinated or
+wrong-package opening, and never try to rescue a wrong opening with later
+clips. Do not use local logo workarounds: no paste, compositing, masking,
+tracking, post-repair, or hand-built logo overlays. A bad or cropped logo means
+rewrite the prompt/reference placement and regenerate the whole high-quality
+first frame. This gate is the main operational difference from single-10s.
 
 Default to RPA helpers before manual judgement:
 
@@ -234,7 +237,10 @@ Apply these rules to both commercial routes:
 Use `scripts/run_pipeline.py prepare-original-video --commercial-route single-10s`
 with at least one product/page `--image-reference`. The generated
 `analysis/seedance-prompt.md` is the production prompt; rewrite its timed beats
-for the product and setting before submission.
+for the product and setting before submission. Single-10s goes directly from
+product/page reference into one Seedance request; do not pre-generate a
+separate OpenRouter clip-1 first frame unless the user explicitly asks for a
+still image review.
 
 Use this shot grammar:
 

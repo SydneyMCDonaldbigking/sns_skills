@@ -39,16 +39,20 @@ Never load the whole vault.
   Default actual cooking to the three-clip 6s director route; use single-10s
   only for simple one-setting product rituals. Seedance cooking clips are
   silent, no subtitles/overlays, no cooking SFX, and use accepted MP4s only.
-- For product commercials, the product package and the English-region logo
-  opening frame are identity-critical. Generate product/logo opening references
-  with OpenRouter Image API model `openai/gpt-image-2` at high quality, pass the
-  supplied product image and official logo as actual image references, and
-  verify the runner reports non-empty `references`. If the package, product
-  shape, or `ASIAN GROCER ONLINE / powered by UMALL` prop is hallucinated,
-  cropped, misspelled, or replaced by a different brand, reject the frame before
+- Three-clip product/cooking commercials have an Identity Gate before Seedance:
+  generate clip 1's opening frame with OpenRouter Image API model
+  `openai/gpt-image-2` at high quality, pass the supplied product image and
+  official logo as actual image references, and verify the runner reports
+  non-empty `references`. If the package, product shape, or
+  `ASIAN GROCER ONLINE / powered by UMALL` prop is hallucinated, cropped,
+  misspelled, or replaced by a different brand, reject the frame before
   Seedance and regenerate; do not continue with a wrong-product clip. Never use
   local logo workarounds: do not paste, composite, mask, track, or overlay the
   logo/sign in local tools, ChatCut, Photoshop, scripts, or post.
+- Single-10s commercials do not use the three-clip Identity Gate by default.
+  Feed the product/page image directly to the single Seedance request as the
+  visual bible and opening product reference. Require readable package/logo in
+  the first shot, then allow the package/logo to leave frame naturally.
 - While a Seedance clip is polling, use the wait time to draft external editable
   caption cues in `analysis/caption-cues/`. Store clip-relative JSON such as
   `clip-02.json` with `start`, `end`, and `text`; add SRT only when useful.
