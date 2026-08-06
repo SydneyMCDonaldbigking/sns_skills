@@ -164,6 +164,13 @@ overwrite a prior run. Run deterministic validation before paid generation.
 Preserve layout logic and copy meaning. Keep the final shopping/search guide
 unless the user waives it. Use real supplied UI/screenshots; never invent
 prices, products, or app screens.
+For final shopping, category, search, or app-entry pages, load
+`references/shopping-guide-page.md`. These pages are operation tutorials, not
+generic CTA posters. When a real phone screenshot and a source/style guide page
+are available, generate the final page with OpenRouter Image API at high
+quality, pass the real phone screenshot, style reference, and English-region
+brand lockup as references, and only use local composites as temporary layout
+sketches or emergency placeholders.
 When generated output contains fake prices, mosaic placeholders, blurred UI, or
 uncertain shopping widgets, use `scripts/carousel_cleanup.py` to white-cover
 those regions instead of hand-patching them in an image editor.

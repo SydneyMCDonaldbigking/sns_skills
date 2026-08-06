@@ -133,10 +133,18 @@ a generic CTA.
   frame literally. Inspect the last motion strip; use a clean last frame
   directly, generate a transition opening anchor when the endpoint is weak, and
   retry the prior clip only when no honest bridge can be made.
+- 2026-08-04: Approved Sauce and Orange final shopping pages worked only after
+  treating the last page as a high-quality OpenRouter operation tutorial:
+  left step panel, right dominant real phone screenshot, glossy red numbered
+  arrows, small basket/crate, English-region logo, and three references
+  together: real phone screenshot, original/source guide style reference, and
+  brand lockup. Do not deliver local composite shopping guides as final when a
+  polished last page is expected.
 
 ## Useful Links
 
 - `../../retrospectives/2026-07-23-chinese-remix-source-drift.md`
+- `../../../viral-social-remix/references/shopping-guide-page.md`
 - `../../../viral-social-remix/references/image-provider.md`
 - `../../../viral-social-remix/references/cooking-video-workflow.md`
 - [[video-production-map]]

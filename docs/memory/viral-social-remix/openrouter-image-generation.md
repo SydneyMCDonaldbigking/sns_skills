@@ -41,6 +41,12 @@ delivery contract:
 - If the original/source post has a final shopping, category, search, or app
   guide page, generate the English-region version by preserving that original
   layout logic.
+- Treat the page as an operation tutorial, not a generic CTA poster. Load
+  `references/shopping-guide-page.md` for the production contract.
+- When the user supplies a real phone screenshot and a source/style guide page
+  is available, use OpenRouter Image API with `--quality high --api-mode images`
+  for the final approved page. Pass the real phone screenshot, the style guide
+  reference, and the English-region brand lockup as image references.
 - Use the English-region brand lockup:
   `ASIAN GROCER ONLINE powered by UMALL`.
 - Use real English app/category/search screenshots inside the phone/app area
@@ -50,9 +56,13 @@ delivery contract:
 - If the needed app screenshot/reference is missing, ask for it before marking
   the carousel complete, unless the user explicitly says to skip the shopping
   handoff.
-- For deterministic shopping-handoff composites, no image API cost is needed;
-  still record the page in `analysis/copy.md`, `analysis/page-prompts/`, and the
-  manifest.
+- Local deterministic composites are only temporary sketches or emergency
+  placeholders. Do not deliver them as final when the user expects a polished
+  shopping guide.
+- After an approved final-page rerun, rebuild the full contact sheet, run full
+  delivery validation, and archive the final page, phone screenshot, style
+  reference, brand lockup, prompt, raw response, cost JSON, and contact sheet
+  under `qa/approved-shopping-guide/`.
 
 ## Cost Habit
 
