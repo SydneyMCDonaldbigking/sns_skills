@@ -43,6 +43,18 @@ tracking, post-repair, or hand-built logo overlays. A bad or cropped logo means
 rewrite the prompt/reference placement and regenerate the whole high-quality
 first frame. This gate is the main operational difference from single-10s.
 
+Size preflight is mandatory. Seedance requires the local opening reference PNG
+to be exactly `1080x1920`. OpenRouter image requests may reject `1080x1920`
+because provider dimensions must be divisible by 16. Prefer
+`scripts/run_openrouter_carousel.py --run output/... --api-only --asset-id 01`
+for clip 1 and `--asset-id 02` / `03` only when a handoff decision requires a
+transition anchor; the runner uses a provider-safe request size and locally
+reframes the delivered PNG to `1080x1920`. If manual `openrouter_image.py` is
+used as a fallback, generate a provider-safe portrait such as `1088x1920`, then
+immediately run `scripts/reframe_image.py --size story` and update the manifest
+to the reframed `generated/page-XX.png`. Never submit or mark `1088x1920`,
+`1024x1536`, or any non-`1080x1920` opening reference as Seedance-ready.
+
 Default to RPA helpers before manual judgement:
 
 - Run `scripts/next_step.py` after each major stage to write
@@ -312,9 +324,11 @@ appliance, and make steam, lid movement, or cookware occlusion part of the
 transition language. Do not keep the whole commercial on one tabletop unless the
 brief explicitly asks for no cooking process.
 
-Generate the clip 1 `1080x1920` opening frame first with the configured image
-API. The prepared `page-02.md` and `page-03.md` files are on-demand opening
-slots, not permission to pre-generate all three opening frames.
+Generate the clip 1 exact `1080x1920` opening frame first with the configured
+image API, preferably through `scripts/run_openrouter_carousel.py --api-only
+--asset-id 01` so OpenRouter's provider-safe request size is reframed locally
+before Seedance. The prepared `page-02.md` and `page-03.md` files are on-demand
+opening slots, not permission to pre-generate all three opening frames.
 
 After each accepted clip, inspect its returned last frame before choosing the
 next opening reference. Also inspect the last 8-12 frames when possible so the
@@ -355,7 +369,9 @@ Use `qa/handoffs/clip-XX-to-clip-YY/index.html` as the review surface and
 `handoff-review.json` as the decision ledger. If the decision is
 `use-last-frame`, run the next Seedance clip with `--continue-from-last-frame`.
 If the decision is `transition-anchor`, update/generate the relevant
-`page-YY.md`/`page-YY.png` opening anchor first. If the decision is `retry`,
+`page-YY.md`/`page-YY.png` opening anchor first with
+`scripts/run_openrouter_carousel.py --api-only --asset-id YY`; confirm the PNG
+is exact `1080x1920` before Seedance. If the decision is `retry`,
 rerun the source clip before continuing.
 
 During polling, prewrite the next clip prompt from

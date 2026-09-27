@@ -83,9 +83,12 @@ partly visible, tighten the prompt/reference placement and rerun high-quality
 image generation. Never paste, composite, mask, track, or overlay the official
 logo onto an otherwise bad first frame.
 
-Use `scripts/run_openrouter_carousel.py --asset-id 01` for the clip 1 opening.
-Use `--asset-id 02` or `--asset-id 03` only after the handoff decision requires
-that slot. Seedance receives only the selected opening reference for each clip.
+Use `scripts/run_openrouter_carousel.py --api-only --asset-id 01` for the clip
+1 opening. Use `--asset-id 02` or `--asset-id 03` only after the handoff
+decision requires that slot. This runner is preferred over direct
+`scripts/openrouter_image.py` calls because it normalizes provider-safe
+OpenRouter image sizes to the exact Seedance requirement, `1080x1920`.
+Seedance receives only the selected opening reference for each clip.
 Opening PNGs, returned last frames, and transition anchors are generation
 references and must not be imported into ChatCut.
 
@@ -97,6 +100,13 @@ reframes the delivered storyboard PNG to `1080x1920`. Carousel sizes and
 horizontal video sizes are not changed by this rule. If the provider returns a
 square image for `vertical-video`, stop and retry with the dedicated Image API
 or a better vertical prompt instead of passing it to Seedance.
+
+If a manual fallback uses `scripts/openrouter_image.py`, do not request
+`1080x1920` directly from OpenRouter. Request a provider-safe portrait size
+such as `1088x1920`, then run `scripts/reframe_image.py --size story` and
+update the manifest output to `generated/page-XX.png` in BOM-free UTF-8. Only
+the reframed exact `1080x1920` PNG may be marked `validated` or submitted to
+Seedance.
 
 Use these optional overrides only for `vertical-video`:
 

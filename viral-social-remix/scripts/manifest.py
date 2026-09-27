@@ -51,7 +51,7 @@ def create(
 
 
 def load(path: str | Path) -> dict:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
 def mark(path: str | Path, asset_id: str, status: str, **fields) -> dict:

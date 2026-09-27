@@ -53,6 +53,14 @@ Never load the whole vault.
   Feed the product/page image directly to the single Seedance request as the
   visual bible and opening product reference. Require readable package/logo in
   the first shot, then allow the package/logo to leave frame naturally.
+- For Seedance opening references, the delivered local PNG must be exactly
+  `1080x1920` before submission. OpenRouter image requests may need a
+  provider-safe size such as `1088x1920` or `1024x1536`; prefer
+  `scripts/run_openrouter_carousel.py --api-only --asset-id XX`, because it
+  reframes to `1080x1920`. If using `scripts/openrouter_image.py` manually,
+  immediately run `scripts/reframe_image.py --size story` and point the
+  manifest at the reframed PNG. Never mark or submit a `1088x1920` opening
+  frame as validated for Seedance.
 - While a Seedance clip is polling, use the wait time to draft external editable
   caption cues in `analysis/caption-cues/`. Store clip-relative JSON such as
   `clip-02.json` with `start`, `end`, and `text`; add SRT only when useful.
@@ -228,16 +236,20 @@ For the three-clip route:
 - Include real cooking-film grammar when the product requires heat: move from
   prep counter to stove, show active flame/heat/steamer or cooking appliance,
   cut into food texture, and use steam/lid/pour/object occlusion as transitions.
-- Generate the clip 1 `1080x1920` first frame first. For clips 2 and 3, inspect
-  the accepted prior clip's returned last frame before choosing the next opening
-  reference. Use that returned last frame directly when it is the most coherent
-  handoff. If the returned last frame is visually weak, malformed, too blurry,
-  awkwardly composed, or unable to begin the next action, generate a new
+- Generate the clip 1 exact `1080x1920` first frame first. Use
+  `scripts/run_openrouter_carousel.py --api-only --asset-id 01` so provider-safe
+  OpenRouter sizes are locally reframed before Seedance. For clips 2 and 3,
+  inspect the accepted prior clip's returned last frame before choosing the next
+  opening reference. Use that returned last frame directly when it is the most
+  coherent handoff. If the returned last frame is visually weak, malformed, too
+  blurry, awkwardly composed, or unable to begin the next action, generate a new
   transition opening anchor with the image model instead of using the bad frame
-  literally. The transition anchor must design the camera bridge: match action,
-  steam/lid/pour/object occlusion, plate movement, rack focus, or another
-  motivated lens transition. Retry the prior clip only when no honest bridge can
-  be made.
+  literally. When an anchor is needed, generate the corresponding exact
+  `1080x1920` `page-02.png` or `page-03.png` with the same runner before
+  calling Seedance. The transition anchor must design the camera bridge: match
+  action, steam/lid/pour/object occlusion, plate movement, rack focus, or
+  another motivated lens transition. Retry the prior clip only when no honest
+  bridge can be made.
 - Brand the sequence as a commercial, not every frame as a billboard. The
   supplied product and official physical `ASIAN GROCER ONLINE / powered by
   UMALL` table sign must read in clip 1's opening reference / first frame only.
