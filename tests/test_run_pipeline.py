@@ -462,3 +462,16 @@ def test_newb_segments_pair_references_and_split_30s():
     assert newb.lint_prompt(body) == []
     assert newb.unreferenced_images(body, 6) == []
     assert newb.unreferenced_images("@图1 then @图12", 2) == ["@图2"]
+
+
+def test_newb_default_nine_images_make_five_segments():
+    segments = pipeline.newb_segments(9)
+    assert len(segments) == 5
+    assert [(seg["start_ref"], seg["end_ref"]) for seg in segments][-2:] == [(7, 8), (9, None)]
+    assert segments[0]["approx_seconds"] == [0.0, 6.0]
+    refs = [{"type": "image", "path": f"references/inputs/s{i}.jpg", "order": i} for i in range(1, 10)]
+    prompt = pipeline.newb_prompt_template("tomato egg", refs)
+    assert "第五段" in prompt and "@图9" in prompt
+    newb = load_script("run_newb_video")
+    body = chr(10).join(line for line in prompt.splitlines() if not line.startswith("#"))
+    assert newb.unreferenced_images(body, 9) == []

@@ -44,8 +44,9 @@ Never load the whole vault.
   default) and submit it with `scripts/run_newb_video.py`. Read
   `references/newb-seedance25.md`. Don't ask which account to bill.
 - **The user supplies the reference images, two per segment** (start state,
-  end state). The default is 3 segments (6 images); add a pair when the steps
-  don't fit (max 9 images). Pass them as `--image-reference` in order. One
+  end state). The default is 9 images = 5 segments of about 6s: four pairs plus
+  a start-only last segment (the plated dish). NewB allows at most 9 images;
+  simpler dishes may use fewer. Pass them as `--image-reference` in order. One
   NewB request carries all segments. If one segment breaks, trim it in Opue
   first, then reroll only that segment as its own take, and reroll the whole
   take last. Do not call the OpenRouter image

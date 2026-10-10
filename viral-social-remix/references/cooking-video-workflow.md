@@ -25,9 +25,10 @@ This is the company API; the work is mostly stir-fry and wok cooking.
   action chain:
   `ingredients -> hot oil/aromatics -> main ingredient into the wok -> toss and sauce gloss -> plate -> chopstick lift / final hero`.
 - **The user supplies the reference images, two per segment**: `@图(2k-1)`
-  is where segment k starts and `@图(2k)` is where it ends. The default is 3
-  segments, adding a pair when needed (max 9 images); the segments share the
-  30s. Do not generate first frames with the image API. Write one prompt
+  is where segment k starts and `@图(2k)` is where it ends. The default is 9
+  images = 5 segments of about 6s: four pairs plus a start-only final segment
+  (the plated dish). That fills NewB's 9-image cap; simpler dishes may use
+  fewer. The segments share the 30s. Do not generate first frames with the image API. Write one prompt
   paragraph per segment that names both images and says what they show.
 - If one segment breaks, fix it in this order: trim it in Opue; reroll only
   that segment as its own take and splice it in; reroll the whole take. The

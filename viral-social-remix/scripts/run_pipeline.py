@@ -694,7 +694,8 @@ NEWB_DURATION = 30.0
 
 def newb_segments(image_count: int) -> list[dict]:
     """Two references per segment: @图(2k-1) is where segment k starts, @图(2k) where it
-    ends. An odd last image is a start-only segment. Segments share the 30s evenly."""
+    ends. An odd last image is a start-only segment (the default 9 images = 4 pairs + the
+    plated dish). Segments share the 30s evenly."""
     if image_count < 2 or image_count > NEWB_MAX_IMAGES:
         raise ValueError(
             f"newb-30s needs 2-{NEWB_MAX_IMAGES} reference images "
@@ -736,14 +737,14 @@ def newb_prompt_template(brief_text: str, references: list[dict]) -> str:
             )
         else:
             body.append(
-                f"第{ordinal}段：{lead}从 @图{seg['start_ref']} 的画面开始（[这张图里是什么]），"
-                "[手的动作 + 镜头]，最后成品主镜头缓慢拉远。"
+                f"第{ordinal}段：{lead}从 @图{seg['start_ref']} 的画面开始（[出锅装盘的成品]），"
+                "[筷子夹起或淋汁等收尾动作 + 镜头]，最后成品主镜头缓慢拉远，只露出已出现过的厨房。"
             )
     return (
         "# NewB Seedance 2.5 prompt (fixed 30s, 720p, 9:16). Lines starting with # are not sent.\n"
         f"# {len(segments)} segments, two references each: segment k goes from @图(2k-1) to @图(2k),\n"
-        f"# about {NEWB_DURATION / len(segments):.0f}s each. Need more steps? Add another pair of "
-        f"--image-reference (max {NEWB_MAX_IMAGES} images).\n"
+        f"# about {NEWB_DURATION / len(segments):.0f}s each. Default is 9 images = 5 segments: 4 pairs plus a\n"
+        f"# start-only last segment (the plated dish). NewB allows at most {NEWB_MAX_IMAGES} images.\n"
         "# Rules: simple subject/action/camera/light per segment; order words only (第一段/接着), never\n"
         "# timestamps; no face, no text, no logo, no sign; end with the soundscape line; avoid 血/砍.\n"
         f"# Brief: {' '.join(brief_text.split())[:300]}\n"

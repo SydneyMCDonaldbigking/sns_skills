@@ -196,11 +196,6 @@ def validate_images(paths: list[str | Path], run_dir: Path, ratio: str) -> tuple
                 "bytes": size,
             }
         )
-    if len(images) > 1 and len(images) % 2:
-        warnings.append(
-            f"{len(images)} reference images: the last segment has only a start image. "
-            "Segments normally take two (start state, end state)."
-        )
     return images, warnings
 
 

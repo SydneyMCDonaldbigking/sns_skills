@@ -42,11 +42,17 @@ supplies the reference images, so no image-API first frames are made. Source con
 One NewB request carries every segment of the dish:
 
 - **Pair the references.** Segment k goes from `@图(2k-1)` (start state) to
-  `@图(2k)` (end state). The default is 3 segments (6 images). If the steps
-  don't fit, the user adds another pair, up to 9 images: 4 full segments plus
-  an optional start-only 5th.
-- **Timing.** The segments share the 30s evenly: about 10s each for 3
-  segments, 7.5s for 4.
+  `@图(2k)` (end state).
+- **Default: 9 images = 5 segments** (user rule, 2026-10-10), which fills
+  NewB's 9-image cap:
+  - four full segments (`@图1`-`@图8`);
+  - a start-only 5th segment (`@图9`, the plated dish) whose end state is
+    written in words: chopstick lift, slow pull-back.
+
+  Fewer images are fine for simpler dishes (2-8; an odd count makes the last
+  segment start-only).
+- **Timing.** The segments share the 30s evenly: about 6s each for 5
+  segments.
 - **Prompt.** Write one paragraph per segment:
   `第N段：从 @图(2k-1) 的画面开始（它是什么），[手的动作 + 镜头]，结束时到达 @图(2k) 的状态（它是什么）。`
   - Use order words only, never timestamps.
