@@ -274,7 +274,7 @@ def create_handoff_review(args: argparse.Namespace) -> int:
         "hands, cookware, set, lighting, and camera angle can continue",
         "last second has a motivated bridge, not a dead endpoint",
         "no face, warped hands, generated overlay text, or damaged product",
-        "later clips do not need the opening logo sign unless it is natural",
+        "generated frames carry no logo or sign; keep only the product identity",
     ]
     if args.decision == "use-last-frame":
         recommendation = "Use the returned last frame directly as the next opening reference."

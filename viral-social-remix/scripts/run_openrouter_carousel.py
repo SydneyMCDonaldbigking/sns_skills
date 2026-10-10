@@ -472,11 +472,11 @@ def _generate_page(
     output = _generated_path(run_dir, asset_id)
     raw_path = _raw_response_path(run_dir, asset_id)
     references = _references_for_asset(run_dir, manifest_data, asset_id)
-    if _is_director_identity_opening(manifest_data, asset_id) and len(references) < 2:
+    if _is_director_identity_opening(manifest_data, asset_id) and not references:
         raise CarouselRunnerError(
-            "Director clip-01 identity frame requires explicit product and logo "
-            "reference_paths/references on asset 01; automatic storyboard "
-            "reference inference is disabled."
+            "Director clip-01 identity frame requires an explicit product "
+            "reference_paths/references entry on asset 01; automatic storyboard "
+            "reference inference is disabled. Do not pass a logo: Opue draws it in post."
         )
     request_size = _provider_request_size(platform, expected_size)
     request_size_text = f"{request_size[0]}x{request_size[1]}"

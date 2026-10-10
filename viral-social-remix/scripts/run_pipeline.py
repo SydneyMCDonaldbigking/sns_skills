@@ -55,7 +55,7 @@ FIXED_COOKING_SHOTS = [
     "Use one visual style across all references and clips. If references differ in style, make a consistent image reference before Seedance.",
     "Include at least one cooking-location/heat/steamer/stove beat when the product needs cooking.",
     "Include at least two close-up inserts across the sequence, such as product texture, steam, package opening, pour, utensil movement, sauce, crunch, plating, or final use.",
-    "Brand as a commercial through clip 1 opening-frame product/sign visibility only; later clips do not need logo-sign continuity.",
+    "Product identity comes from the supplied product image in clip 1's opening frame. Generated frames carry no logo, sign, price, or brand text; Opue post-production draws the logo and all on-screen text.",
     "Generate clip 1's exact 1080x1920 opening frame first with scripts/run_openrouter_carousel.py --api-only --asset-id 01; do not manually submit provider-size images to Seedance.",
     "OpenRouter may require provider-safe portrait dimensions; the final local page-XX.png must be reframed to exact 1080x1920 before the manifest is marked validated.",
     "After each accepted clip, inspect its returned last frame and final motion strip. Use it directly only when clean; otherwise generate a transition opening anchor with the image model for a deliberate camera bridge.",
@@ -63,30 +63,27 @@ FIXED_COOKING_SHOTS = [
     "During Seedance polling, prewrite the next clip prompt draft under analysis/seedance-prompts/drafts/ and leave only OPENING_REFERENCE and HANDOFF_MECHANISM unresolved.",
     "After each major stage, run scripts/next_step.py so analysis/next-step.json carries the next deterministic command.",
     "Give Seedance only the selected opening reference for each request.",
-    "Every Seedance clip is 6s, 9:16, 1080p, and silent.",
+    "Every Seedance clip is 6s, 9:16, 1080p, with native ambient cooking sound only: no music, dialogue, or voiceover.",
     "While each Seedance clip is polling, draft external editable caption cues in analysis/caption-cues/clip-XX.json with clip-relative start/end/text; never burn captions into Seedance.",
-    "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
-    "Before ChatCut import, run scripts/edit_plan.py with accepted MP4s and actual trims; read analysis/edit-plan.json before trimming/reframing.",
+    "After the clips are accepted, run scripts/opue_project.py with the brand (umall or asian_grocer), headline, and actual trims to draft the Opue_video_add recipe project; then pick, preview, and render in Opue.",
     "Before final handoff, run scripts/qa_decision_sheet.py to build qa/decision-sheet.html.",
     "Keep the same no-face hands, clothing, kitchen/table, light logic, product identity, and package when naturally visible.",
-    "Opening references, returned last frames, and transition anchors are generation references and must not be imported into ChatCut.",
+    "Opening references, returned last frames, and transition anchors are generation references and must not go into the Opue project.",
 ]
 FIXED_SINGLE_10S_SHOTS = [
     "Single 10s route: one Seedance request, one coherent environment, 5-6 motivated commercial micro-shots.",
     "Use this for drinks, snacks, pantry, shelf-stable products, office rituals, and other products where the whole story can happen in one scene.",
-    "Use the supplied product/page image as product bible and opening reference. Product/logo/package readability is required only in the first shot.",
-    "Do not force logo, package text, or brand props to remain visible after the opening shot.",
+    "Use the supplied product/page image as product bible and opening reference. Product/package identity is required only in the first shot; no logo or brand text is generated.",
+    "Do not force package text or the product pack to remain visible after the opening shot. Logo and on-screen text are drawn in Opue post-production.",
     "Seedance workshop contract: write instruction, not description. The prompt must name SETTINGS, SUBJECTS/OBJECTS, VISUAL STYLE, LIGHTING/TONE, CAMERA, ACTION MECHANICS, QUALITY, AUDIO, and CONSTRAINTS.",
     "Write timed beats such as 0-1.2s product hero, 1.2-2.4s hand/use action, 2.4-4.2s preparation/pour, 4.2-6.2s macro texture/liquid/steam, 6.2-8.0s user ritual, 8.0-10.0s final hero.",
     "Use Shot 1 / Shot 2 / Shot 3 style ordering inside the 10s prompt when needed; each shot must state who/what, where, action, and camera.",
     "For each camera move, state start frame, movement verb, direction/amplitude/speed, and end frame. Use motivated cuts, macro inserts, push-ins, rack focus, object wipes, pour/steam motion bridges, and reframing.",
     "Keep camera movement simple, smooth, stable, and attached to the action's purpose. Do not make a single continuous camera drift.",
     "Keep visual style consistent across references; avoid style mixtures from mismatched source images.",
-    "Every single-10s Seedance clip is 10s, 9:16, 1080p, and silent.",
+    "Every single-10s Seedance clip is 10s, 9:16, 1080p, with native ambient sound only: no music, dialogue, or voiceover.",
     "While the Seedance job is polling, draft external editable caption cues in analysis/caption-cues/single-10s.json with clip-relative start/end/text; never burn captions into Seedance.",
-    "Before ChatCut caption placement, run scripts/caption_cues.py with actual trims to compile analysis/caption-cues/chatcut-caption-plan.json.",
-    "After generation, run scripts/next_step.py, scripts/edit_plan.py, and scripts/qa_decision_sheet.py before ChatCut handoff when editing is needed.",
-    "Import the accepted MP4 into ChatCut only if BGM, captions, voiceover, trimming, or digital reframing is needed. Do not generate SFX.",
+    "After generation, run scripts/next_step.py and scripts/qa_decision_sheet.py, then scripts/opue_project.py to draft the Opue_video_add project for logo, captions, and end card. No BGM.",
 ]
 CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -234,8 +231,8 @@ def director_opening_frame_prompt(brief_text: str, group: int) -> str:
     opening_plans = {
         1: (
             "Design the clip 1 opening reference. Start the commercial with a "
-            "readable product/package hero, the official physical tabletop brand "
-            "sign, and the first no-face hand action implied by the brief."
+            "readable product/package hero matching the supplied product image "
+            "and the first no-face hand action implied by the brief."
         ),
         2: (
             "This is the clip 2 on-demand transition opening slot. Generate it "
@@ -262,13 +259,13 @@ def director_opening_frame_prompt(brief_text: str, group: int) -> str:
         3: "The frame must bridge from clip 2's usable endpoint into serving, use, or final presentation through match action, steam/lid/pour/object occlusion, rack focus, texture insert, plate movement, or another motivated camera transition.",
     }
     brand_plan = (
-        "Render the official ASIAN GROCER ONLINE / powered by UMALL logo only "
-        "as a real printed tabletop sign with perspective, shadow, and partial "
-        "scene occlusion. It must be readable in clip 1's opening frame."
-        if group == 1
-        else (
-            "Do not force the physical logo sign into this later opening. Include "
-            "the product package only when it naturally supports the composition."
+        "No logo, store sign, price, or brand text anywhere in the frame; the "
+        "logo and all on-screen text are drawn later in Opue post-production. "
+        + (
+            "Reproduce the supplied product/package shape, colours, and artwork "
+            "faithfully; do not invent new package text."
+            if group == 1
+            else "Include the product package only when it naturally supports the composition."
         )
     )
     return (
@@ -347,7 +344,7 @@ def _mark_director_three_clip_mode(
             "ratio": "9:16",
             "duration": 6,
             "resolution": "1080p",
-            "generate_audio": False,
+            "generate_audio": True,
             "return_last_frame": True,
             "watermark": False,
         },
@@ -355,11 +352,11 @@ def _mark_director_three_clip_mode(
             "ratio": "9:16",
             "resolution": "1080p",
             "target_duration": None,
-            "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
+            "duration_policy": "natural edit duration; do not force a fixed final length; trim and assemble in Opue_video_add from the accepted clips",
             "expect_audio": True,
-            "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
-            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json; place editable white centered current-step captions, subtle dark stroke/shadow, no colored box",
-            "edit_policy": "before ChatCut import run scripts/edit_plan.py with accepted MP4s and actual trims, then follow analysis/edit-plan.json",
+            "audio_policy": "native ambient cooking sound from generation only; no BGM, dialogue, or voiceover",
+            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling and check them with scripts/caption_cues.py; scripts/opue_project.py turns them into Opue step captions drawn by the project's style kit",
+            "edit_policy": "run scripts/opue_project.py with accepted MP4s and actual trims, then engine.pick, engine.preview, and engine.render --sheet in Opue_video_add",
             "qa_policy": "use scripts/handoff_review.py after clip joins and scripts/qa_decision_sheet.py before final handoff",
         },
         "continuity": {
@@ -368,9 +365,9 @@ def _mark_director_three_clip_mode(
             "handoff_policy": "inspect accepted prior clip's returned last frame and final motion strip; use a clean last frame directly or generate a transition opening anchor when the last frame is weak",
         },
         "brand": {
-            "strategy": "first-frame-physical-prop",
-            "asset": "viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png",
-            "visible_text": "physical-prop-only",
+            "strategy": "opue-post-production",
+            "brands": ["umall", "asian_grocer"],
+            "visible_text": "none-in-generated-frames",
         },
         "budget": {
             "retry_limit": 1,
@@ -380,7 +377,7 @@ def _mark_director_three_clip_mode(
     data["video_workflow"] = {
         "status": "prepared",
         "visual_qa": "not_started",
-        "chatcut": "not_started",
+        "finish": "not_started",
         "export_qa": "user_acceptance",
         "history": [],
         "clips": {
@@ -392,7 +389,7 @@ def _mark_director_three_clip_mode(
     data["assumptions"].append(
         {
             "inferred": True,
-            "value": "Director-led sequential handoff: generate clip 1 opening first; for clips 2 and 3 inspect the accepted prior clip's returned last frame and final motion strip before using it directly or generating a transition opening anchor for the next camera bridge. ChatCut imports only accepted MP4 clips.",
+            "value": "Director-led sequential handoff: generate clip 1 opening first; for clips 2 and 3 inspect the accepted prior clip's returned last frame and final motion strip before using it directly or generating a transition opening anchor for the next camera bridge. Only accepted MP4 clips go into the Opue project.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -460,7 +457,7 @@ def _mark_single_10s_mode(
             "ratio": "9:16",
             "duration": 10,
             "resolution": "1080p",
-            "generate_audio": False,
+            "generate_audio": True,
             "return_last_frame": False,
             "watermark": False,
         },
@@ -468,16 +465,17 @@ def _mark_single_10s_mode(
             "ratio": "9:16",
             "resolution": "1080p",
             "target_duration": None,
-            "duration_policy": "single coherent 10s Seedance multi-shot; ChatCut may trim/reframe when useful but should not force a fixed final length",
+            "duration_policy": "single coherent 10s Seedance multi-shot; trim and finish in Opue_video_add; do not force a fixed final length",
             "expect_audio": True,
-            "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place SFX",
-            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling; before ChatCut caption placement run scripts/caption_cues.py with actual trims and read chatcut-caption-plan.json when captions are requested",
-            "edit_policy": "after generation run scripts/edit_plan.py when ChatCut trimming/reframing is needed",
+            "audio_policy": "native ambient sound from generation only; no BGM, dialogue, or voiceover",
+            "text_policy": "draft external clip-relative caption cues in analysis/caption-cues/ while Seedance is polling and check them with scripts/caption_cues.py; scripts/opue_project.py turns them into Opue step captions",
+            "edit_policy": "after generation run scripts/opue_project.py, then finish in Opue_video_add",
             "qa_policy": "run scripts/next_step.py and scripts/qa_decision_sheet.py before final handoff when editing is needed",
         },
         "brand": {
-            "strategy": "first-frame-product-reference",
-            "visible_text": "opening-product-or-package-only",
+            "strategy": "opue-post-production",
+            "brands": ["umall", "asian_grocer"],
+            "visible_text": "none-in-generated-frames",
         },
         "budget": {
             "retry_limit": 1,
@@ -487,7 +485,7 @@ def _mark_single_10s_mode(
     data["video_workflow"] = {
         "status": "prepared",
         "visual_qa": "not_started",
-        "chatcut": "not_started",
+        "finish": "not_started",
         "export_qa": "user_acceptance",
         "history": [],
         "clips": {
@@ -497,7 +495,7 @@ def _mark_single_10s_mode(
     data.setdefault("assumptions", []).append(
         {
             "inferred": True,
-            "value": "Single-10s commercial route: use product/page image reference as visual bible, generate one 10s multi-shot Seedance clip, and use ChatCut only for trim/reframe/BGM/captions/handoff.",
+            "value": "Single-10s commercial route: use product/page image reference as visual bible, generate one 10s multi-shot Seedance clip, and finish logo/captions/end card in Opue_video_add.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -736,9 +734,10 @@ def prepare_original_video_run(
                 "Create a premium 10-second vertical product commercial. This is an "
                 "instruction prompt, not a description of an already finished video. "
                 "Use [Image 1] as the opening product/package reference and visual "
-                "product bible. The product/package/logo must be readable in the first "
-                "shot only; do not force logo, package text, or product-pack visibility "
-                "after the opening shot.\n\n"
+                "product bible. The product/package must be recognisable in the first "
+                "shot only; do not force package text or product-pack visibility after "
+                "the opening shot. Generate no logo, sign, or brand text: Opue "
+                "post-production draws them.\n\n"
                 "SETTINGS: choose one practical real-life setting implied by the brief "
                 "(office desk, home kitchen, pantry counter, beverage table, or another "
                 "product-appropriate location) and keep it continuous for the whole "
@@ -775,9 +774,10 @@ def prepare_original_video_run(
                 "QUALITY: rich product detail, sharp focus, detailed food or packaging "
                 "texture, natural steam/liquid/material behavior, realistic hands and "
                 "props, controlled depth of field, clean premium color grading.\n"
-                "AUDIO: generate_audio is false for this workflow. Do not ask Seedance "
-                "for SFX, dialogue, music, subtitles, or voiceover; audio is finished "
-                "later in ChatCut unless the user explicitly selects native audio.\n"
+                "AUDIO: native ambient sound only, matching the visible action (oil sizzle, "
+                "utensil on cookware, simmer bubbles, pour). End the prompt with a line such as "
+                "'soundscape: <ambient sounds>. No dialogue, no music.' No BGM, voiceover, or "
+                "SFX stingers; logo and captions are drawn later in Opue post-production.\n"
                 "CONSTRAINTS: no face, no subtitles, no captions, no title cards, no "
                 "lower-thirds, no burned-in text, no overlay graphics, no floating "
                 "logo, no watermarks, no extra logos, no warped hands, no invented "
@@ -796,7 +796,7 @@ def prepare_original_video_run(
             )
         group_actions = {
             1: (
-                "0-2s establish the product pack, physical brand sign, setting, "
+                "0-2s establish the product pack, setting, "
                 "and the first no-face hand action from the brief. 2-4s cut or "
                 "push into a close-up insert of package opening, ingredient "
                 "texture, hand placement, pour, spoon, wrapper, or product surface. "
@@ -821,7 +821,7 @@ def prepare_original_video_run(
                 "2-4s cut into the strongest texture/usage insert from the brief. "
                 "4-6s settle on a refined final hero with the finished food or "
                 "product-use state; include the product pack only if it fits "
-                "naturally, and do not force the logo sign to return."
+                "naturally."
             ),
         }
         for group, action in group_actions.items():
@@ -865,15 +865,12 @@ def prepare_original_video_run(
                     "QUALITY: rich food/product detail, sharp focus, detailed texture, "
                     "natural steam/liquid/heat behavior, realistic hands and cookware, "
                     "controlled depth of field, premium believable color grading.\n"
-                    "AUDIO: generate_audio is false for this workflow. Do not ask "
-                    "Seedance for SFX, music, dialogue, voiceover, or subtitles; audio "
-                    "is finished later in ChatCut unless the user explicitly selects "
-                    "native audio.\n"
-                    "BRAND: the physical ASIAN GROCER ONLINE / powered by UMALL "
-                    "tabletop sign must read only in clip 1's opening reference / "
-                    "first frame. Later clips do not need to preserve or repeat it; "
-                    "food texture, cooking, plating, and usage can naturally push it "
-                    "out of frame.\n"
+                    "AUDIO: native ambient sound only, matching the visible action (oil sizzle, "
+                    "utensil on cookware, simmer bubbles, pour). End the prompt with a line such as "
+                    "'soundscape: <ambient sounds>. No dialogue, no music.' No BGM, voiceover, or "
+                    "SFX stingers; logo and captions are drawn later in Opue post-production.\n"
+                    "BRAND: no logo, store sign, price, or brand text in any frame; "
+                    "keep the product identity from the opening reference.\n"
                     "CONSTRAINTS: no face, no new objects, no scene teleporting, no "
                     "subtitles, no overlay text, no title cards, no lower-thirds, no "
                     "floating logo, no watermarks, no extra logos, no warped hands, "

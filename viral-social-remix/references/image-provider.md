@@ -19,12 +19,12 @@ Use this file when generating or retrying images for the remix workflow.
   `https://openrouter.ai/api/v1/images`, model `openai/gpt-image-2`, request
   size `1024x1536`, then the local runner reframes only `vertical-video`
   outputs to final `1080x1920`.
-- Three-clip product/logo opening frames are always high-quality identity
+- Three-clip product opening frames are always high-quality identity
   frames: run `scripts/run_openrouter_carousel.py --api-mode images --quality
   high --asset-id 01`, keep model `openai/gpt-image-2`, and include the
-  supplied product image plus the official region logo as actual image
-  references. Do not accept prompt-only generation for three-clip clip 1. If
-  the generated sign is wrong, regenerate the whole image-model first frame.
+  supplied product image as an actual image reference. Do not pass a logo and
+  do not accept prompt-only generation for three-clip clip 1. Video frames
+  carry no logo or sign; Opue adds branding in post.
   Single-10s commercials do not run this OpenRouter first-frame gate by
   default; pass product/page images directly to Seedance.
 
@@ -75,13 +75,11 @@ awkward for the next action.
 
 After each OpenRouter image run, inspect the JSON output. For three-clip clip 1
 product-commercial frames, `generated[0].references` must list the product
-image and official logo inputs. If it is empty, treat the result as invalid even
-if the image looks plausible: fix the manifest/reference paths and rerun before
-submitting Seedance. A model-invented package or logo is not an acceptable
-identity reference. If the logo/sign is cropped, misspelled, replaced, or only
-partly visible, tighten the prompt/reference placement and rerun high-quality
-image generation. Never paste, composite, mask, track, or overlay the official
-logo onto an otherwise bad first frame.
+image input. If it is empty, treat the result as invalid even if the image looks
+plausible: fix the manifest/reference paths and rerun before submitting
+Seedance. A model-invented package is not an acceptable identity reference. If
+the product is cropped or altered, or the model added a logo, sign, or price
+card, tighten the prompt and rerun high-quality image generation.
 
 Use `scripts/run_openrouter_carousel.py --api-only --asset-id 01` for the clip
 1 opening. Use `--asset-id 02` or `--asset-id 03` only after the handoff
@@ -90,7 +88,7 @@ decision requires that slot. This runner is preferred over direct
 OpenRouter image sizes to the exact Seedance requirement, `1080x1920`.
 Seedance receives only the selected opening reference for each clip.
 Opening PNGs, returned last frames, and transition anchors are generation
-references and must not be imported into ChatCut.
+references and must not become takes in the Opue project.
 
 For `vertical-video`, use OpenRouter's dedicated Image API instead of the
 chat-completions image path. The request uses model

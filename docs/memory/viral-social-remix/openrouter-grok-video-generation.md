@@ -60,42 +60,24 @@ is intentional.
   was paid for. Replace the weak prep portion with storyboard stills plus subtle
   Ken Burns motion, then stitch that to the usable cooking segments. On the
   2026-07-25 soup run, Segment A's cutting action was replaced this way before
-  ChatCut import.
+  editing.
 - If Grok adds edge watermarking or border marks, create a review/export copy by
   zooming and cropping locally, then upscale/crop to the target vertical canvas.
   The soup test used a light zoom crop to `1080x1920` before stitching.
 - Keep no-subtitle rules in the prompt: no title cards, captions,
   lower-thirds, ingredient labels, sticker ads, floating graphics, or screen
   overlay text.
-- Company branding may appear only if it is a real physical sign, logo prop, or
-  packaging already present in the storyboard. It must not become an overlay.
-- Grok can use product and brand images as `input_references`, but it cannot be
-  trusted to reproduce the exact `ASIAN GROCER ONLINE powered by UMALL` lockup.
-  For final delivery, do not ask Grok to render the company logo text. Use the
-  real product package in generation, then place the official logo PNG in
-  ChatCut/post if exact brand identity is required.
+- Generated frames carry no logo, sign, or brand text. Grok cannot be trusted
+  to reproduce brand lettering, so never ask it to. Use the real product package
+  in generation; the Opue finish draws the `umall` or `asian_grocer` logo and all
+  text ([[opue-finish-workflow]]).
 
-## Local Foley
+## Audio
 
-When ChatCut finishing asks for cooking sound but video generation is no-audio,
-it is acceptable to create low-volume local Foley/SFX and light BGM before or
-inside ChatCut:
-
-- Prep: short cutting-board taps and knife clicks.
-- Cooking base: gentle sizzle and wet spoon stirring.
-- Soup finish: broth pour, small ingredient drops, bubbling, and spoon lift.
-- BGM: local synthetic music can sound cheap. For reviewable cooking shorts,
-  prefer one tasteful ChatCut AI or stock BGM pass, then trim it to the final
-  video duration on a separate ChatCut audio track. Keep it adjustable and
-  around background level so Foley remains audible.
-- Text: when the generated video has no voice, do not wait for ASR captions.
-  Add concise English cooking-step labels as a Motion Graphic overlay timed to
-  the visual beats. Default subtitles/step labels should be white, horizontally
-  centered, and placed in the middle of the video frame unless the user asks for
-  another layout. Use shadow/stroke for contrast instead of colored boxes.
-
-Keep Foley subtle, original, and generated for our video. Do not copy source
-audio from the reference reel.
+Superseded on 2026-10-10. Generate native ambient sound where the provider
+supports it, and end prompts with `soundscape: ... No dialogue, no music.` Do not
+add local Foley, BGM, or stock music by default. Captions come from the Opue
+finish, not from ASR or hand-placed labels.
 
 ## QA Checklist
 
@@ -120,7 +102,7 @@ After Grok finishes:
   `output/20260725-153706-japansoup-grok-remake/generated/openrouter-grok-5s-test-720p.mp4`
 - Spicy soft tofu soup 15s three-segment review with local Foley:
   `output/20260725-153706-japansoup-grok-remake/generated/grok-japansoup-clean-stitched-15s-1080x1920-sfx.mp4`
-- Spicy soft tofu soup C-version ChatCut import, with storyboard Ken Burns prep
+- Spicy soft tofu soup C-version edit, with storyboard Ken Burns prep
   montage replacing the bad fake-cutting Segment A:
   `output/20260725-153706-japansoup-grok-remake/generated/grok-japansoup-c-version-stitched-15s-1080x1920-sfx.mp4`
 - Honey butter chicken 15s three-segment Grok draft with white centered label

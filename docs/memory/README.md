@@ -15,9 +15,9 @@ production checklists.
 - `../../00-start-here.md`: vault-level relationship map and authority ladder.
 - `viral-social-remix/index.md`: daily operating memory for the social remix skill.
 - `viral-social-remix/video-production-map.md`: video relationship map for
-  Seedance anchors, transitions, provider notes, visual taste, and ChatCut.
-- `viral-social-remix/chatcut/README.md`: ChatCut product map, editing themes,
-  low-model execution contract, prompt recipes, and finishing QA.
+  Seedance anchors, transitions, provider notes, visual taste, and the Opue finish.
+- `viral-social-remix/opue-finish-workflow.md`: why video post-production moved
+  from ChatCut to `Opue_video_add`, and how it connects to the video chain.
 - `../retrospectives/`: incident-level writeups after a painful run.
 - `inbox/`: temporary notes that still need to be cleaned up.
 

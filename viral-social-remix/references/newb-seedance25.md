@@ -15,7 +15,7 @@ account (`--provider` is not used; NewB has its own runner). Source contract:
 | Reference naming | `[Image 1]` | `@图1`, `@图2` in upload order |
 | First frame | explicit `first_frame` role | a lone reference image is usually treated as the first frame; multiple images are looser references |
 | Last frame | `return_last_frame: true` | not returned; the runner extracts it locally with ffmpeg |
-| Audio | `generate_audio: false` | native ambient audio always generated; runner strips it by default |
+| Audio | `generate_audio: true` on final profiles, ambient only | native audio always generated; kept by default (house audio is ambient only), `--strip-audio` removes it |
 | Timing in prompt | timed beats work | do not write timelines; the runner rejects timestamps |
 | Billing | per-request API spend | membership quota shared with the NewB web app; failed jobs are refunded automatically |
 | Speed | minutes | usually 7-20 min, longer at peak |
@@ -37,15 +37,16 @@ account (`--provider` is not used; NewB has its own runner). Source contract:
 ## Route mapping for company commercials
 
 A 30s request is long enough for a whole commercial. Default to one request per
-commercial, then trim to a natural length in ChatCut.
+commercial, then trim to a natural length in the Opue finish
+(`opue-finish.md`).
 
 - **Single-30s (default with NewB)**: one request covers the full action chain
   from `cooking-video-workflow.md`, such as package identity -> prep -> heat ->
   transformation -> texture macro -> plated hero.
   - Cooked products still pass the three-clip Identity Gate first. Generate
-    the opening frame with `openai/gpt-image-2`, including the product and the
-    `ASIAN GROCER ONLINE / powered by UMALL` physical sign, then send it as the
-    only image (`@图1`) so NewB uses it as the first frame.
+    the opening frame with `openai/gpt-image-2` from the real product image,
+    with no logo or sign, then send it as the only image (`@图1`) so NewB uses
+    it as the first frame.
   - For simple pantry, drink, or office-ritual products, the product or page
     image may be `@图1` directly, as in the single-10s route.
 - **Chained takes**: only when one 30s take cannot carry the story. The local
@@ -55,7 +56,8 @@ commercial, then trim to a natural length in ChatCut.
 - **Rerolls**: use a new `--label take-02`. The runner refuses to overwrite an
   existing output without `--overwrite`.
 - **Output size**: NewB delivers 720p. The company spec is `1080x1920`, so the
-  upscale or acceptance of 720p is decided at ChatCut export. Keep generation
+  upscale or acceptance of 720p is decided at the Opue render, which outputs
+  its own canvas size. Keep generation
   references at exact `1080x1920` regardless.
 
 ## Prompt rules
@@ -76,20 +78,23 @@ NewB's own guidance overrides the timed-beat templates in
    job. This matches the no-face policy anyway.
 5. **Refer to images by `@图N`** in the exact `--image` order.
 6. **Still state the house constraints**: no face, no subtitles, no captions,
-   no overlays, no watermarks, no extra logos, and no music, since audio is
-   stripped anyway. Physical product packaging and the opening logo sign are
-   allowed.
+   no overlays, no watermarks, no logos or signs. Physical product packaging is
+   allowed. Opue draws all branding and text in post.
+7. **End with the ambient soundscape line**:
+   `soundscape: <热油滋滋声、锅铲碰锅、汤咕嘟>. No dialogue, no music.` The
+   runner warns when a prompt does not rule out music.
 
 Prompt skeleton (Chinese or English both work; keep the brand text exact):
 
 ```text
-@图1 是开场画面：[产品 + 桌面实体立牌 ASIAN GROCER ONLINE / powered by UMALL + 场景]。
+@图1 是开场画面：[真实产品 + 场景]。
 写实高级感超市美食广告，竖屏，暖色[光源与方向]，同一个厨房、同一套厨具、同一种色调，无人脸只出现手。
 先 [开场动作，景别 + 机位 + 运镜]。
 接着 [手/工具动作]，切到 [特写：纹理/蒸汽/酱汁]。
 然后 [加热/转化动作，火焰/锅盖/蒸汽作为转场]。
 最后 [装盘成品主镜头，缓慢拉远，只露出已出现过的厨房]。
-产品外形和包装全程保持一致。不要字幕、文字叠加、水印、额外 logo、背景音乐。
+产品外形和包装全程保持一致。不要字幕、文字叠加、水印、logo、招牌。
+soundscape: [这一段动作的环境声]. No dialogue, no music.
 ```
 
 ## Commands
@@ -108,8 +113,9 @@ interval 15s.
 
 Outputs:
 
-- `generated/<label>.mp4`: the silent main output.
-- `generated/<label>.audio.mp4`: the NewB original with audio.
+- `generated/<label>.mp4`: the main output, with the ambient audio kept.
+- `generated/<label>.audio.mp4`: the original, written only with
+  `--strip-audio`.
 - `generated/<label>-last-frame.png`: the local handoff frame.
 - `qa/<label>.json`: the ledger, with the signed URL redacted.
 - The manifest entry `newb_video_generation.<label>`, which includes the

@@ -54,14 +54,14 @@ PROFILE_DEFAULTS = {
     "final-clip": {
         "duration": 6,
         "resolution": "1080p",
-        "generate_audio": False,
+        "generate_audio": True,
         "watermark": False,
         "return_last_frame": True,
     },
     "single-10s-final": {
         "duration": 10,
         "resolution": "1080p",
-        "generate_audio": False,
+        "generate_audio": True,
         "watermark": False,
         "return_last_frame": False,
     },

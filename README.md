@@ -25,14 +25,14 @@ request order is known.
 .\.venv\python.exe viral-social-remix\scripts\video_qa.py approve output/<run>
 
 .\.venv\python.exe viral-social-remix\scripts\video_qa.py prepare-export `
-  output/<run> --video generated/final-export.mp4
+  output/<run> --video <opue>/projects/<name>/out/<file>.mp4
 .\.venv\python.exe viral-social-remix\scripts\video_qa.py approve-export output/<run>
 ```
 
 `visual-preview` is 5 seconds, 1080p, no audio, and requests the last frame for
 continuation. Preflight enforces the official Seedance 2.0 duration/reference
 limits and rejects invalid prompt labels before submission. Generated MP4s do
-not proceed to ChatCut/export until `video_workflow.status` is
+not proceed to the Opue finish/export until `video_workflow.status` is
 `visual_qa_passed`, and a final export is not complete until
 `export_qa_passed`. Full details are in
 [`viral-social-remix/references/seedance-video.md`](viral-social-remix/references/seedance-video.md).

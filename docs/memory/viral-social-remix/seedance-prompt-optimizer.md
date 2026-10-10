@@ -76,7 +76,8 @@ target object/person. For extension or stitching, describe the transition. For
 text-generation tests, name exact text, timing, placement, and appearance.
 
 Normal company cooking videos remain no-face and text-free in raw generation;
-add captions, labels, and BGM later in ChatCut only when requested.
+captions, labels, and the logo come from the Opue finish; audio is native
+ambient sound only.
 
 ## Guardrails
 

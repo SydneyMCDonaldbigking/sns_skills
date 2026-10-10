@@ -57,11 +57,11 @@ Result: 31 visible candidates, 20 retained after the recent-year filter.
 - English captions often carry the full recipe. On-screen text is only a hook
   or short label, not the full instructions.
 - Many high performers use centered white text with a subtle shadow. For our
-  pipeline, keep generated frames/videos text-free, then add centered white
-  subtitles/labels in ChatCut only when requested.
+  pipeline, keep generated frames/videos text-free; captions and labels come
+  from the Opue finish's style kits.
 - Product relevance works best when the product is physically present: package
   on counter, seasoning bottle in hand, grocery shelf, or final hero with a
-  real sign/package. Avoid overlay ads.
+  real package. Avoid overlay ads; branding comes from the Opue finish.
 
 ## Risks For AI Video
 

@@ -7,7 +7,7 @@ It is separate from run notes and source packages.
 
 - Before original English cooking videos.
 - Before IG/Reels-inspired recipe breakdowns.
-- Before ChatCut finishing when subtitles, BGM, sound effects, or pacing matter.
+- Before the Opue finish when captions, headline angle, or pacing matter.
 
 ## Rules
 
@@ -19,8 +19,8 @@ It is separate from run notes and source packages.
   engagement counts, and abstract observations.
 - Keep English-region output separate from Chinese-region references.
 - For AI video generation, remember that the generated storyboard/video itself
-  should contain no visible text. Add English subtitles or labels later in
-  ChatCut only when the user asks for post-production text.
+  should contain no visible text, logo, or sign. English captions, labels, and
+  the logo come from the Opue finish ([[opue-finish-workflow]]).
 
 ## Files
 

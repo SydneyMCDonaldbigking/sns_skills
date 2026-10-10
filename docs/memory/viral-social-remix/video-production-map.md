@@ -7,14 +7,14 @@ tags:
 aliases:
   - Video Production Map
   - Seedance Relationship Map
-updated: 2026-07-30
+updated: 2026-10-10
 ---
 
 # Video Production Map
 
 Use this as the relationship map for original product/cooking videos. It
-connects the production contract, provider memory, visual taste, and ChatCut
-handoff without duplicating the full workflow.
+connects the production contract, provider memory, visual taste, and the Opue
+finish without duplicating the full workflow.
 
 ## Source Of Truth
 
@@ -28,9 +28,9 @@ the memory and follow the contract.
 ```mermaid
 flowchart TD
   A["Brief / source / product refs"] --> B{"Route"}
-  B --> C["Single 10s Seedance"]
+  B --> C["Single 10s Seedance / NewB 30s take"]
   B --> D["Three 6s Seedance clips"]
-  C --> E["Optional ChatCut finish"]
+  C --> E["Opue finish: logo, captions, end card"]
   D --> F["Clip 1 opening anchor"]
   F --> G["Clip 1 MP4 + returned last frame"]
   G --> H{"Last frame and last motion strip clean?"}
@@ -69,12 +69,14 @@ focus, texture insert, or another motivated transition.
 - Cost and QA memory: [[seedance-video-generation]]
 - Original cooking summary: [[original-cooking-video]]
 - Visual taste: [[aesthetic-library/no-face-asian-cooking-style]]
-- ChatCut finish: [[chatcut-handoff-workflow]]
-- ChatCut memory hub: [[chatcut/README]]
+- Opue finish: [[opue-finish-workflow]]
+- Opue contract: [[viral-social-remix/references/opue-finish]]
+- NewB Seedance 2.5: [[viral-social-remix/references/newb-seedance25]]
 
 ## Asset Boundary
 
-Generation references stay out of ChatCut: opening anchors, returned last
-frames, transition anchors, product/package/logo references, contact sheets,
-and QA strips. ChatCut receives only accepted MP4 clips plus requested BGM,
-voiceover, and editable post-production text.
+Generation references stay out of the Opue project: opening anchors, returned
+last frames, transition anchors, product/package references, contact sheets,
+and QA strips. Opue receives only accepted MP4 clips (with their ambient sound)
+and caption cues; it draws the logo and all on-screen text. Generated frames
+carry no logo, sign, or text.

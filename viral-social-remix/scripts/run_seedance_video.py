@@ -726,7 +726,7 @@ def _update_manifest_video(
             if workflow_status == "generated":
                 workflow["visual_qa"] = "pending"
         workflow["history"] = history
-        workflow.setdefault("chatcut", "not_started")
+        workflow.setdefault("finish", "not_started")
         workflow.setdefault("export_qa", "not_started")
         data["video_workflow"] = workflow
     _write_json(manifest_path, data)
@@ -949,7 +949,7 @@ def run_seedance_video(
         if video_urls or audio_urls:
             raise SeedanceRunnerError(
                 "The three-clip cooking route accepts only its image anchor(s); "
-                "BGM and voiceover are added later in ChatCut. Do not add SFX by default."
+                "audio is native ambient sound and Opue draws logo and captions later."
             )
         selected_storyboard_ids = selected_groups[storyboard_group]
         generation_key = f"clip-{storyboard_group:02d}"
@@ -1139,10 +1139,9 @@ def run_seedance_video(
                     f"{expected_image_count} image(s) and no "
                     f"video/audio references; found {counts}"
                 )
-            if options["duration"] != 6 or options["generate_audio"]:
+            if options["duration"] != 6:
                 raise video_job.VideoJobError(
-                    "The three-clip cooking route requires a silent 6-second Seedance "
-                    "generation"
+                    "The three-clip cooking route requires a 6-second Seedance generation"
                 )
         final_prompt, prompt_warnings = video_job.compile_prompt(
             composed_prompt,

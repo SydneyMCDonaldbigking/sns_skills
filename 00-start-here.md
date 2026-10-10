@@ -19,7 +19,7 @@ Obsidian feels noisy.
 - [[docs/memory/viral-social-remix/index|Viral Social Remix Memory]]: daily
   operating memory for the skill.
 - [[docs/memory/viral-social-remix/video-production-map|Video Production Map]]:
-  relationship map for Seedance, image anchors, camera transitions, and ChatCut.
+  relationship map for Seedance, image anchors, camera transitions, and the Opue finish.
 - [[viral-social-remix/SKILL|Skill Runtime Contract]]: the executable skill
   contract Codex should read first.
 - [[viral-social-remix/references/cooking-video-workflow|Cooking Video Workflow]]:
@@ -44,7 +44,7 @@ If two notes disagree, trust the higher layer and update the lower memory note.
 - Seedance prompt optimization:
   [[docs/memory/viral-social-remix/seedance-prompt-optimizer]]
 - Image/carousel generation: [[docs/memory/viral-social-remix/openrouter-image-generation]]
-- ChatCut finishing: [[docs/memory/viral-social-remix/chatcut/README|ChatCut Editing Memory]]
+- Video finishing: [[docs/memory/viral-social-remix/opue-finish-workflow|Opue Finish]] (ChatCut retired 2026-10-10)
 - Visual taste: [[docs/memory/viral-social-remix/aesthetic-library/README|Aesthetic Library]]
 - Source/material indexing: [[docs/workflows/local-material-index]]
 - Repository hygiene: [[docs/workflows/repository-hygiene]]

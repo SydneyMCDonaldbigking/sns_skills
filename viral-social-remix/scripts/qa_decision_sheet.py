@@ -72,44 +72,35 @@ def handoff_rows(run_dir: Path) -> tuple[str, list[str]]:
     return "\n".join(rows), images
 
 
-def clip_rows(edit_plan: dict[str, Any] | None) -> str:
-    if not edit_plan:
-        return "<tr><td colspan=\"7\" class=\"missing\">missing analysis/edit-plan.json</td></tr>"
-    rows = []
-    for clip in edit_plan.get("clips", []):
+def cue_rows(run_dir: Path) -> tuple[str, int]:
+    cue_dir = run_dir / "analysis" / "caption-cues"
+    rows: list[str] = []
+    total = 0
+    for path in sorted(cue_dir.glob("*.json")) if cue_dir.is_dir() else []:
+        if path.name == "timeline.json":
+            continue
+        data = load_json(path) or {}
+        cues = data.get("cues") or []
+        total += len(cues)
+        text = " / ".join(str(cue.get("text", "")) for cue in cues)
         rows.append(
             "<tr>"
-            f"<td>{html_escape(clip.get('clip'))}</td>"
-            f"<td>{html_escape(clip.get('source'))}</td>"
-            f"<td>{html_escape(clip.get('trim_in'))}</td>"
-            f"<td>{html_escape(clip.get('trim_out'))}</td>"
-            f"<td>{html_escape(clip.get('timeline_start'))}</td>"
-            f"<td>{html_escape(clip.get('timeline_end'))}</td>"
-            f"<td>{html_escape(clip.get('editor_notes'))}</td>"
+            f"<td>{html_escape(data.get('source_clip') or path.stem)}</td>"
+            f"<td>{len(cues)}</td>"
+            f"<td>{html_escape(text)}</td>"
             "</tr>"
         )
-    return "\n".join(rows)
-
-
-def caption_summary(caption_plan: dict[str, Any] | None) -> str:
-    if not caption_plan:
-        return "<p class=\"missing\">missing analysis/caption-cues/chatcut-caption-plan.json</p>"
-    captions = caption_plan.get("captions") or []
-    if not captions:
-        return "<p class=\"missing\">caption plan has no captions</p>"
-    first = captions[0]
-    last = captions[-1]
-    return (
-        f"<p>{len(captions)} captions, from "
-        f"{html_escape(first.get('start'))}s to {html_escape(last.get('end'))}s.</p>"
-    )
+    if not rows:
+        rows.append("<tr><td colspan=\"3\" class=\"missing\">no caption cues in analysis/caption-cues/</td></tr>")
+    return "
+".join(rows), total
 
 
 def build_sheet(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir)
     manifest = load_json(run_dir / "analysis" / "manifest.json")
-    edit_plan = load_json(run_dir / "analysis" / "edit-plan.json")
-    caption_plan = load_json(run_dir / "analysis" / "caption-cues" / "chatcut-caption-plan.json")
+    cue_table, cue_count = cue_rows(run_dir)
+    opue = (manifest or {}).get("opue_project") or {}
     next_step = load_json(run_dir / "analysis" / "next-step.json")
     handoff_table, handoff_images = handoff_rows(run_dir)
     images_html = "\n".join(
@@ -117,11 +108,12 @@ def build_sheet(args: argparse.Namespace) -> int:
         for path in handoff_images
     )
     checks = [
-        "opening product/sign readable when required",
+        "opening product/package identity matches the supplied product (no logo or text needed in generated frames)",
         "joins have a motivated handoff or transition anchor",
         "no face, damaged hands, overlay text, fake UI, or burned-in captions",
-        "edit plan uses accepted MP4 clips only",
-        "caption plan exists before editable caption placement when captions are used",
+        "only accepted MP4 clips go into the Opue project",
+        "ambient cooking sound only: no music, dialogue, or voiceover in generated clips",
+        "caption cues describe visible actions only; no prices, claims, or facts without a source",
         "final set/background stays consistent for ending extensions",
     ]
     check_html = "\n".join(f"<li>{html_escape(item)}</li>" for item in checks)
@@ -162,12 +154,10 @@ def build_sheet(args: argparse.Namespace) -> int:
   <ul>{check_html}</ul>
   <h2>Handoffs</h2>
   <table><thead><tr><th>Handoff</th><th>Decision</th><th>Recommendation</th><th>Links</th></tr></thead><tbody>{handoff_table}</tbody></table>
-  <h2>Edit Plan</h2>
-  <p>{link("analysis/edit-plan.json", "edit-plan.json")} / {link("analysis/edit-plan.csv", "edit-plan.csv")}</p>
-  <table><thead><tr><th>Clip</th><th>Source</th><th>In</th><th>Out</th><th>Timeline In</th><th>Timeline Out</th><th>Notes</th></tr></thead><tbody>{clip_rows(edit_plan)}</tbody></table>
-  <h2>Captions</h2>
-  {caption_summary(caption_plan)}
-  <p>{link("analysis/caption-cues/chatcut-caption-plan.json", "chatcut-caption-plan.json")}</p>
+  <h2>Caption Cues</h2>
+  <table><thead><tr><th>Clip</th><th>Cues</th><th>Text</th></tr></thead><tbody>{cue_table}</tbody></table>
+  <h2>Opue Project</h2>
+  <p>{html_escape(opue.get("path") or "not drafted yet: run scripts/opue_project.py")}</p>
   <h2>Visual References</h2>
   <div class="grid">{images_html or '<p class="missing">no handoff images yet</p>'}</div>
 </body>
@@ -180,8 +170,8 @@ def build_sheet(args: argparse.Namespace) -> int:
         "decision_sheet": str(output),
         "mode": mode,
         "handoff_reports": len(list((run_dir / "qa" / "handoffs").glob("*/handoff-review.json"))),
-        "edit_plan": bool(edit_plan),
-        "caption_plan": bool(caption_plan),
+        "caption_cues": cue_count,
+        "opue_project": opue.get("path"),
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0

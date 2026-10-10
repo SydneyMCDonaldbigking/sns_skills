@@ -333,7 +333,7 @@ def _write_single_10s_manifest(analysis: Path) -> None:
                 "video_workflow": {
                     "status": "prepared",
                     "visual_qa": "not_started",
-                    "chatcut": "not_started",
+                    "finish": "not_started",
                     "export_qa": "user_acceptance",
                     "history": [],
                 },

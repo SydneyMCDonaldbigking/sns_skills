@@ -3,57 +3,82 @@
 This is the single authority for original no-face cooking commercials. Do not
 load old run notes unless something fails.
 
+House rules since 2026-10-10:
+
+- **No text or logo from the generator.** Generated frames and clips show the
+  real product and food only: no logo, store sign, price, label, caption, or
+  brand text.
+- **Post-production is `Opue_video_add`** (`references/opue-finish.md`). It
+  draws the brand logo (`umall` or `asian_grocer`, chosen per video), the
+  headline, step captions, product sticker, and end card. ChatCut is retired.
+- **Audio is the clips' native ambient sound only**: sizzle, simmer, utensils,
+  pour. Every video prompt ends with
+  `soundscape: <ambient sounds>. No dialogue, no music.` No BGM or voiceover
+  unless the user supplies or asks for it.
+
 ## Route selection
 
 Choose one commercial route before paid generation:
 
-- **Single-10s commercial**: one silent `10s`, `9:16`, `1080p` Seedance
-  request. Use for drinks, snacks, pantry, office rituals, and simple
+- **Single-10s commercial**: one `10s`, `9:16`, `1080p` Seedance request with
+  ambient sound only. Use for drinks, snacks, pantry, office rituals, and simple
   one-setting product-use stories. Pass the product/page image directly as the
   visual bible and opening product reference. Write 4-6 timed micro-shots in one
-  prompt. Product/logo/package readability is required only in the first shot.
-  Do not create a separate OpenRouter first-frame Identity Gate unless the user
-  explicitly asks for a still-frame review. Do not force logo or package
-  continuity later. ChatCut is optional for trim/reframe/BGM/captions/voiceover
-  handoff.
-- **Three-clip 6s director route**: three silent `6s`, `9:16`, `1080p`
-  Seedance requests. Use for actual cooking, large scene changes, stove/heat,
-  steamer/fire, transformation beats, or when reroll control matters.
+  prompt. The product must be recognisable in the first shot. Do not create a
+  separate OpenRouter first-frame Identity Gate unless the user explicitly asks
+  for a still-frame review. Do not force package continuity later. Finish in
+  Opue.
+- **Three-clip 6s director route**: three `6s`, `9:16`, `1080p` Seedance
+  requests with ambient sound only. Use for actual cooking, large scene changes,
+  stove/heat, steamer/fire, transformation beats, or when reroll control
+  matters.
+- **NewB Seedance 2.5 single-30s**: when the user bills NewB, one fixed
+  30s/720p take usually carries the whole three-clip action chain. It uses the
+  same Identity Gate opening frame as the sole `@图1`. Prompt rules are in
+  `references/newb-seedance25.md`.
 
 Default to three-clip for cooked foods. Prefer single-10s for a simple,
 coherent one-setting product-use ritual.
 
 Three-clip chain:
 
-`three script beats -> clip 1 designed first frame -> sequential silent 6s Seedance commercial micro-shot clips with handoff_review.py decisions and next-prompt drafts -> edit_plan.py + caption_cues.py -> ChatCut finish -> qa_decision_sheet.py`
+`three script beats -> clip 1 designed first frame -> sequential 6s Seedance commercial micro-shot clips with handoff_review.py decisions and next-prompt drafts -> qa_decision_sheet.py -> opue_project.py -> Opue pick/preview/render`
 
 Opening references are generation inputs, not editing assets. They may be a
 director-designed first frame, an accepted prior clip's returned last frame, or
 a generated transition opening anchor/bridge frame.
 
-Three-clip Identity Gate before paid video: clip 1's opening frame must be
-generated with high-quality `openai/gpt-image-2` through the OpenRouter Image
-API, using the supplied product image and official English logo as actual image
-references. Check the runner output and manifest: references must not be empty.
-Reject the frame before Seedance if the package, product form, official logo
-sign, or target region is wrong; never continue with a hallucinated or
-wrong-package opening, and never try to rescue a wrong opening with later
-clips. Do not use local logo workarounds: no paste, compositing, masking,
-tracking, post-repair, or hand-built logo overlays. A bad or cropped logo means
-rewrite the prompt/reference placement and regenerate the whole high-quality
-first frame. This gate is the main operational difference from single-10s.
+Three-clip Identity Gate before paid video:
 
-Size preflight is mandatory. Seedance requires the local opening reference PNG
-to be exactly `1080x1920`. OpenRouter image requests may reject `1080x1920`
-because provider dimensions must be divisible by 16. Prefer
-`scripts/run_openrouter_carousel.py --run output/... --api-only --asset-id 01`
-for clip 1 and `--asset-id 02` / `03` only when a handoff decision requires a
-transition anchor; the runner uses a provider-safe request size and locally
-reframes the delivered PNG to `1080x1920`. If manual `openrouter_image.py` is
-used as a fallback, generate a provider-safe portrait such as `1088x1920`, then
-immediately run `scripts/reframe_image.py --size story` and update the manifest
-to the reframed `generated/page-XX.png`. Never submit or mark `1088x1920`,
-`1024x1536`, or any non-`1080x1920` opening reference as Seedance-ready.
+- Generate clip 1's opening frame with high-quality `openai/gpt-image-2`
+  through the OpenRouter Image API, with the supplied product image as an
+  actual image reference.
+- Check the runner output and manifest: references must not be empty.
+- Do not pass a logo and do not ask for a sign; Opue adds branding in post.
+- Reject the frame before Seedance if the package shape, colours, artwork,
+  product form, or food identity is wrong. Never continue with a hallucinated
+  or wrong-package opening, and never try to rescue a wrong opening with later
+  clips.
+- Also reject it if the model invented a logo, sign, price card, or extra
+  brand text. Regenerate the whole first frame.
+
+This gate is the main operational difference from single-10s.
+
+Size preflight is mandatory:
+
+- Seedance requires the local opening reference PNG to be exactly `1080x1920`.
+- OpenRouter image requests may reject `1080x1920`, because provider
+  dimensions must be divisible by 16.
+- Prefer `scripts/run_openrouter_carousel.py --run output/... --api-only
+  --asset-id 01` for clip 1, and `--asset-id 02` / `03` only when a handoff
+  decision requires a transition anchor. The runner uses a provider-safe
+  request size and locally reframes the delivered PNG to `1080x1920`.
+- If manual `openrouter_image.py` is the fallback, generate a provider-safe
+  portrait such as `1088x1920`, then immediately run
+  `scripts/reframe_image.py --size story` and point the manifest at the
+  reframed `generated/page-XX.png`.
+- Never submit or mark `1088x1920`, `1024x1536`, or any non-`1080x1920`
+  opening reference as Seedance-ready.
 
 Default to RPA helpers before manual judgement:
 
@@ -62,8 +87,8 @@ Default to RPA helpers before manual judgement:
 - Run `scripts/handoff_review.py` after each accepted clip except the final
   clip. It extracts the final motion strip, writes the handoff report, and
   creates the next prompt draft.
-- Run `scripts/edit_plan.py` after clips are accepted and trims are known.
-- Run `scripts/qa_decision_sheet.py` before handoff or export review.
+- Run `scripts/qa_decision_sheet.py` before the Opue handoff.
+- Run `scripts/opue_project.py` after clips are accepted and trims are known.
 
 ## Approved patterns to reuse
 
@@ -74,7 +99,7 @@ product; copy the route choice, action chain, and prompt structure.
   frozen dumplings, gyoza, buns, or any product whose appeal depends on visible
   cooking transformation. The approved chain is `package identity -> pan action
   -> water/lid/steam -> reveal -> crisp underside -> plated hero`. Keep the
-  product pack/sign readable at the opening, then let stove, lid, steam, crisp
+  product pack recognisable at the opening, then let stove, lid, steam, crisp
   texture, chopsticks, sauce, and plating carry the rest. Continue clip 2 from
   clip 1's clean last-frame state; continue clip 3 from the condensation/lid
   state. Write prompts as three physical shots per clip, not as a recipe
@@ -93,19 +118,18 @@ product; copy the route choice, action chain, and prompt structure.
   prep board -> blanch or first heat action -> aromatics and soy-rich braise ->
   soaked vermicelli enters near the end -> glossy pork and noodles lift -> hot
   casserole hero`. Build clip 1's opening frame from the real product image,
-  cover/product reference, and English physical logo sign; reject and regenerate
-  the opening frame if the product or sign is cropped. For clips 2 and 3,
+  cover/product reference; reject and regenerate the opening frame if the
+  product is cropped or altered. For clips 2 and 3,
   inspect the prior returned last frame and last motion strip, then continue
   from that frame only when the pot, hands, lighting, and food state are clean.
-  Do not force the logo sign after the opening. Keep the recipe logic physical:
+  Keep the recipe logic physical:
   soaked vermicelli should enter late, steam and sauce should bridge the cuts,
   and the final payoff should be chopsticks lifting translucent sauced noodles
   with tender pork belly above the simmering pot.
 - **Steamed buns / custard buns / kids-meal pattern**: use the three-clip 6s
   route for custard buns, bao, tangyuan, and other products where the ad must
   prove package-to-cooked convenience. Do not keep the whole sequence on one
-  tabletop. The required chain is `package identity with official English
-  physical logo sign -> pack opens and buns are removed -> buns move onto a
+  tabletop. The required chain is `package identity -> pack opens and buns are removed -> buns move onto a
   real stovetop steamer or cooking appliance -> lid/steam heat beat -> lid
   opens and buns are lifted out -> plated kids-meal hero with milk`. Clip 1
   must show the pack opening and a motivated move toward the stove/steamer.
@@ -114,10 +138,9 @@ product; copy the route choice, action chain, and prompt structure.
   when appropriate, and the milk cup entering the final same-kitchen hero.
   Build at least five distinct commercial views across the sequence: package
   hero, hand/pack close-up, stove or steamer medium shot, steam/lid macro, and
-  final plate pull-back. If the generated opening frame damages, crops, or
-  misspells the `ASIAN GROCER ONLINE / powered by UMALL` sign, regenerate the
-  whole first frame before Seedance instead of accepting a fake logo or trying
-  to patch the sign locally.
+  final plate pull-back. If the generated opening frame damages or crops the
+  product, or invents a logo or sign, regenerate the whole first frame before
+  Seedance.
   Keep the advertised product family stable all the way through: custard buns
   must stay smooth round custard buns with golden custard filling, not pleated
   soup dumplings, xiaolongbao, meat buns, tangyuan, or a generic bao basket.
@@ -129,21 +152,21 @@ product; copy the route choice, action chain, and prompt structure.
   chain is `product identity and prep board -> tongs move fish to the same pan
   -> oil sear and glaze -> clean returned last-frame handoff -> plate with rice
   and garnish -> slow pull-back in the same kitchen`. Build clip 1's opening
-  frame from the real fish texture, product-pack context, and English physical
-  logo sign; reject and regenerate the opening frame when the sign is cropped
-  or a fake brand appears. Continue clips 2 and 3 from returned last
+  frame from the real fish texture and product-pack context; reject and
+  regenerate the opening frame when the product is cropped or a fake brand
+  appears. Continue clips 2 and 3 from returned last
   frames when the pan, tongs, hand, window/shelf/counter anchors, and warm light
   remain clean. If the fish is still visibly underdone at a handoff, write the
   next prompt to continue searing briefly before plating instead of pretending
   it is finished. Final pull-backs must reveal only the established window,
   shelf, pan, counter, and light direction.
 
-- **MiniMax H3 local multi-reference production pattern**: use this when the user selects local ComfyUI / MiniMax H3 R2V instead of Seedance. Prefer the native `3 x 5s` route for 1080x1920 production on A100-class GPUs: generate or collect reference images first, then run each 5s clip with 4-step Turbo LoRA, previous-last-frame continuity, no native audio, and exact per-clip crop from 1088x1920 to 1080x1920. The current user's preferred handoff is separate reviewed clips for manual editing; do not concatenate by default unless explicitly requested. H3 can preserve fictional people from references, so do not default to hands-only when the brief needs family, actor, cook, model, or product spokesperson continuity. Build a deliberate reference stack before video: fictional character/person reference, action hands/tool reference, fixed scene reference, product/package reference, process-state reference, mid-state reference, final hero reference, and official English-region logo/brand prop where relevant. Keep the stack under H3's 9-image limit, counting any previous last frame inserted as a reference.
+- **MiniMax H3 local multi-reference production pattern**: use this when the user selects local ComfyUI / MiniMax H3 R2V instead of Seedance. Prefer the native `3 x 5s` route for 1080x1920 production on A100-class GPUs: generate or collect reference images first, then run each 5s clip with 4-step Turbo LoRA, previous-last-frame continuity, ambient-only native audio, and exact per-clip crop from 1088x1920 to 1080x1920. Accepted clips go to `scripts/opue_project.py` for the Opue finish; do not concatenate them yourself. H3 can preserve fictional people from references, so do not default to hands-only when the brief needs family, actor, cook, model, or product spokesperson continuity. Build a deliberate reference stack before video: fictional character/person reference, action hands/tool reference, fixed scene reference, product/package reference, process-state reference, mid-state reference, final hero reference, with no logo or brand prop (Opue adds branding in post). Keep the stack under H3's 9-image limit, counting any previous last frame inserted as a reference.
   For family heat-and-serve products such as egg tarts, do not start from the finished afternoon-tea table unless the user explicitly asks for only a serving moment. The default commercial chain is `fridge/freezer take-out -> package/tray close-up -> oven/preheat/tray-in -> oven glow and baking macro -> mitt pulls hot tray out -> plating close-up -> parent/child afternoon-tea hero`. Generate specific Image2/Seedream references for `fridge-to-oven` and `oven-baking`; keep children safely away from heat, usually behind the counter or softly in the background. Each 5s H3 prompt should use exactly three stable shots by default: establish/action, one close-up proof insert, and endpoint/handoff. Choose close-up subjects such as package peel, foil cup, custard shine, crust layers, oven glow, mitt action, steam, plating, and final product hero, but do not cram all of them into the same 5s clip. Do not waste a whole clip on a single table arrival.
-  For real cooking dishes such as old duck soup, give H3 the missing process knowledge with references and prompt beats. The approved old-duck-soup chain is `fictional cook character -> cutting board -> daikon/duck/ginger/scallion close-ups -> ingredients into pot -> visible blue flame -> lid/steam bridge -> clear broth simmer macro -> ladle stir/lift -> bowl pour -> garnish -> finished table hero`. Always include prep/cut-state and cooked/final-state references, or H3 may skip cutting, keep ingredients raw, or make the final dish muddy. Prompts must name the physical action, shot size, angle, lens/focus, camera move, endpoint, and handoff for every shot. Use the fixed three-shot H3 rhythm for stability: `0.0-1.6s establish`, `1.6-3.4s close-up proof`, `3.4-5.0s endpoint/handoff`. Use close framing inside those three shots instead of adding extra cuts. Favor locked-off, tiny push-in, short tilt, gentle pull-back, or one rack focus; avoid continuous drifting, stacked camera moves, or too many simultaneous actions. For this user, a successful H3 handoff is often three exact 1080x1920 clips rather than an agent-made final edit.
+  For real cooking dishes such as old duck soup, give H3 the missing process knowledge with references and prompt beats. The approved old-duck-soup chain is `fictional cook character -> cutting board -> daikon/duck/ginger/scallion close-ups -> ingredients into pot -> visible blue flame -> lid/steam bridge -> clear broth simmer macro -> ladle stir/lift -> bowl pour -> garnish -> finished table hero`. Always include prep/cut-state and cooked/final-state references, or H3 may skip cutting, keep ingredients raw, or make the final dish muddy. Prompts must name the physical action, shot size, angle, lens/focus, camera move, endpoint, and handoff for every shot. Use the fixed three-shot H3 rhythm for stability: `0.0-1.6s establish`, `1.6-3.4s close-up proof`, `3.4-5.0s endpoint/handoff`. Use close framing inside those three shots instead of adding extra cuts. Favor locked-off, tiny push-in, short tilt, gentle pull-back, or one rack focus; avoid continuous drifting, stacked camera moves, or too many simultaneous actions. Each H3 prompt ends with an Opue-style `soundscape: ... No dialogue, no music.` line.
 Reusable lesson: user approval came from route fit and physical commercial
 logic, not from generic "cinematic" styling. Good outputs had visible cause and
-effect, controlled hand/tool/liquid/steam motion, restrained logo use, macro
+effect, controlled hand/tool/liquid/steam motion, branding left to post, macro
 texture payoff, and a final hero that felt like a real ad endpoint.
 
 ## Workshop-distilled Seedance rules
@@ -222,11 +245,11 @@ Apply these rules to both commercial routes:
   props, lighting direction, color grade, and camera height. If the pull-back
   reveals more space, extrapolate only from the already established set; do not
   invent a new window, shelf wall, counter layout, burner type, or room style.
-- If packaging or brand text must be readable, provide a high-resolution
-  reference and spell the exact text in the prompt. Still expect small generated
-  text to drift; critical logo text must be generated correctly in the opening
-  physical prop from the official logo reference. If it is wrong, regenerate the
-  full opening frame; do not repair, paste, track, or overlay the logo in post.
+- Never rely on generated text. Packaging may appear from a high-resolution
+  product reference, but its printed text is not the brand proof and will drift.
+  Names, prices, and the logo are drawn by Opue in post. Show the real product
+  with Opue's `product` sticker (the real product image) when it must be
+  readable.
 - If a reference object is embedded in a busy image, first create or request a
   clean object-only reference. This is especially useful for clothing, bags,
   packaging, utensils, and hero products that Seedance might deform.
@@ -234,18 +257,13 @@ Apply these rules to both commercial routes:
   movement, product/prop emphasis, and endpoint composition. A screenplay beat
   plus a small number of consistent keyframes is more reliable than one loose
   descriptive paragraph.
-- Keep native audio off for this workflow. The workshop notes that provider
-  audio can be enabled, but food commercials here finish BGM, voiceover, and any
-  captions in ChatCut unless the user explicitly selects native audio.
-- If the user explicitly requests Seedance-generated sound, first lock a silent
-  visual direction, then use `references/seedance-video.md#native-audio-prompting`.
-  Write audio as timed beats: room tone, action sounds, music bed, voice line,
-  language, and sync point. Align SFX tightly to cuts and actions, such as cup
-  set-down, ice clink, pour, shake, lid lift, flame ignition, page flip, or prop
-  movement. Use one restrained music bed plus sparse diegetic sounds; reject or
-  move sound to ChatCut when native audio damages an otherwise good picture.
-  For spoken lines, spell symbols/numbers phonetically and avoid long or fast
-  multilingual dialogue unless an audio reference is provided.
+- Keep native audio on, ambient only. Describe the diegetic sounds of the
+  visible action (oil sizzle, utensil on cookware, simmer, pour, lid) and end
+  the prompt with `soundscape: <ambient sounds>. No dialogue, no music.`
+- No music bed, voice lines, or SFX stingers. If native audio damages an
+  otherwise good picture, keep the picture and ask the user before stripping
+  the audio. Voiceover or BGM only when the user supplies or explicitly asks
+  for it; then follow `references/seedance-video.md#native-audio-prompting`.
 
 ## Single-10s commercial
 
@@ -259,8 +277,8 @@ still image review.
 
 Use this shot grammar:
 
-- `0-1.2s`: product/package hero in the real setting. The product/logo/package
-  must be readable here.
+- `0-1.2s`: product/package hero in the real setting. The product must be
+  recognisable here.
 - `1.2-2.4s`: hand action that proves convenience or use.
 - `2.4-4.2s`: practical preparation, pour, brew, mix, plate, open, or serve.
 - `4.2-6.2s`: macro premium texture: steam, liquid bloom, gloss, ingredient
@@ -276,14 +294,14 @@ Seedance prompt rules:
   bridges, and reframing. Do not make a single continuous camera drift.
 - Name the setting, camera, lighting, action mechanics, endpoint, and negative
   constraints in the prompt. Replace abstract promises with visible proof:
-  readable opening package, controlled hand movement, steam/liquid/texture
+  recognisable opening product, controlled hand movement, steam/liquid/texture
   detail, and a clear final product state.
-- No face, subtitles, overlays, watermarks, extra logos, or forced package/logo
-  continuity after the opening shot.
+- No face, subtitles, overlays, watermarks, logos, signs, or forced package
+  continuity after the opening shot. End with the `soundscape:` line.
 
 Submit with `scripts/run_seedance_video.py --profile single-10s-final`. Use
 `--allow-data-url` only when the provider path for local images has already been
-accepted in the current workflow. Do not generate SFX.
+accepted in the current workflow. Ambient sound only: no music or SFX stingers.
 
 ## Direct the three clips
 
@@ -308,7 +326,7 @@ For each beat, decide before generating:
 - the lens/focus feel and focus plane;
 - the starting frame composition;
 - the starting food/action state;
-- the product and physical logo-sign placement;
+- the product placement (no logo or sign in frame);
 - the setting, time of day, atmosphere, light source, light direction, shadow
   behavior, contrast, and color grade;
 - the visual style and whether every reference matches it;
@@ -340,8 +358,8 @@ join is judged from motion, not only a still:
 
 - Use the returned last frame directly when the product/food state, hands,
   lighting, and camera angle are intact and it can begin the next action
-  naturally. For clips after the opening, do not reject a good handoff merely
-  because the logo sign leaves frame.
+  naturally. Do not reject a good handoff merely because the product pack
+  leaves frame.
 - Generate a transition opening anchor when the returned last frame is visually
   weak, too blurry, malformed, awkwardly composed, or cannot begin the next
   action cleanly. Do not copy the damaged endpoint literally. Use the last
@@ -383,28 +401,19 @@ During polling, prewrite the next clip prompt from
 only `OPENING_REFERENCE` and `HANDOFF_MECHANISM` unresolved until the returned
 last frame and motion strip are reviewed.
 
-Do not generate nine storyboard frames by default. Do not import opening frames,
-returned last frames, transition anchors, or other generation references into
-ChatCut.
+Do not generate nine storyboard frames by default. Opening frames, returned
+last frames, transition anchors, and other generation references never become
+takes in the Opue project.
 
-Use the official English logo:
-`viral-social-remix/umall_logo/asian-grocer-online-powered-by-umall.png`.
-Render it as a real printed tabletop sign with scene perspective, lighting,
-shadow, and occlusion. Its visible text is
-`ASIAN GROCER ONLINE / powered by UMALL`. Never use the Chinese-region logo or a
-floating overlay. Never paste or composite the logo/sign manually; if the model
-does not generate the complete physical sign, reject the first frame and
-regenerate it with a stricter prompt.
-The physical sign only needs to read in clip 1's opening reference / first
-frame. Do not force the logo sign to remain consistent or visible in later
-clips; stove, heat, steam, pour, plating, and food-texture inserts should
-prioritize natural commercial cinematography. The product pack may return in the
-final hero only when it fits the composition naturally.
+Generate no logo, store sign, price, label, or brand text in any frame or clip.
+Branding is Opue's job in post: the brand logo, headline, step captions, product
+sticker, and end card. The product pack may return in the final hero only when
+it fits the composition naturally.
 
 Keep the product, kitchen, hands/clothing, light, cookware, and color grade
-consistent. No face. Product-package text and the physical logo sign are
-allowed; other generated text, subtitles, labels, watermarks, and title cards
-are forbidden.
+consistent. No face. Product packaging may appear as the real object; all other
+generated text, subtitles, labels, watermarks, signs, and title cards are
+forbidden.
 
 ## Opening-frame prompt
 
@@ -439,14 +448,13 @@ or design the transition handle: [same object/action match, steam/lid occlusion,
 pour/object bridge, plate move, rack focus, texture insert, or other specific
 bridge].
 END INTENTION: the six-second shot should naturally arrive at [end composition].
-LOGO PROP: for clip 1 opening reference only, reproduce the supplied ASIAN
-GROCER ONLINE / powered by UMALL logo as a real tabletop sign with correct
-perspective, shadow, and occlusion. For clips 2 and 3, do not force logo
-continuity; omit the sign unless it naturally belongs in the shot.
+BRAND: no logo, store sign, price card, or brand text anywhere in the frame;
+Opue draws branding in post. Reproduce the supplied product/package shape,
+colours, and artwork faithfully without inventing new package text.
 QUALITY: rich food/product detail, sharp focus, realistic hands and cookware,
 natural steam/liquid/heat behavior, premium but believable grocery-commercial
 color.
-NEGATIVE: face, extra fingers, warped tools, invented packaging, floating logo,
+NEGATIVE: face, extra fingers, warped tools, invented packaging, logo, sign,
 subtitles, captions, labels, title cards, lower-thirds, watermarks.
 ```
 
@@ -477,15 +485,14 @@ anchors, cookware placement, hands/clothing, lighting direction, and color
 grade. When extending or pulling back from a returned last frame, reveal only
 more of the same established room; do not change the window, shelf, counter,
 burner, pot, room style, or background prop layout.
-Preserve the product pack when it naturally remains in frame. Preserve the
-physical logo sign only for clip 1's opening frame; later clips should not force
-the sign back into stove, steam, pouring, plating, or close-up inserts. Natural
-cooking physics. No face, new objects, scene teleporting, subtitles, overlays,
-watermarks, or extra logos.
+Preserve the product pack when it naturally remains in frame. Natural cooking
+physics. No face, new objects, scene teleporting, subtitles, overlays,
+watermarks, logos, or signs.
+soundscape: [ambient sounds of the visible action]. No dialogue, no music.
 ```
 
-For every request: `6s`, `9:16`, `1080p`, `generate_audio: false`, and
-`return_last_frame: true`.
+For every request: `6s`, `9:16`, `1080p`, `generate_audio: true` (ambient
+only), and `return_last_frame: true`.
 
 Use only the selected opening reference by default. For clips 2 and 3, compare
 the accepted prior clip's returned last frame, last motion strip, and planned
@@ -496,8 +503,8 @@ merely for reassurance.
 
 ## Caption cue planning
 
-Do not wait until ChatCut to invent captions. During each Seedance polling wait,
-draft external editable current-step captions for the submitted clip and store
+Do not wait until the Opue finish to invent captions. During each Seedance polling wait,
+draft external current-step captions for the submitted clip and store
 them under `analysis/caption-cues/`. This uses otherwise idle time and makes
 later editing read prepared timing instead of creating captions from scratch.
 
@@ -506,9 +513,8 @@ Use clip-relative timing first:
 - Three-clip route: write `clip-01.json`, `clip-02.json`, and `clip-03.json`
   with times in each source clip's own `0.0-6.0s` range.
 - Single-10s route: write `single-10s.json` with times in `0.0-10.0s`.
-- After final trimming decisions, run `scripts/caption_cues.py` to write
-  `timeline.json` with actual timeline-relative placement before placing
-  captions in ChatCut.
+- NewB route: name the file after the take label, such as `newb-video.json`
+  or `take-02.json`, with times in `0.0-30.0s`.
 
 JSON cue format:
 
@@ -518,48 +524,40 @@ JSON cue format:
   "language": "en",
   "source_clip": "clip-02",
   "timing_basis": "clip-relative",
-  "style": "editable centered white text with subtle dark stroke/shadow, no colored box",
   "cues": [
     {"start": 0.4, "end": 1.8, "text": "Aromatics hit the heat"},
-    {"start": 2.2, "end": 3.8, "text": "Soy-rich braise builds"},
+    {"start": 2.2, "end": 3.8, "text": "Soy-rich *braise* builds"},
     {"start": 4.2, "end": 5.6, "text": "Noodles soak up flavor"}
   ]
 }
 ```
 
-Keep cue text short and useful: 2-6 words, natural English for English-region,
-one idea per cue, no prices, no claims, no hashtags, no recipe paragraphs. For
-food commercials, prefer captions tied to visible action: `Blanch for clean
-flavor`, `Aromatics hit the heat`, `Sauce turns glossy`, `Noodles soak up
-flavor`, `Ready to serve`. If a clip may be trimmed, keep cues away from the
-first and last 0.3 seconds.
+Cue text rules:
 
-When useful, also write a matching `clip-XX.srt` for quick manual preview, but
-the JSON is the source of truth for ChatCut placement. Captions are external
-editing data only: Seedance prompts must still say no subtitles, no captions,
-no title cards, and no burned-in text.
+- Keep it short and useful: 2-6 words of natural English, one idea per cue.
+- No prices, claims, hashtags, or recipe paragraphs. Opue also forbids facts
+  without a source.
+- Tie captions to visible action, for example `Blanch for clean flavor`,
+  `Aromatics hit the heat`, `Sauce turns glossy`, or `Ready to serve`.
+- Mark the keyword to highlight with `*stars*`.
+- Each cue becomes an Opue step caption at its start time, with a step badge
+  and the kit's word-by-word animation. A cue starts a new step, so write one
+  cue per visible step.
+- If a clip may be trimmed, keep cues away from the first and last 0.3
+  seconds.
 
-RPA handoff: use `scripts/caption_cues.py` whenever cue JSON exists. During
-Seedance polling, run it without trims to validate cue files and write per-clip
-SRT previews:
+Captions are external data only. Generated video prompts must still say no
+subtitles, no captions, no title cards, and no burned-in text.
+
+Check the cue files during polling:
 
 ```bash
 python scripts/caption_cues.py output/YYYYMMDD-HHmmss-task
 ```
 
-Before ChatCut caption placement, run it again with actual edit trims so the
-timeline math is deterministic:
-
-```bash
-python scripts/caption_cues.py output/YYYYMMDD-HHmmss-task \
-  --trim clip-01=0.30:5.70 \
-  --trim clip-02=0.10:5.40 \
-  --trim clip-03=0.00:5.20
-```
-
-This writes `analysis/caption-cues/timeline.json`, `timeline.srt`,
-`timeline.csv`, and `chatcut-caption-plan.json`. Treat
-`chatcut-caption-plan.json` as the editor placement contract.
+This validates the cue files, writes per-clip SRT previews, and, with `--trim`,
+writes a timeline preview. `scripts/opue_project.py` reads the cue JSON
+directly.
 
 ## Fast review
 
@@ -571,7 +569,7 @@ python scripts/qa_decision_sheet.py output/YYYYMMDD-HHmmss-task
 
 Review one strip/sheet covering all three clips. Check only:
 
-- correct product and logo prop;
+- correct product identity, with no generated logo, sign, price, or brand text;
 - product/package identity remains consistent across all clips; reject if the
   product mutates into another SKU, package, dumpling/bun type, filling, or
   serving style;
@@ -584,63 +582,40 @@ Review one strip/sheet covering all three clips. Check only:
   steam, sauce, utensils, packaging, pour, crunch, or plating;
 - believable food/action progression;
 - usable join, including the planned transition handle;
-- no generated overlay text.
+- no generated overlay text;
+- ambient sound only: no music, dialogue, or voice.
 
-Retry any failed clip or bad join. Do not proceed to ChatCut with a clip whose
-last second fights the next opening.
+Retry any failed clip or bad join. Do not proceed to the Opue finish with a clip
+whose last second fights the next opening.
 
-## ChatCut finish
+## Opue finish
 
-Import only the three accepted MP4 clips, in order. Never import opening frames,
-product/logo references, contact sheets, or QA images.
+Follow `references/opue-finish.md`. In short:
 
-Make a real editorial pass in ChatCut. Do not assume each Seedance MP4 should be
-used as one intact shot. Split, trim, and duplicate only from committed timeline
-items as the tool allows. Use the best moments:
+1. Ask for the brand if it is not given: `umall` or `asian_grocer`.
+2. Draft the project from the accepted MP4s and actual trims:
 
-- trim weak starts, dead air, repeated movement, and awkward endings;
-- cut into close-up portions of the same source when the food/product texture,
-  steam, pour, packaging, utensils, or plating moment is stronger than the wide
-  view;
-- use punch-in / digital push-in / pull-back / pan / reframe effects to create
-  secondary camera movement on the best frames;
-- add a short match cut, steam/lid/pour/object wipe, or very short dissolve only
-  when it serves the already planned handoff;
-- do not hide broken continuity with a long generic dissolve.
+   ```bash
+   python scripts/opue_project.py output/YYYYMMDD-HHmmss-task \
+     --brand asian_grocer --title "Make This for the Kids" \
+     --kicker "Pan-fried gyoza" --emoji "🥟" \
+     --trim clip-01=0.30:5.70 --trim clip-03=0.00:5.20
+   ```
 
-Keep a natural edit duration; do not force the commercial to exactly 18s or any
-other fixed length when the rhythm works. Place by seconds when available; if
-the tool requires frames, convert from the editor's actual timebase, not the
-source clip fps.
+3. You are the editor. Look at the stills in `qa/opue-frames/` and decide
+   these yourself, without asking the user:
+   - the per-step `emoji`;
+   - the highlighted `keywords`;
+   - ingredient `callouts` when the opening lays out ingredients;
+   - a `product` sticker made from the real product image;
+   - `cta.search`.
 
-Before ChatCut import, compile an edit plan from the accepted MP4s and actual
-trim choices:
+   Every on-screen fact must come from the user or the package.
+4. In the Opue repo, run `engine.pick <brand> --for projects/<name>`, then
+   `engine.preview`. Check the preview yourself and fix what is off, then run
+   `engine.render --sheet`.
+5. Give the user the MP4 from `projects/<name>/out/` and its contact sheet. Keep
+   a natural edit duration. The clips' ambient sound stays as the only audio.
 
-```bash
-python scripts/edit_plan.py output/YYYYMMDD-HHmmss-task \
-  --trim clip-01=0.30:5.70 \
-  --trim clip-02=0.10:5.40 \
-  --trim clip-03=0.00:5.20
-```
-
-Read `analysis/edit-plan.json` first in ChatCut. Import only the accepted MP4s,
-place them by the plan's timeline seconds, then apply the listed trims,
-transitions, punch-ins, reframes, and caption plan. If the edit changes, rerun
-`scripts/edit_plan.py` and `scripts/caption_cues.py` before placing captions.
-
-Add an editable track for agent-generated BGM only when requested or useful,
-matching the target market and product tone. Do not generate, place, or time
-cooking SFX; the user will handle sound effects later when desired. Add the
-user's voiceover only when supplied. Before creating captions in ChatCut, run
-`scripts/caption_cues.py` with the actual trims unless
-`analysis/caption-cues/chatcut-caption-plan.json` already matches the current
-edit. Read that plan first and place those editable current-step captions;
-adjust manually only when the edit changes after compilation. Captions stay at
-the visual center: white, subtle dark stroke/shadow, no colored box.
-
-Do not run an agent-owned final acceptance pass. The user reviews the cut. After
-the requested handoff is available, stop: provide the editable ChatCut project
-link, export job status/link, or downloaded file path. Do not extract proof
-frames, inspect opening/joins/ending, or judge the cut unless the user explicitly
-asks for review or troubleshooting. Only check the minimal tool state required
-to know that the handoff exists.
+Do not run an extra agent-owned acceptance pass after Opue's own pre-handoff
+checks. The user reviews the cut.

@@ -78,7 +78,8 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
         "Seedance workshop contract",
         "direction/amplitude/speed",
         "transition opening anchor",
-        "must not be imported into ChatCut",
+        "must not go into the Opue project",
+        "no logo, sign, price, or brand text",
     ]:
         assert phrase in shot_list
     for index in range(1, 4):
@@ -93,6 +94,8 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
         assert "1080x1920" in opening_prompt
         assert "MOTION READINESS" in opening_prompt
         assert "FRAMING/LENS" in opening_prompt
+        assert "No logo, store sign" in opening_prompt
+        assert "tabletop sign" not in opening_prompt
         prompt_path = (
             run_dir
             / "analysis"
@@ -115,8 +118,11 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
             "QUALITY",
             "AUDIO",
             "CONSTRAINTS",
+            "No dialogue, no music.",
         ]:
             assert phrase in prompt
+        assert "ChatCut" not in prompt
+        assert "ASIAN GROCER ONLINE" not in prompt
     page_two_prompt = (
         run_dir / "analysis" / "page-prompts" / "page-02.md"
     ).read_text(encoding="utf-8")
@@ -135,7 +141,7 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
         ["02"],
         ["03"],
     ]
-    assert data["video"]["generation"]["generate_audio"] is False
+    assert data["video"]["generation"]["generate_audio"] is True
     assert data["video"]["generation"]["return_last_frame"] is True
     assert "transition opening anchor" in data["video"]["continuity"]["handoff_policy"]
     delivery = data["video"]["delivery"]
@@ -143,15 +149,17 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
         "ratio": "9:16",
         "resolution": "1080p",
         "target_duration": None,
-        "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
+        "duration_policy": "natural edit duration; do not force a fixed final length; trim and assemble in Opue_video_add from the accepted clips",
         "expect_audio": True,
-        "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
+        "audio_policy": "native ambient cooking sound from generation only; no BGM, dialogue, or voiceover",
     }
     for key, value in expected_delivery.items():
         assert delivery[key] == value
     assert "caption_cues.py" in delivery["text_policy"]
-    assert "editable white centered current-step captions" in delivery["text_policy"]
-    assert "edit_plan.py" in delivery["edit_policy"]
+    assert "opue_project.py" in delivery["text_policy"]
+    assert "opue_project.py" in delivery["edit_policy"]
+    assert data["video"]["brand"]["strategy"] == "opue-post-production"
+    assert data["video_workflow"]["finish"] == "not_started"
     assert "qa_decision_sheet.py" in delivery["qa_policy"]
     assert data["storyboard_references"] == []
     assert data["video_workflow"]["status"] == "prepared"
@@ -190,15 +198,17 @@ def test_prepare_original_video_run_single_10s_prompt_uses_workshop_contract(
         "AUDIO",
         "CONSTRAINTS",
         "0-1.2s",
+        "No dialogue, no music.",
     ]:
         assert phrase in prompt
+    assert "ChatCut" not in prompt
 
     data = json.loads(
         (run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8")
     )
     assert data["video_mode"] == "single-10s-commercial"
     assert data["video"]["generation"]["duration"] == 10
-    assert data["video"]["generation"]["generate_audio"] is False
+    assert data["video"]["generation"]["generate_audio"] is True
 
 
 def test_prepare_original_video_run_records_structured_references(tmp_path: Path):

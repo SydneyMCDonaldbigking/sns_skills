@@ -5,8 +5,10 @@ Use this reference after a `vertical-video` or `video` run has a finished
 profile.
 
 For the current company product/cooking-commercial routes, first follow
-`cooking-video-workflow.md`: either one silent 10s request (`single-10s`) or
-three separate silent 6s director requests using `--storyboard-group`. In the
+`cooking-video-workflow.md`: either one 10s request (`single-10s`) or three
+separate 6s director requests using `--storyboard-group`, all with native
+ambient sound only (`soundscape: ... No dialogue, no music.`) and no logo,
+sign, or text in frame. In the
 three-clip route, generate clip 1's opening frame first; clips 2 and 3 use one
 selected opening anchor chosen after the prior accepted clip's returned last
 frame and final motion strip are inspected. Use a clean returned last frame
@@ -18,7 +20,7 @@ override that contract.
 
 The manifest is the source of truth. The workflow is:
 
-`prepare -> preflight -> submit -> download -> metadata QA -> human visual QA -> ChatCut -> export QA`
+`prepare -> preflight -> submit -> download -> metadata QA -> human visual QA -> Opue finish -> export QA`
 
 Do not submit a task directly from an improvised prompt. Prepare Manifest v2,
 dry-run the compiled request, and let the runner stop on invalid references,
@@ -97,8 +99,8 @@ kuaipao notes (probed 2026-08-10, docs were wrong):
   not confuse `bitrate_mode` with the provider's 8-bit / 10-bit output note.
 - Workshop capability notes: Seedance 2.0 family supports 24 fps output, 8-bit
   or 10-bit bitrate, and native audio generation is enabled by provider default
-  unless explicitly turned off. This workflow normally sends
-  `generate_audio: false` and finishes audio in ChatCut.
+  unless explicitly turned off. Final profiles send `generate_audio: true`
+  for ambient sound only; previews stay silent to save spend.
 - Seedance 2.0 can support `4k`; keep local production profiles at `1080p`
   unless the user explicitly requests a 4k final and budget/runtime has been
   approved.
@@ -197,8 +199,8 @@ The compact manifest section is:
       "available": false
     },
     "brand": {
-      "strategy": "post-composited-physical-prop",
-      "visible_text": "none"
+      "strategy": "opue-post-production",
+      "visible_text": "none-in-generated-frames"
     },
     "budget": {
       "retry_limit": 1,
@@ -208,7 +210,7 @@ The compact manifest section is:
   "video_workflow": {
     "status": "prepared",
     "visual_qa": "not_started",
-    "chatcut": "not_started",
+    "finish": "not_started",
     "export_qa": "not_started",
     "history": []
   }
@@ -301,10 +303,9 @@ such as only "cinematic, high quality"; replace them with specific standards
 such as rich detail, cinematic color grade, sharp focus, detailed product or
 food texture, and the exact text that must remain readable.
 
-When exact text, packaging, or a logo matters, provide a high-resolution
-reference and spell out the text in the prompt. Expect generated video to drift
-on small typography; prefer first-frame control, a real physical prop, or
-post-composited tracking for critical brand text.
+Never rely on generated text. Packaging can appear from a high-resolution
+product reference, but small typography drifts. Logos, names, prices, and
+captions are drawn in post by Opue (`opue-finish.md`).
 
 For object consistency, use clean isolated references when possible. If a
 reference object is attached to a person or busy scene, make or request a clean
@@ -426,9 +427,11 @@ and consistent visual style.
 ## Native Audio Prompting
 
 Seedance Workshop treats natural sound as a quality dimension, alongside
-natural motion and consistent visual style. Use native audio only when the user
-explicitly asks for model-generated sound, or after the silent picture has been
-approved and a native-audio experiment is intentional.
+natural motion and consistent visual style. The house default is native
+**ambient** sound only: the diegetic sounds of the visible action, ending with
+`soundscape: <ambient sounds>. No dialogue, no music.` The fuller guidance below
+(music bed, dialogue, voiceover, audio references) applies only when the user
+explicitly asks for it.
 
 When native audio is selected:
 
@@ -464,7 +467,8 @@ When native audio is selected:
   ambience. If a prop sound should happen once, say it happens once.
 - QA native audio for sync, clipped starts/ends, wrong language, unwanted
   voices, distracting music, and audio tails. If audio is wrong but picture is
-  good, finish sound in ChatCut rather than rerolling good visuals.
+  good, ask the user before stripping or replacing it rather than rerolling
+  good visuals.
 
 Example sound grammar:
 
@@ -491,8 +495,8 @@ Profiles make cost and approval intent explicit:
 
 Explicit CLI flags override profile values. Start with `visual-preview`. Use
 `single-10s-final` only for a deliberate one-request commercial route. Use
-`native-audio-final` only after the picture is approved; otherwise finish audio
-in ChatCut. Compact/single-10s manifests default to one retry and
+`native-audio-final` only for user-requested music, dialogue, or voiceover; the
+final profiles already carry ambient sound. Compact/single-10s manifests default to one retry and
 `stop_before_final: true`; after reviewing a final-profile dry run, pass
 `--approve-final-spend` for the intentional production submission.
 
@@ -586,7 +590,7 @@ This validates duration, dimensions, and expected audio state, then writes:
 - `qa/video-review-strip.jpg`
 - `qa/video-frames/review-*.jpg`
 
-Review food physics, package/logo fidelity, background/camera continuity,
+Review food physics, package fidelity, absence of generated logos/signs, background/camera continuity,
 unsafe actions, duplicate objects, unwanted text, watermarks, extra logos, and
 clip joins. Then record the decision:
 
@@ -596,14 +600,14 @@ clip joins. Then record the decision:
 ```
 
 Metadata failure cannot be approved. Only
-`video_workflow.status: visual_qa_passed` may proceed to ChatCut and export.
+`video_workflow.status: visual_qa_passed` may proceed to the Opue finish.
 
-After ChatCut export, close the second gate:
+After the Opue render, close the second gate on its output:
 
 ```powershell
 .\.venv\python.exe viral-social-remix\scripts\video_qa.py prepare-export `
   output/<run> `
-  --video generated/final-export.mp4 `
+  --video <opue>/projects/<name>/out/<file>.mp4 `
   --expect-audio
 
 .\.venv\python.exe viral-social-remix\scripts\video_qa.py approve-export output/<run>
@@ -619,22 +623,11 @@ The raw generated picture is subtitle-free: no captions, title cards,
 lower-thirds, labels, stickers, watermarks, floating logos, or ad banners.
 Burned-in model text is not editable.
 
-For exact branding, use one declared strategy:
-
-- `storyboard-physical-prop`
-- `product-only`
-- `physical-prop-rough`
-- `post-composited-physical-prop`
-- `clean-end-card`
-- `no-brand-visible`
-
-For `post-composited-physical-prop`, track the official logo PNG onto a real
-scene surface with matching perspective, motion, occlusion, lighting, and
-texture. It must not become a floating overlay.
-
-For `first-frame-physical-prop`, keep the exact physical sign already present in
-the supplied opening frame. Do not ask Seedance or ChatCut to redraw
-or replace it.
+Branding strategy is `opue-post-production`: generated frames carry no logo,
+sign, price, or brand text, and `Opue_video_add` draws the brand logo
+(`umall` or `asian_grocer`), headline, step captions, product sticker, and end
+card. See `opue-finish.md`. The older physical-prop and post-composited sign
+strategies are retired for video.
 
 ## Secret Handling
 

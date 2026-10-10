@@ -564,7 +564,7 @@ def set_export_decision(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Probe Seedance/ChatCut video and manage the visual QA gate."
+        description="Probe Seedance/Opue video and manage the visual QA gate."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

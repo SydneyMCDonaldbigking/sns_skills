@@ -115,7 +115,7 @@ def _prepared_three_clip_storyboard_run(tmp_path: Path) -> Path:
     data["video_workflow"] = {
         "status": "prepared",
         "visual_qa": "not_started",
-        "chatcut": "not_started",
+        "finish": "not_started",
         "export_qa": "not_started",
         "history": [],
         "clips": {
@@ -180,7 +180,7 @@ def _prepared_director_three_clip_run(tmp_path: Path) -> Path:
     data["video_workflow"] = {
         "status": "prepared",
         "visual_qa": "not_started",
-        "chatcut": "not_started",
+        "finish": "not_started",
         "export_qa": "not_started",
         "history": [],
         "clips": {
@@ -264,7 +264,7 @@ def _prepared_multimodal_video_run(tmp_path: Path) -> Path:
     data["video_workflow"] = {
         "status": "prepared",
         "visual_qa": "not_started",
-        "chatcut": "not_started",
+        "finish": "not_started",
         "export_qa": "not_started",
         "history": [],
     }

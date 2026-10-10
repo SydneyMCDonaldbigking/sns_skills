@@ -13,7 +13,7 @@ Sources studied on 2026-07-28:
   https://docs.byteplus.com/en/docs/modelark/2222480
 - BytePlus official note: Seedance 2.0 prompt optimization skill, invoked as
   `/sd2-pe + prompt` in a code/AI agent after installing its `SKILL.md`.
-- ChatCut `video-gen` / `seedance2` skill notes: reference assets anchor
+- Former ChatCut `video-gen` / `seedance2` skill notes: reference assets anchor
   product/object/style far better than text-only prompts.
 
 ## Main Takeaway
@@ -68,16 +68,15 @@ For our English no-face cooking videos, prefer a 4-6 asset pack:
 - `Image 2`: real hero product/package reference, cropped clearly.
 - `Image 3`: second product/package reference when product fidelity matters,
   such as sauce bottle, soup base pack, package back/front, or ingredient pack.
-- `Image 4`: English-region physical brand prop or logo/sign reference.
 - `Video 1`: source cooking rhythm or camera movement reference, when
   available.
-- `Audio 1`: optional rhythm/ambience reference only for final audio-enabled
-  tests. For first visual QA, keep Seedance no-audio and finish sound in
-  ChatCut.
+- `Audio 1`: optional ambience reference only. Final clips keep native
+  ambient sound (`soundscape: ... No dialogue, no music.`); previews stay
+  no-audio.
 
-Use more real product and brand references when product fidelity matters. For a
-logo, ask for it as a physical printed sign, packaging label, table card, or
-scene prop. Do not ask for floating logos, screen overlays, stickers, lower
+Use more real product references when product fidelity matters. Do not ask
+for a logo, sign, or brand text at all; the Opue finish draws branding in post
+([[opue-finish-workflow]]). Do not ask for floating logos, screen overlays, stickers, lower
 thirds, or ad banners.
 
 Do not rely on a single logo image plus text prompt to preserve brand identity.
@@ -120,7 +119,7 @@ anti-distortion constraints.
 - Avoid high-burst or physically strict motion unless a real video reference is
   supplied.
 - Keep scene elements sparse: table/counter, pan/pot, stove, cutting board,
-  knife, bowl/plate, product package, and physical logo prop.
+  knife, bowl/plate, and product package.
 
 ## Text And Logo Constraints
 
@@ -134,17 +133,17 @@ For our raw generated video:
 - no title cards, lower-thirds, ingredient labels, captions, sticker ads, or
   watermarks;
 - no extra logos or platform marks;
-- only the explicitly referenced real physical brand prop/package may show.
+- no logo, store sign, or price card; only the real product package may show.
 
-Add English captions, labels, and BGM later in ChatCut. Add SFX only when the
-user explicitly asks and the visible action supports it.
+English captions, labels, and the logo are added later in the Opue finish.
+Audio is native ambient sound only; there is no BGM unless the user asks.
 
 Avoid asking Seedance to generate subtitles for production cooking videos.
 Model-generated subtitles are burned in, harder to edit, prone to spelling or
 layout drift, and can fight the composition. The only exception is when the
 task is explicitly a text-generation/text-layout test. Normal publishing
-captions, labels, and subtitles belong in ChatCut, where they stay editable,
-centered, white, and safe from platform UI.
+captions, labels, and subtitles belong in the Opue finish, where they are
+drawn by a style kit, stay editable, and stay clear of platform UI.
 
 ## Continuity Strategy
 

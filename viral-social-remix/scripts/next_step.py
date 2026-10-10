@@ -74,8 +74,6 @@ def file_state(run_dir: Path) -> dict[str, bool]:
         "clip_03": (run_dir / "generated" / "seedance-clip-03.mp4").is_file(),
         "single_10s": (run_dir / "generated" / "seedance-video.mp4").is_file(),
         "caption_cues": cue_dir.exists() and any(cue_dir.glob("*.json")),
-        "caption_plan": (cue_dir / "chatcut-caption-plan.json").is_file(),
-        "edit_plan": (run_dir / "analysis" / "edit-plan.json").is_file(),
         "decision_sheet": (run_dir / "qa" / "decision-sheet.html").is_file(),
     }
 
@@ -89,7 +87,38 @@ def latest_handoff_status(run_dir: Path, source_clip: str) -> dict[str, Any] | N
     return load_json(report)
 
 
-def recommend_three_clip(run_dir: Path, states: dict[str, bool]) -> dict[str, Any]:
+def finish(run_dir: Path, states: dict[str, bool], manifest: dict[str, Any] | None) -> dict[str, Any]:
+    if not states["decision_sheet"]:
+        return {
+            "stage": "qa-sheet",
+            "action": "build one-page QA decision sheet",
+            "command": command(run_dir, "qa_decision_sheet.py"),
+        }
+    opue = (manifest or {}).get("opue_project") or {}
+    if not opue.get("path"):
+        return {
+            "stage": "opue-project",
+            "action": (
+                "draft the Opue_video_add recipe project from accepted clips and caption cues; "
+                "ask the user for the brand (umall or asian_grocer) if not given"
+            ),
+            "command": command(
+                run_dir, "opue_project.py", '--brand <umall|asian_grocer> --title "<headline>"'
+            ),
+        }
+    return {
+        "stage": "opue-render",
+        "action": (
+            "as the editor, fill step emoji, keywords, ingredient callouts, and product sticker "
+            "from qa/opue-frames/; then pick the kit, check the preview, and render with --sheet"
+        ),
+        "command": f"cd {opue.get('root', '<Opue_video_add>')} && " + " && ".join(opue.get("next") or []),
+    }
+
+
+def recommend_three_clip(
+    run_dir: Path, states: dict[str, bool], manifest: dict[str, Any] | None = None
+) -> dict[str, Any]:
     if not states["page_01"]:
         return {
             "stage": "opening-frame",
@@ -141,61 +170,19 @@ def recommend_three_clip(run_dir: Path, states: dict[str, bool]) -> dict[str, An
                 "command": command(run_dir, "handoff_review.py", f"--clip {clip}"),
             }
 
-    if not states["edit_plan"]:
-        return {
-            "stage": "edit-plan",
-            "action": "compile clip trims and editorial intent",
-            "command": command(run_dir, "edit_plan.py"),
-        }
-    if states["caption_cues"] and not states["caption_plan"]:
-        return {
-            "stage": "caption-plan",
-            "action": "compile caption cues with actual trims",
-            "command": command(run_dir, "caption_cues.py"),
-        }
-    if not states["decision_sheet"]:
-        return {
-            "stage": "qa-sheet",
-            "action": "build one-page QA decision sheet",
-            "command": command(run_dir, "qa_decision_sheet.py"),
-        }
-    return {
-        "stage": "chatcut",
-        "action": "import accepted MP4s and follow analysis/edit-plan.json",
-        "command": "open ChatCut and place clips/captions from edit-plan and chatcut-caption-plan",
-    }
+    return finish(run_dir, states, manifest)
 
 
-def recommend_single_10s(run_dir: Path, states: dict[str, bool]) -> dict[str, Any]:
+def recommend_single_10s(
+    run_dir: Path, states: dict[str, bool], manifest: dict[str, Any] | None = None
+) -> dict[str, Any]:
     if not states["single_10s"]:
         return {
             "stage": "seedance",
             "action": "generate the single 10s commercial",
             "command": seedance_command(run_dir, "--profile single-10s-final"),
         }
-    if not states["edit_plan"]:
-        return {
-            "stage": "edit-plan",
-            "action": "compile single-clip edit plan",
-            "command": command(run_dir, "edit_plan.py"),
-        }
-    if states["caption_cues"] and not states["caption_plan"]:
-        return {
-            "stage": "caption-plan",
-            "action": "compile caption cues with actual trims",
-            "command": command(run_dir, "caption_cues.py"),
-        }
-    if not states["decision_sheet"]:
-        return {
-            "stage": "qa-sheet",
-            "action": "build one-page QA decision sheet",
-            "command": command(run_dir, "qa_decision_sheet.py"),
-        }
-    return {
-        "stage": "chatcut",
-        "action": "import accepted MP4 and follow analysis/edit-plan.json",
-        "command": "open ChatCut and place clip/captions from edit-plan and chatcut-caption-plan",
-    }
+    return finish(run_dir, states, manifest)
 
 
 def recommend(args: argparse.Namespace) -> int:
@@ -211,9 +198,9 @@ def recommend(args: argparse.Namespace) -> int:
     else:
         mode = video_mode(manifest)
         if mode == "director-first-frame-three-clips":
-            result = recommend_three_clip(run_dir, states)
+            result = recommend_three_clip(run_dir, states, manifest)
         elif mode == "single-10s-commercial":
-            result = recommend_single_10s(run_dir, states)
+            result = recommend_single_10s(run_dir, states, manifest)
         else:
             result = {
                 "stage": "unknown",

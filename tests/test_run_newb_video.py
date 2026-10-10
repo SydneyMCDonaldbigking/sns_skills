@@ -24,7 +24,8 @@ def _run(tmp_path: Path) -> Path:
     analysis.mkdir(parents=True)
     (run_dir / "generated").mkdir()
     (analysis / "newb-prompt.md").write_text(
-        "# director note, not sent\n@图1 里的煎饺在平底锅里煎到底部金黄，镜头缓慢推近。",
+        "# director note, not sent\n@图1 里的煎饺在平底锅里煎到底部金黄，镜头缓慢推近。\n"
+        "soundscape: 热油滋滋声。No dialogue, no music.",
         encoding="utf-8",
     )
     manifest.create(analysis / "manifest.json", "vertical-video", ["01"])
@@ -108,6 +109,12 @@ def test_multipart_encoding_carries_fields_and_files():
     assert body.endswith(b"--BOUND--\r\n")
 
 
+def test_missing_no_music_line_warns(tmp_path):
+    run_dir = _run(tmp_path)
+    result = runner.run_newb_video(run_dir, prompt="煎饺煎到金黄", dry_run=True)
+    assert any("No dialogue, no music" in warning for warning in result["warnings"])
+
+
 def test_submit_poll_download_strips_audio_and_redacts_signed_url(tmp_path, monkeypatch):
     monkeypatch.setenv("NEWB_API_KEY", "wfv_test")
     run_dir = _run(tmp_path)
@@ -130,6 +137,7 @@ def test_submit_poll_download_strips_audio_and_redacts_signed_url(tmp_path, monk
     ledger = runner.run_newb_video(
         run_dir,
         images=["generated/page-01.png"],
+        strip_audio=True,
         request_fn=api,
         download_fn=fake_download,
         strip_audio_fn=fake_strip,
@@ -214,7 +222,6 @@ def test_poll_timeout_keeps_task_id_for_resume(tmp_path, monkeypatch):
     ledger = runner.run_newb_video(
         run_dir,
         resume_task_id="auto",
-        keep_audio=True,
         request_fn=resume_api,
         download_fn=lambda url, output: output.write_bytes(b"mp4"),
         extract_frame_fn=lambda source, output: False,

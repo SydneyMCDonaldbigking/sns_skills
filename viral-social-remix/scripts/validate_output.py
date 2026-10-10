@@ -241,7 +241,7 @@ def _validate_compact_job(base: Path, data: dict) -> list[str]:
         if not isinstance(workflow, dict):
             errors.append("Manifest v2 compact video_workflow is required")
         else:
-            for field in ["status", "visual_qa", "chatcut", "export_qa", "history"]:
+            for field in ["status", "visual_qa", "finish", "export_qa", "history"]:
                 if field not in workflow:
                     errors.append(
                         f"Manifest v2 video_workflow.{field} is required"

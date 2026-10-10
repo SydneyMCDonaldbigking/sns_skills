@@ -70,11 +70,13 @@ def test_cooking_workflow_uses_director_first_frame_contract():
         "Generate a transition opening anchor when the returned last frame is visually",
         "Do not copy the damaged endpoint literally",
         "camera transition, not a generic replacement still",
-        "ASIAN GROCER ONLINE",
-        "powered by UMALL",
-        "Never use the Chinese-region logo",
+        "opue-finish.md",
+        "No dialogue, no music.",
+        "scripts/opue_project.py",
     ]:
         assert required in text
+    for retired in ["ChatCut finish", "tabletop sign", "chatcut-caption-plan", "edit_plan.py"]:
+        assert retired not in text
 
 
 def test_seedance_reference_distills_prompt_optimizer_rules():
@@ -150,7 +152,7 @@ def test_obsidian_relationship_maps_connect_current_video_contract():
     original = (MEMORY / "original-cooking-video.md").read_text(encoding="utf-8")
     seedance = (MEMORY / "seedance-video-generation.md").read_text(encoding="utf-8")
     official = (MEMORY / "seedance-official-prompting.md").read_text(encoding="utf-8")
-    chatcut = (MEMORY / "chatcut-handoff-workflow.md").read_text(encoding="utf-8")
+    opue = (MEMORY / "opue-finish-workflow.md").read_text(encoding="utf-8")
 
     for required in [
         "[[docs/memory/viral-social-remix/video-production-map|Video Production Map]]",
@@ -164,7 +166,7 @@ def test_obsidian_relationship_maps_connect_current_video_contract():
         "transition opening anchor",
         "Last frame and last motion strip clean?",
         "[[seedance-official-prompting]]",
-        "[[chatcut-handoff-workflow]]",
+        "[[opue-finish-workflow]]",
     ]:
         assert required in video_map
 
@@ -172,9 +174,10 @@ def test_obsidian_relationship_maps_connect_current_video_contract():
     assert "transition opening anchor" in original
     assert "transition opening anchor" in seedance
     assert "transition opening anchor" in official
-    assert "transition opening anchors or returned last-frame references" in chatcut
+    assert "transition anchors or returned last-frame references" in opue
     assert "three director-designed opening frames" not in original
-    assert "designed into each opening frame" not in chatcut
+    assert not (MEMORY / "chatcut-handoff-workflow.md").exists()
+    assert not (MEMORY / "chatcut").exists()
 
 
 def test_obsidian_ignores_generated_noise_and_obsolete_notes_are_removed():
@@ -256,13 +259,21 @@ def test_seedance_reference_documents_controlled_manifest_v2_workflow():
         assert required in text
 
 
-def test_brand_rules_require_scene_anchored_exact_logo_compositing():
+def test_video_branding_is_opue_post_production_only():
     cooking = (REF / "cooking-video-workflow.md").read_text(encoding="utf-8")
     brand = (REF / "brand-region-assets.md").read_text(encoding="utf-8")
-    for text in [cooking, brand]:
-        assert "perspective" in text
-        assert "occlusion" in text
-        assert "floating" in text
+    finish = (REF / "opue-finish.md").read_text(encoding="utf-8")
+    for text in [cooking, brand, finish]:
+        assert "no logo" in text.lower()
+        assert "Opue" in text
+    for required in ["`umall`", "`asian_grocer`", "full-colour transparent"]:
+        assert required in brand
+    for required in ["No dialogue, no music.", "engine.pick", "engine.render", "opue_project.py"]:
+        assert required in finish
+    # carousels keep the combined lockup, generated in-scene, never floating
+    assert "perspective" in brand
+    assert "occlusion" in brand
+    assert "floating" in brand
 
 
 def test_xiaohongshu_real_talk_template_is_reusable_and_source_safe():

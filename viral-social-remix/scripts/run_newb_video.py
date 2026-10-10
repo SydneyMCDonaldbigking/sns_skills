@@ -65,7 +65,7 @@ TIMELINE_PATTERNS = [
     re.compile(r"(?<![\d:])\d{1,2}:\d{2}(?![\d:])"),
     re.compile(r"第\s*\d+\s*秒"),
 ]
-TRUTHY = {"1", "true", "yes", "y", "on"}
+NO_MUSIC_RE = re.compile(r"no music|without music|不要(?:背景)?音乐|无(?:背景)?音乐|没有(?:背景)?音乐|不要\s*BGM", re.I)
 
 
 class NewBRunnerError(RuntimeError):
@@ -264,7 +264,7 @@ def _ffmpeg() -> str | None:
     return shutil.which("ffmpeg")
 
 
-def strip_audio(source: Path, output: Path) -> bool:
+def strip_audio_track(source: Path, output: Path) -> bool:
     ffmpeg = _ffmpeg()
     if not ffmpeg or not source.is_file():
         return False
@@ -444,7 +444,7 @@ def run_newb_video(
     images: list[str | Path] | None = None,
     ratio: str | None = None,
     label: str = DEFAULT_LABEL,
-    keep_audio: bool = False,
+    strip_audio: bool = False,
     allow_timeline: bool = False,
     resume_task_id: str | None = None,
     overwrite: bool = False,
@@ -499,6 +499,11 @@ def run_newb_video(
                 "Pass --allow-timeline to submit anyway."
             )
         image_specs, warnings = validate_images(images or [], run, ratio)
+        if not NO_MUSIC_RE.search(prompt_text):
+            warnings.append(
+                "Prompt does not rule out music: end it with "
+                "'soundscape: <ambient sounds>. No dialogue, no music.'"
+            )
 
     plan = {
         "provider": config["provider"],
@@ -514,7 +519,7 @@ def run_newb_video(
         "images": [
             {key: spec[key] for key in ("label", "path", "size", "bytes")} for spec in image_specs
         ],
-        "keep_audio": keep_audio,
+        "strip_audio": strip_audio,
         "resume_task_id": resume_task_id,
         "warnings": warnings,
     }
@@ -573,10 +578,10 @@ def run_newb_video(
         raise NewBRunnerError(f"NewB task {task_id} succeeded but the file passed its 7-day retention")
 
     download_fn = download_fn or download_video
-    strip_audio_fn = strip_audio_fn or strip_audio
+    strip_audio_fn = strip_audio_fn or strip_audio_track
     extract_frame_fn = extract_frame_fn or extract_last_frame
     postprocess: dict[str, Any] = {}
-    if keep_audio:
+    if not strip_audio:
         download_fn(final["video_url"], output_path)
     else:
         download_fn(final["video_url"], audio_path)
@@ -584,7 +589,7 @@ def run_newb_video(
         if not postprocess["audio_stripped"]:
             raise NewBRunnerError(
                 f"Downloaded {_relative_to_run(audio_path, run)} but could not strip audio; "
-                "install ffmpeg or rerun with --resume and --keep-audio"
+                "install ffmpeg or rerun with --resume without --strip-audio"
             )
         postprocess["audio_original"] = _relative_to_run(audio_path, run)
     postprocess["last_frame"] = (
@@ -624,7 +629,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--ratio", choices=RATIOS, help="Default: from the manifest platform, else 9:16.")
     parser.add_argument("--label", default=DEFAULT_LABEL, help="Output name; use take-02 etc. for rerolls.")
-    parser.add_argument("--keep-audio", action="store_true", help="Keep NewB native audio in the main output.")
+    parser.add_argument(
+        "--strip-audio", action="store_true",
+        help="Remove NewB native audio. Default keeps it: the house audio is ambient sound only.",
+    )
     parser.add_argument("--allow-timeline", action="store_true", help="Submit even if the prompt has timestamps.")
     parser.add_argument(
         "--resume", metavar="TASK_ID",
@@ -656,7 +664,7 @@ def main(argv: list[str] | None = None) -> int:
                 images=args.image,
                 ratio=args.ratio,
                 label=args.label,
-                keep_audio=args.keep_audio,
+                strip_audio=args.strip_audio,
                 allow_timeline=args.allow_timeline,
                 resume_task_id=args.resume,
                 overwrite=args.overwrite,

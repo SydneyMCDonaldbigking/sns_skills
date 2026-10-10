@@ -29,7 +29,7 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 ## Route Memory
 
 - [[video-production-map]]: relationship map for the current Seedance video
-  chain, transition anchors, provider notes, visual taste, and ChatCut handoff.
+  chain, transition anchors, provider notes, visual taste, and the Opue finish.
 - `chinese-xhs-remix.md`: Chinese Xiaohongshu target-only/source-drift rules.
 - [[openrouter-image-generation]]: current image API/model/cost rules.
 - [[original-cooking-video]]: original cooking video structure and text policy.
@@ -45,12 +45,9 @@ This is the first page to read after `viral-social-remix/SKILL.md`.
 - [[aesthetic-library/README]]: English-region IG/Reels food taste memory,
   recent-year pattern studies, no-face cooking style, subtitle/BGM preferences,
   and product integration rules.
-- [[chatcut/README|ChatCut editing memory]]: confirmed editor capability map,
-  low-model execution contract, theme playbooks, Agent prompt recipes, and QA
-  discipline.
-- [[chatcut-handoff-workflow]]: after Seedance/video generation, import
-  generated MP4 segments into ChatCut as an editable timeline; then handle BGM,
-  subtitle labels, review, and export when requested.
+- [[opue-finish-workflow]]: video post-production in `Opue_video_add` (logo,
+  Reels captions, step labels, end card); ChatCut is retired since 2026-10-10.
+  The contract is `../../../viral-social-remix/references/opue-finish.md`.
 - [[run-notes-template]]: copy this into `output/<run>/qa/run-notes.md`.
 - [[self-distillation]]: how to promote run lessons into this vault.
 
@@ -60,13 +57,13 @@ For original cooking video work, use
 `../../../viral-social-remix/references/cooking-video-workflow.md` as the only
 production contract. Use [[video-production-map]] as the Obsidian relationship
 map. Read aesthetic memory only when defining a new visual direction and
-[[chatcut-handoff-workflow]] only after the generated MP4 clips pass review.
+[[opue-finish-workflow]] only after the generated MP4 clips pass review.
 
 Provider research remains available in [[seedance-video-generation]] and
 [[seedance-official-prompting]], but it does not override the company contract.
 
 Do not treat Seedance as the end of the workflow when the user is talking about
-剪辑, 串视频, BGM, subtitles, labels, review, or export.
+剪辑, 串视频, subtitles, labels, logo, review, or export: that is the Opue finish.
 
 ## Image Carousel Rule
 
@@ -95,13 +92,6 @@ a generic CTA.
   is viable; exact conveyor-style mechanical physics is not reliable.
 - 2026-07-23: For the winter drinks remix, pages 1-5 came from the original
   Xiaohongshu post. Only page 6 used the real UMALL mobile Drinks screenshot.
-- 2026-07-25: After Seedance, use ChatCut for editable clipping/review. Prefer
-  importing generated segments as separate V1 items; use the stitched MP4 only
-  as quick review or when a single clip is requested.
-- 2026-07-25: For cooking-video finishing in ChatCut, English labels/subtitles
-  may reference the original video's pacing/style, but wording and BGM should be
-  based on our generated video. Trim BGM to the exact video duration; no long
-  music tail after the final frame.
 - 2026-07-25: For cheap video API smoke tests, use OpenRouter Grok with
   `GROK_OPENROUTER_API_KEY`, `x-ai/grok-imagine-video`, 720p, 9:16, no audio,
   and a one-second first-frame test before spending on longer clips.
@@ -111,24 +101,20 @@ a generic CTA.
   place real English app/search results inside it.
 - 2026-07-25: For English IG-style food videos, recent high-performing samples
   favor food-first close-ups, one-pan/lazy/time-saving hooks, sparse props,
-  stable camera angles, and centered white post-production text. Generated
-  storyboard/video frames still stay text-free; add labels/subtitles in ChatCut.
+  stable camera angles, and post-production text. Generated storyboard/video
+  frames stay text-free; captions come from the Opue finish.
 - 2026-07-26: Clear the saved image/carousel taste library. For graphically
   designed posts, reference the original/source or a chosen competitor post
   directly instead of improvising a house style from memory.
 - 2026-07-28: Company cooking-commercial production uses the three-clip
   director route. Generate clip 1's opening anchor first; for clips 2 and 3,
   inspect the prior last frame and final motion strip before choosing the next
-  opening anchor. Opening anchors stay outside ChatCut.
-- 2026-07-28: A ChatCut theme is not a font/filter preset. Teach execution
-  models each theme as audience promise + emotion + rhythm + proof, and force
-  Structure, Continuity, Rhythm, Text, Motion, Audio, Brand, then visual/export
-  QA instead of decorating an unverified rough cut.
+  opening anchor. Opening anchors stay outside post-production.
 - 2026-07-28: Make video generation manifest-driven. Compile semantic
   `{{ref:id}}` tokens to provider labels only after reference ordering, run
   official-limit preflight before spend, save a sanitized request lock/hash,
   use no-audio preview profiles, persist returned last frames for continuation,
-  and require explicit human visual approval before ChatCut/export.
+  and require explicit human visual approval before the finish/export.
 - 2026-07-30: For the three-clip Seedance route, do not use a bad returned last
   frame literally. Inspect the last motion strip; use a clean last frame
   directly, generate a transition opening anchor when the endpoint is weak, and
@@ -140,6 +126,11 @@ a generic CTA.
   together: real phone screenshot, original/source guide style reference, and
   brand lockup. Do not deliver local composite shopping guides as final when a
   polished last page is expected.
+- 2026-10-10: ChatCut is retired. Video post-production is `Opue_video_add`
+  through `scripts/opue_project.py`. Generated frames carry no logo, sign, or
+  text, and Opue draws the `umall` or `asian_grocer` logo plus all English text.
+  Audio is the clips' native ambient sound only
+  (`soundscape: ... No dialogue, no music.`). See [[opue-finish-workflow]].
 
 ## Useful Links
 
@@ -151,5 +142,4 @@ a generic CTA.
 - [[seedance-video-generation]]
 - [[seedance-official-prompting]]
 - [[openrouter-grok-video-generation]]
-- [[chatcut/README|ChatCut editing memory]]
-- [[chatcut-handoff-workflow]]
+- [[opue-finish-workflow]]

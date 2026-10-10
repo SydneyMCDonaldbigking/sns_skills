@@ -1,4 +1,4 @@
-"""Compile external caption cue JSON into editor-ready timeline files."""
+"""Validate caption cue JSON and compile timeline files for Opue step captions."""
 
 from __future__ import annotations
 
@@ -12,10 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-OUTPUT_JSON_NAMES = {"timeline.json", "chatcut-caption-plan.json"}
-DEFAULT_STYLE = (
-    "editable centered white text with subtle dark stroke/shadow, no colored box"
-)
+OUTPUT_JSON_NAMES = {"timeline.json"}
+DEFAULT_STYLE = "Opue style kit captions drawn in post (scripts/opue_project.py)"
 CLIP_RE = re.compile(r"^clip-(\d+)$")
 
 
@@ -359,30 +357,12 @@ def compile_cues(args: argparse.Namespace) -> int:
         ],
     }
 
-    chatcut_plan = {
-        "schema_version": 1,
-        "kind": "chatcut-editable-caption-placement-plan",
-        "timing_unit": "seconds",
-        "style": {
-            "placement": "center",
-            "text_color": "white",
-            "stroke_or_shadow": "subtle dark stroke/shadow",
-            "box": "none",
-        },
-        "captions": timeline["cues"],
-    }
-
     timeline_path = cue_dir / "timeline.json"
-    chatcut_path = cue_dir / "chatcut-caption-plan.json"
     timeline_srt_path = cue_dir / "timeline.srt"
     timeline_csv_path = cue_dir / "timeline.csv"
 
     timeline_path.write_text(
         json.dumps(timeline, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    chatcut_path.write_text(
-        json.dumps(chatcut_plan, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     write_srt(timeline_srt_path, timeline_cues)
@@ -396,7 +376,6 @@ def compile_cues(args: argparse.Namespace) -> int:
                 "captions": len(timeline_cues),
                 "outputs": [
                     str(timeline_path),
-                    str(chatcut_path),
                     str(timeline_srt_path),
                     str(timeline_csv_path),
                 ],
@@ -412,7 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Compile analysis/caption-cues/*.json into per-clip SRT plus "
-            "timeline JSON/SRT/CSV for editable caption placement."
+            "timeline JSON/SRT/CSV for reviewing step captions before opue_project.py."
         )
     )
     parser.add_argument("run_dir", help="Run directory containing analysis/caption-cues")

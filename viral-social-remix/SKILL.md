@@ -8,8 +8,10 @@ description: |
   and cooking commercial. Also use for UMALL / Asian Grocer Online workflows,
   English-region logo/size decisions, Chrome MCP capture, OpenRouter image
   generation, Seedance three-clip cooking videos, 10s product commercials,
-  final-frame video extensions, and fixing generated carousel artifacts such as
-  fake prices, blurred/mosaic UI, wrong logo, or wrong target region.
+  NewB Seedance 2.5 takes, Opue_video_add post-production (logo, Reels
+  captions, end card), final-frame video extensions, and fixing generated
+  carousel artifacts such as fake prices, blurred/mosaic UI, wrong logo, or
+  wrong target region.
 ---
 
 # Viral Social Remix
@@ -37,28 +39,33 @@ Never load the whole vault.
   in-app browser or a fresh unauthenticated tab.
 - For original cooking commercials, use `vertical-video`, `9:16`, `1080x1920`.
   Default actual cooking to the three-clip 6s director route; use single-10s
-  only for simple one-setting product rituals. Seedance cooking clips are
-  silent, no subtitles/overlays, no cooking SFX, and use accepted MP4s only.
+  only for simple one-setting product rituals. Generated clips keep native
+  ambient sound only (sizzle, simmer, utensils): every video prompt ends with
+  `soundscape: <ambient sounds>. No dialogue, no music.` No BGM, voiceover,
+  subtitles, or overlays from the generator. Use accepted MP4s only.
+- Video post-production is `Opue_video_add`, not ChatCut (retired 2026-10-10).
+  Read `references/opue-finish.md`. Opue draws the logo and every on-screen word;
+  generated frames carry no logo, sign, price, label, or brand text. Video brand
+  is `umall` or `asian_grocer`, chosen per video (ask when not given), with a
+  full-colour transparent logo; the combined lockup stays for carousels only.
 - Seedance billing accounts are separate and never mix keys: `--provider
   byteplus` is the company ModelArk account (default), `--provider kuaipao` is
   the user's personal gifted relay, and NewB is the user's Seedance 2.5
   membership quota through `scripts/run_newb_video.py` (fixed 30s/720p, no
   timeline prompts; read `references/newb-seedance25.md`). Ask which account to
   bill when the user has not said.
-- Three-clip product/cooking commercials have an Identity Gate before Seedance:
-  generate clip 1's opening frame with OpenRouter Image API model
-  `openai/gpt-image-2` at high quality, pass the supplied product image and
-  official logo as actual image references, and verify the runner reports
-  non-empty `references`. If the package, product shape, or
-  `ASIAN GROCER ONLINE / powered by UMALL` prop is hallucinated, cropped,
-  misspelled, or replaced by a different brand, reject the frame before
-  Seedance and regenerate; do not continue with a wrong-product clip. Never use
-  local logo workarounds: do not paste, composite, mask, track, or overlay the
-  logo/sign in local tools, ChatCut, Photoshop, scripts, or post.
+- Three-clip product/cooking commercials have a product Identity Gate before
+  Seedance: generate clip 1's opening frame with OpenRouter Image API model
+  `openai/gpt-image-2` at high quality, pass the supplied product image as an
+  actual image reference, and verify the runner reports non-empty `references`.
+  Do not pass a logo and do not ask for a sign. If the package, product shape,
+  colours, or food identity is hallucinated, cropped, or replaced, reject the
+  frame before Seedance and regenerate; do not continue with a wrong-product
+  clip.
 - Single-10s commercials do not use the three-clip Identity Gate by default.
   Feed the product/page image directly to the single Seedance request as the
-  visual bible and opening product reference. Require readable package/logo in
-  the first shot, then allow the package/logo to leave frame naturally.
+  visual bible and opening product reference. Require a recognisable product in
+  the first shot, then allow the package to leave frame naturally.
 - For Seedance opening references, the delivered local PNG must be exactly
   `1080x1920` before submission. OpenRouter image requests may need a
   provider-safe size such as `1088x1920` or `1024x1536`; prefer
@@ -69,24 +76,20 @@ Never load the whole vault.
   frame as validated for Seedance.
 - While a Seedance clip is polling, use the wait time to draft external editable
   caption cues in `analysis/caption-cues/`. Store clip-relative JSON such as
-  `clip-02.json` with `start`, `end`, and `text`; add SRT only when useful.
-  These cues are for later ChatCut/editor placement, never burned into Seedance.
-  Before ChatCut caption placement, run `scripts/caption_cues.py` with actual
-  trims to compile `timeline.json`, `timeline.srt`, `timeline.csv`, and
-  `chatcut-caption-plan.json`.
+  `clip-02.json` with `start`, `end`, and `text` (2-6 English words naming a
+  visible action, `*star*` the keyword). Check them with `scripts/caption_cues.py`.
+  They become Opue step captions through `scripts/opue_project.py`; never burn
+  them into generated video.
 - Use the RPA helper scripts before manual judgement when they apply:
   `scripts/next_step.py` for command choice, `scripts/handoff_review.py` for
-  clip joins, `scripts/edit_plan.py` before ChatCut trimming,
-  `scripts/qa_decision_sheet.py` for one-page review, and
+  clip joins, `scripts/qa_decision_sheet.py` for one-page review,
+  `scripts/opue_project.py` to draft the Opue project from accepted clips, and
   `scripts/carousel_cleanup.py` for fake price/mosaic/placeholder white-cover
   repairs.
 - In the three-clip route, inspect the prior clip's returned last frame and last
   motion strip before the next clip. Use the returned frame only when it is
   clean; generate a transition opening anchor when the frame is weak, malformed,
   blurry, awkward, or cannot begin the next action.
-- Product/logo branding is commercial context, not a billboard. The physical
-  `ASIAN GROCER ONLINE / powered by UMALL` sign must read in clip 1's opening
-  reference only. Do not force logo/sign continuity in later cooking clips.
 - Product identity still must remain stable after the opening. If Seedance
   changes the product family, package, ingredient shape, filling, or serving
   identity across clips, stop and retry or create a corrected transition anchor;
@@ -97,8 +100,8 @@ Never load the whole vault.
   set: cookware position, visible background props, window/shelf/counter layout,
   burner/flame, light direction, color grade, and camera height. Pull back only
   into the same established room; do not invent a new kitchen.
-- Stop at the user's requested handoff. If they say no editing, do not enter
-  ChatCut. The user is the reviewer.
+- Stop at the user's requested handoff. If they say no editing, stop at the
+  accepted clips and skip Opue. The user is the reviewer.
 
 ## Context
 
@@ -216,15 +219,14 @@ Choose the route before generation:
 - **Single-10s commercial**: use for drinks, snacks, pantry products,
   shelf-stable products, office rituals, and other products where one coherent
   environment can carry the whole ad. Feed the product/page image directly as
-  the visual bible and opening product reference. Generate one silent `10s`,
-  `9:16`, `1080p` Seedance multi-shot clip with 4-6 timed beats. Product/logo
-  readability is required only in the opening shot; do not force logo or package
-  continuity later. Use ChatCut only for trim/reframe/BGM/captions/voiceover
-  handoff when needed.
+  the visual bible and opening product reference. Generate one `10s`, `9:16`,
+  `1080p` Seedance multi-shot clip with 4-6 timed beats and ambient sound only.
+  The product must be recognisable in the opening shot; do not force package
+  continuity later. Finish logo, captions, and end card in Opue.
 - **Three-clip 6s director route**: use for cooked products, big location
   changes, stove/heat/steamer action, complex transformations, or when the user
   wants more reroll/control. Chain:
-  `script beats -> clip 1 first frame -> commercial micro-shot Seedance clips with handoff/transition-anchor decisions -> ChatCut finish`.
+  `script beats -> clip 1 first frame -> commercial micro-shot Seedance clips with handoff/transition-anchor decisions -> Opue finish`.
 
 Default to three-clip for actual cooking. Prefer single-10s when the story is a
 simple product-use ritual in one place, such as an office product break.
@@ -257,37 +259,31 @@ For the three-clip route:
   action, steam/lid/pour/object occlusion, plate movement, rack focus, or
   another motivated lens transition. Retry the prior clip only when no honest
   bridge can be made.
-- Brand the sequence as a commercial, not every frame as a billboard. The
-  supplied product and official physical `ASIAN GROCER ONLINE / powered by
-  UMALL` table sign must read in clip 1's opening reference / first frame only.
-  Later clips do not need to preserve, repeat, or match the logo sign; close-up
-  food, stove, heat, pour, plating, or texture inserts may leave it out of
-  frame naturally.
+- Brand the sequence in post, not in the frame. Generated frames carry the real
+  product and food only: no logo, store sign, price, or brand text. Opue adds the
+  brand logo, headline, step captions, product sticker, and end card.
 - Give each Seedance request only its selected opening reference: a designed
   first frame, an accepted returned last frame, or a generated transition
   opening anchor.
-- Use `6s`, `9:16`, `1080p`, silent generation, no face, and no generated
-  subtitles or overlays. Write the prompt as timed shot beats such as
-  `0-2s`, `2-4s`, `4-6s`.
+- Use `6s`, `9:16`, `1080p`, native ambient sound only, no face, and no
+  generated subtitles or overlays. Write the prompt as timed shot beats such as
+  `0-2s`, `2-4s`, `4-6s`, ending with
+  `soundscape: <ambient sounds>. No dialogue, no music.`
 - Review each clip's last 8-12 frames before approving the next clip. The next
   prompt must name the handoff mechanism: same object/action match, steam/lid
   occlusion, pour/object motion bridge, or another deliberate bridge.
 - Review all three clips once and retry any visible failure, bad join, damaged
-  product/sign, or endpoint that cannot support the planned handoff.
-- Import only accepted MP4 clips into ChatCut. Never import first frames,
-  storyboards, product/logo references, contact sheets, or QA images.
-- Treat ChatCut as a second editing pass, not an assembler. Split each accepted
-  MP4 into usable beats when needed; trim weak starts/ends; punch in on texture,
-  steam, pour, utensils, packaging, or plating; reframe with subtle
-  digital push-ins, pull-backs, pans, and rack-focus-like zooms; add match cuts
-  or motivated short transitions only where they improve rhythm.
-- Keep a natural edit duration. Do not force the final commercial to a fixed
-  length when the visual rhythm works. In ChatCut, place clips by actual seconds
-  or convert durations with the editor's real timebase; never assume that source
-  fps equals timeline framebase. Generate and place editable BGM only; do not
-  generate or place cooking SFX. Add the user's voiceover when supplied; add
-  centered white editable current-step captions with a subtle dark stroke/shadow
-  and no colored box.
+  product, or endpoint that cannot support the planned handoff.
+- Only accepted MP4 clips go into the Opue project. Never use first frames,
+  storyboards, product references, contact sheets, or QA images as takes.
+- Finish with `scripts/opue_project.py` (brand, headline, actual trims). You are
+  the editor: from the stills it writes to `qa/opue-frames/`, decide the
+  per-step emoji, highlighted keywords, ingredient callouts, and product sticker
+  yourself, without handing them back to the user. Then in the Opue repo run
+  `engine.pick` and `engine.preview` (check it), then `engine.render --sheet`.
+  Keep a natural edit duration; follow `references/opue-finish.md` for headline
+  angle, per-step emoji, ingredient callouts, and fact rules. No BGM, voiceover,
+  or SFX stingers unless the user supplies or asks for them.
 
 Prepare three-clip with
 `scripts/run_pipeline.py prepare-original-video --commercial-route three-clip`.
@@ -305,7 +301,7 @@ Use `scripts/run_openrouter_video.py` and `references/openrouter-video.md` only
 for an explicitly selected Grok route.
 
 When the user selects Seedance 2.5 / NewB, keep the route choice, action chain,
-Identity Gate, and logo policy from `references/cooking-video-workflow.md`, but
+Identity Gate, and Opue finish from `references/cooking-video-workflow.md`, but
 follow `references/newb-seedance25.md` for generation: one 30s take per
 commercial by default, the gate-approved opening frame as the sole `@图1`, ordered
 shots without timestamps, `--quota` before batches, and `--resume` instead of
@@ -313,17 +309,16 @@ resubmitting slow jobs.
 
 ## Finish
 
-After generation and ChatCut editing, do not run an agent-owned acceptance pass.
-The user is the reviewer. Stop after the requested handoff is available: an
-editable ChatCut project link, an export job, or a downloaded/exported file. Do
-not extract proof frames, inspect opening/joins/ending, or judge whether the cut
-is good unless the user explicitly asks for review or troubleshooting. Only do
-minimal tool-state checks needed to know that the handoff exists.
+After the Opue render, hand over the MP4 from `projects/<name>/out/` together
+with its contact sheet. The user is the reviewer. Do only Opue's own pre-handoff
+checks: cuts on their frames, ambient sound in sync, no frozen frames, and
+readable captions. Do not run an extra agent-owned acceptance pass or judge
+whether the cut is good unless the user asks for review or troubleshooting.
 
 When the user says a commercial is good, satisfying, approved, or ready to post,
 distill the reusable lesson immediately into
 `references/cooking-video-workflow.md`: route choice, action chain, reference
-strategy, logo policy, and why the result worked. Keep it concise and reusable,
+strategy, Opue finish choices, and why the result worked. Keep it concise and reusable,
 not a chat-only memory. Write a run note only after success and only when it
 contains a reusable lesson. Never store keys, raw provider responses, signed
 URLs, or base64 payloads in Obsidian.

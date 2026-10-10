@@ -22,8 +22,8 @@ For a 10-17s reel, favor this rhythm:
 3. 6-11s: heat transformation, bubbling, stir-fry, sear, or sauce coating.
 4. 11-15s: plating, garnish, chopstick/spoon lift.
 5. Last 1-2s: final hero with the package or grocery product when it fits the
-   scene. Use the physical brand sign only when it naturally belongs; do not
-   force sign continuity after clip 1.
+   scene. Branding (logo, end card) is added in the Opue finish, never as a
+   generated sign.
 
 For 3 x 5s API video segments:
 
@@ -35,36 +35,34 @@ For 3 x 5s API video segments:
 
 - Keep generated frames and videos free of visible text, captions, labels,
   title cards, stickers, lower-thirds, or fake UI.
-- Do not ask the image/video model to render ingredient labels. Put labels in
-  ChatCut later if needed.
+- Do not ask the image/video model to render ingredient labels. Opue draws
+  ingredient callouts and step captions in post.
 - Keep props sparse: table, pan/pot, burner, knife, cutting board, one bowl,
-  one utensil, product package or brand sign only when needed.
+  one utensil, and the product package only when needed. Never a logo or sign.
 - Do not show a creator face. Use hands-only cooking action.
 - Keep the same camera angle, cookware, countertop, hand model, and lighting
   across Seedance shots, generated reference frames, and split videos.
 - Prefer real tactile actions: pour sauce, add tofu, stir noodles, toss chicken,
   spoon broth, drizzle chili oil, sprinkle scallions, lift dumpling, plate rice.
 
-## Text And ChatCut
+## Text And Audio
 
-- IG examples often use short centered white text. In our generation pipeline,
-  that text belongs in ChatCut, not in the AI storyboard/video prompt.
-- When subtitles or labels are requested, default to white centered text with a
-  subtle shadow, placed near the visual middle so upload UI does not hide it.
-- Keep subtitle lines short: 2-5 words or one compact sentence.
-- BGM should be trimmed to exact video duration. Add light food SFX only when
-  the user asks and it matches visible action: chopping, sizzling, bubbling,
-  pouring, plating.
+- IG examples often use short on-screen text. In our pipeline, that text belongs
+  in the Opue finish, not in the AI storyboard/video prompt. Opue's style kits
+  place captions clear of the platform UI.
+- Keep caption cues short: 2-6 words naming a visible action.
+- Audio is the generated clips' native ambient sound: chopping, sizzling,
+  bubbling, pouring, plating. There is no BGM unless the user asks.
 
 ## Product And Brand Integration
 
 - Product should be a physical object, not an overlay ad.
-- For English-region output, use the `ASIAN GROCER ONLINE powered by UMALL`
-  logo lockup if a brand prop is needed.
+- Brand the video in post with the `umall` or `asian_grocer` Opue logo; do not
+  put a brand prop or sign into generated frames.
 - Strong product scenes:
   - package standing beside raw ingredients in the opening setup;
   - sauce/seasoning bottle being used in the mechanism shot;
-  - final plate with package or small tabletop sign in the final hero;
+  - final plate with the package beside it in the final hero;
   - grocery shelf/list framing for guide-style content.
 - Weak product scenes:
   - floating logo;

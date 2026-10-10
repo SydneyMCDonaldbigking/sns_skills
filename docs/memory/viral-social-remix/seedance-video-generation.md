@@ -198,7 +198,7 @@ After Seedance finishes:
 
 - Report actual token usage and estimated cost to the user.
 
-After ChatCut/export, repeat the metadata plus human-review gate on the actual
+After the Opue render, repeat the metadata plus human-review gate on the actual
 delivery file:
 
 ```powershell
@@ -206,20 +206,11 @@ delivery file:
 .\.venv\python.exe .\viral-social-remix\scripts\video_qa.py approve-export output/xxx
 ```
 
-## Next Step: ChatCut Editing
+## Next Step: Opue Finish
 
-After a Seedance MP4 passes visual QA, continue through
-[[chatcut-handoff-workflow]] when the user wants editing, review, BGM, subtitle
-labels, stitching, or final export.
-
-For multi-segment cooking videos, keep the segment MP4s as separate editable
-ChatCut timeline items on `V1`. Use a stitched MP4 only for quick review or when
-the user explicitly asks for one flat clip.
-
-For no-audio food B-roll finishing, ChatCut can add original no-vocal BGM on
-`A1` and editable subtitle/ingredient-label Motion Graphics on `V2`. Do this
-only after the user asks for audio/subtitles/finishing; the default Seedance
-preview remains no-audio and no-subtitle.
+After visual QA passes, finish accepted clips in `Opue_video_add`:
+[[opue-finish-workflow]]. Clips keep their native ambient sound; Opue adds the
+logo, captions, and end card. There is no BGM unless the user asks.
 
 ## Relevant Runs
 
