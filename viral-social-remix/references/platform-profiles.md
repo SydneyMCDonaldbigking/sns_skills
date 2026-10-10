@@ -5,7 +5,7 @@
 | Xiaohongshu source to English carousel | Natural English | 1152x1152 | Match source page count | `caption-en.txt` |
 | Xiaohongshu target carousel | Chinese | 1152x1536 | Match source page count | `caption-zh.txt` |
 | Instagram/Facebook carousel | Natural English | 1152x1152 | Match source page count | `caption-en.txt` |
-| English vertical product/cooking video | Natural English | 9:16 video, 1080p; optional opening frames 1080x1920 | single 10s Seedance clip, 3 ambient-sound 6s Seedance clips, or one NewB 30s take | `caption-en.txt` |
+| English vertical product/cooking video | Natural English | 9:16 video, 1080p; optional opening frames 1080x1920 | one NewB Seedance 2.5 30s 720p take with user references (default); legacy Seedance 2.0 10s or 3x6s only on request | `caption-en.txt` |
 | Video storyboard | Target-market language | 1920x1080 | exactly 9 frames plus one 1920x1080 contact sheet | Target-platform caption |
 
 Use an explicit user target platform when supplied. Otherwise infer source and

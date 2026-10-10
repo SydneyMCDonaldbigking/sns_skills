@@ -58,6 +58,7 @@ def test_prepare_run_creates_delivery_skeleton(tmp_path: Path):
 def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_path: Path):
     run_dir = pipeline.prepare_original_video_run(
         brief="Brand: UMall. Dish: quick tomato egg stir fry.",
+        commercial_route="three-clip",
         output_root=tmp_path / "output",
         task_name="tomato-egg",
     )
@@ -217,6 +218,7 @@ def test_prepare_original_video_run_records_structured_references(tmp_path: Path
 
     run_dir = pipeline.prepare_original_video_run(
         brief="Brand: UMall. Dish: quick tomato egg stir fry.",
+        commercial_route="three-clip",
         output_root=tmp_path / "output",
         task_name="tomato-egg-refs",
         image_references=[str(image)],
@@ -395,3 +397,52 @@ def test_generate_cli_outputs_json(tmp_path: Path, monkeypatch, capsys):
 
     assert code == 0
     assert json.loads(capsys.readouterr().out) == {"saved": ["generated/02.png"]}
+
+
+def test_prepare_original_video_defaults_to_newb_with_user_references(tmp_path: Path):
+    from PIL import Image
+
+    wok = tmp_path / "wok-start.png"
+    dish = tmp_path / "final-dish.jpg"
+    Image.new("RGB", (720, 1280), "white").save(wok)
+    Image.new("RGB", (720, 1280), "white").save(dish)
+    run_dir = pipeline.prepare_original_video_run(
+        brief="Dish: tomato egg stir fry.",
+        output_root=tmp_path / "output",
+        task_name="tomato-egg-newb",
+        image_references=[str(wok), str(dish)],
+    )
+    data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
+    assert data["video_mode"] == "newb-single-30s"
+    assert data["video"]["generation"]["resolution"] == "720p"
+    assert data["video"]["generation"]["duration"] == 30
+    assert [ref["order"] for ref in data["video"]["references"]] == [1, 2]
+    prompt = (run_dir / "analysis" / "newb-prompt.md").read_text(encoding="utf-8")
+    assert "# @图1 = wok-start.png" in prompt
+    assert "# @图2 = final-dish.jpg" in prompt
+    assert "No dialogue, no music." in prompt
+    assert not list((run_dir / "analysis" / "page-prompts").glob("*.md"))
+
+    newb = load_script("run_newb_video")
+    body = "\n".join(line for line in prompt.splitlines() if not line.startswith("#"))
+    assert newb.lint_prompt(body) == []
+    plan = newb.run_newb_video(run_dir, dry_run=True)
+    assert [image["label"] for image in plan["images"]] == ["@图1", "@图2"]
+    assert plan["images"][0]["path"].endswith("wok-start.png")
+
+    next_step = load_script("next_step")
+    states = next_step.file_state(run_dir)
+    assert next_step.recommend_newb(run_dir, states, data)["stage"] == "newb"
+    data["newb_video_generation"] = {"newb-video": {"status": "queued", "task_id": "t1"}}
+    assert next_step.recommend_newb(run_dir, states, data)["stage"] == "newb-resume"
+    data["newb_video_generation"]["newb-video"]["status"] = "succeeded"
+    assert next_step.recommend_newb(run_dir, states, data)["stage"] == "qa-sheet"
+
+
+def test_newb_route_requires_user_reference(tmp_path: Path):
+    import pytest
+
+    with pytest.raises(ValueError, match="image-reference"):
+        pipeline.prepare_original_video_run(
+            brief="Dish: fried rice.", output_root=tmp_path / "output", task_name="rice"
+        )

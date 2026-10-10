@@ -18,7 +18,30 @@ House rules since 2026-10-10:
 
 ## Route selection
 
-Choose one commercial route before paid generation:
+**Default (2026-10-10): NewB Seedance 2.5 single take**, route `newb-30s`.
+This is the company API; the work is mostly stir-fry and wok cooking.
+
+- One fixed `30s`, `720p`, `9:16` take with ambient sound carries the whole
+  action chain:
+  `ingredients -> hot oil/aromatics -> main ingredient into the wok -> toss and sauce gloss -> plate -> chopstick lift / final hero`.
+- **The user supplies the reference images.** The first is the opening state;
+  others can be the ingredients, a key step, or the finished dish. Do not
+  generate first frames with the image API. Name every image as `@图N` in the
+  prompt and say what it is for.
+- Prompt rules (from NewB):
+  - simple subject/action/camera/light;
+  - ordered shots, never timestamps;
+  - no face, text, logo, or sign;
+  - end with `soundscape: 热油滋滋声、锅铲碰锅、翻炒声. No dialogue, no music.`
+  - The details are in `references/newb-seedance25.md`.
+- The identity check moves to the generated take. Reject and reroll
+  (`--label take-02`) if the dish, ingredients, or product changes into
+  something else, a face appears, or the model writes text.
+- Then caption cues -> `qa_decision_sheet.py` -> `opue_project.py` -> Opue
+  pick/preview/render, as in the Opue finish section below.
+
+The routes below are **legacy Seedance 2.0** routes (BytePlus or kuaipao). Use
+them only when the user explicitly asks. Choose one before paid generation:
 
 - **Single-10s commercial**: one `10s`, `9:16`, `1080p` Seedance request with
   ambient sound only. Use for drinks, snacks, pantry, office rituals, and simple
@@ -32,10 +55,6 @@ Choose one commercial route before paid generation:
   requests with ambient sound only. Use for actual cooking, large scene changes,
   stove/heat, steamer/fire, transformation beats, or when reroll control
   matters.
-- **NewB Seedance 2.5 single-30s**: when the user bills NewB, one fixed
-  30s/720p take usually carries the whole three-clip action chain. It uses the
-  same Identity Gate opening frame as the sole `@图1`. Prompt rules are in
-  `references/newb-seedance25.md`.
 
 Default to three-clip for cooked foods. Prefer single-10s for a simple,
 coherent one-setting product-use ritual.

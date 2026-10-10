@@ -131,6 +131,10 @@ a generic CTA.
   text, and Opue draws the `umall` or `asian_grocer` logo plus all English text.
   Audio is the clips' native ambient sound only
   (`soundscape: ... No dialogue, no music.`). See [[opue-finish-workflow]].
+- 2026-10-10: NewB Seedance 2.5 (company API, 30s, 720p) is the default for all
+  video, mostly stir-fry. The user supplies the reference images; there are no
+  image-API first frames. Seedance 2.0 BytePlus/kuaipao routes are legacy,
+  used on request only.
 
 ## Useful Links
 

@@ -329,6 +329,19 @@ def _manifest_task_id(run_dir: Path, label: str) -> str | None:
     return entry.get("task_id")
 
 
+def _manifest_reference_images(run_dir: Path) -> list[str]:
+    """User-supplied reference images recorded by prepare-original-video, in order."""
+    manifest_path = run_dir / "analysis" / "manifest.json"
+    if not manifest_path.is_file():
+        return []
+    video = manifest.load(manifest_path).get("video") or {}
+    refs = sorted(
+        (item for item in video.get("references") or [] if item.get("type") == "image" and item.get("path")),
+        key=lambda item: item.get("order", 0),
+    )
+    return [item["path"] for item in refs]
+
+
 def _default_ratio(run_dir: Path) -> str:
     manifest_path = run_dir / "analysis" / "manifest.json"
     if manifest_path.is_file():
@@ -498,7 +511,7 @@ def run_newb_video(
                 f"without timestamps. Found: {', '.join(timeline_hits[:5])}. "
                 "Pass --allow-timeline to submit anyway."
             )
-        image_specs, warnings = validate_images(images or [], run, ratio)
+        image_specs, warnings = validate_images(images or _manifest_reference_images(run), run, ratio)
         if not NO_MUSIC_RE.search(prompt_text):
             warnings.append(
                 "Prompt does not rule out music: end it with "

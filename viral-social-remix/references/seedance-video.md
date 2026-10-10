@@ -37,6 +37,11 @@ the default stays `byteplus` so no existing command changes billing.
 | `byteplus` | company ModelArk (reimbursed) | `https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks` | `dreamina-seedance-2-0-260128` | `BYTEPLUS_ARK_API_KEY`, `BYTEPLUS_API_KEY`, `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, `SEEDANCE_API_KEY` |
 | `kuaipao` | personal kuaipao.pro relay (gifted) | `https://kuaipao.pro/api/v3/contents/generations/tasks` | `doubao-seedance-2.0-1080p` | `KUAIPAO_ARK_API_KEY`, `KUAIPAO_API_KEY` |
 
+**NewB (company Seedance 2.5, fixed 30s/720p) is the default for all video
+since 2026-10-10.** It has its own runner, `scripts/run_newb_video.py`, and key
+`NEWB_API_KEY`; see `newb-seedance25.md`. This file now covers the legacy
+Seedance 2.0 accounts, used only when the user asks for them.
+
 Keys never cross providers: a `kuaipao` run will not fall back to the company
 ModelArk key, and vice versa. Per-provider overrides are `VSR_SEEDANCE_ENDPOINT`
 / `VSR_SEEDANCE_MODEL` for `byteplus` and `VSR_KUAIPAO_ENDPOINT` /

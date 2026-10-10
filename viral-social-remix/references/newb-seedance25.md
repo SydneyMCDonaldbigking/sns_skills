@@ -1,7 +1,10 @@
 # NewB Seedance 2.5
 
-Use this reference when the user selects Seedance 2.5 or the NewB membership
-account (`--provider` is not used; NewB has its own runner). Source contract:
+**NewB is the default for all video** (since 2026-10-10). It is the company's
+Seedance 2.5 API, mostly used for stir-fry and wok cooking. `--provider` is not
+used; NewB has its own runner. Prepare runs with
+`run_pipeline.py prepare-original-video` (default route `newb-30s`). The user
+supplies the reference images, so no image-API first frames are made. Source contract:
 `claude_only/NewB视频-API接入文档-会员版.md` (v1, 2026-09-29, local-only).
 
 ## What is different from Seedance 2.0
@@ -40,15 +43,17 @@ A 30s request is long enough for a whole commercial. Default to one request per
 commercial, then trim to a natural length in the Opue finish
 (`opue-finish.md`).
 
-- **Single-30s (default with NewB)**: one request covers the full action chain
-  from `cooking-video-workflow.md`, such as package identity -> prep -> heat ->
-  transformation -> texture macro -> plated hero.
-  - Cooked products still pass the three-clip Identity Gate first. Generate
-    the opening frame with `openai/gpt-image-2` from the real product image,
-    with no logo or sign, then send it as the only image (`@图1`) so NewB uses
-    it as the first frame.
-  - For simple pantry, drink, or office-ritual products, the product or page
-    image may be `@图1` directly, as in the single-10s route.
+- **Single-30s (default)**: one request covers the full action chain, e.g. for
+  stir-fry: ingredients -> hot oil and aromatics -> main ingredient into the
+  wok -> toss and sauce gloss -> plate -> chopstick lift / final hero.
+  - **References come from the user.** `prepare-original-video
+    --image-reference` copies them into the run in order, and
+    `run_newb_video.py` uploads them in that order when `--image` is not
+    given.
+  - Put the opening state first. With one image, NewB treats it as the first
+    frame. With several, say in the prompt what each `@图N` is (ingredients,
+    a key step, the finished dish) and what to keep from it.
+  - Do not generate first frames with the image API.
 - **Chained takes**: only when one 30s take cannot carry the story. The local
   `generated/<label>-last-frame.png` is the handoff candidate. It is 720p, so
   prefer a generated `1080x1920` transition anchor when the frame is soft. Each

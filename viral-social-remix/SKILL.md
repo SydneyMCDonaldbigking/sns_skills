@@ -37,24 +37,33 @@ Never load the whole vault.
 - If the user mentions Chrome, Chrome MCP, or links `chrome:control-chrome`,
   control the user's existing logged-in Chrome tab. Do not silently use the
   in-app browser or a fresh unauthenticated tab.
-- For original cooking commercials, use `vertical-video`, `9:16`, `1080x1920`.
-  Default actual cooking to the three-clip 6s director route; use single-10s
-  only for simple one-setting product rituals. Generated clips keep native
-  ambient sound only (sizzle, simmer, utensils): every video prompt ends with
+- **All videos go to NewB Seedance 2.5 by default** (company API, set
+  2026-10-10). The work is mostly stir-fry and other wok cooking. One take is
+  fixed at `30s`, `720p`, `9:16`. Prepare it with
+  `scripts/run_pipeline.py prepare-original-video` (route `newb-30s` is the
+  default) and submit it with `scripts/run_newb_video.py`. Read
+  `references/newb-seedance25.md`. Don't ask which account to bill.
+- **The user supplies the reference images.** Pass them as `--image-reference`
+  in order; the first is the opening state. Do not call the OpenRouter image
+  API to design first frames for video. Look at the user's references, name
+  each one as `@图N` in the prompt, and check product/food identity in the
+  generated take instead.
+- Generated clips keep native ambient sound only (sizzle, wok, utensils):
+  every video prompt ends with
   `soundscape: <ambient sounds>. No dialogue, no music.` No BGM, voiceover,
-  subtitles, or overlays from the generator. Use accepted MP4s only.
+  subtitles, or overlays come from the generator. Use accepted MP4s only. Opue
+  renders the final at a `1080x1920` canvas from the 720p source.
 - Video post-production is `Opue_video_add`, not ChatCut (retired 2026-10-10).
   Read `references/opue-finish.md`. Opue draws the logo and every on-screen word;
   generated frames carry no logo, sign, price, label, or brand text. Video brand
   is `umall` or `asian_grocer`, chosen per video (ask when not given), with a
   full-colour transparent logo; the combined lockup stays for carousels only.
-- Seedance billing accounts are separate and never mix keys: `--provider
-  byteplus` is the company ModelArk account (default), `--provider kuaipao` is
-  the user's personal gifted relay, and NewB is the user's Seedance 2.5
-  membership quota through `scripts/run_newb_video.py` (fixed 30s/720p, no
-  timeline prompts; read `references/newb-seedance25.md`). Ask which account to
-  bill when the user has not said.
-- Three-clip product/cooking commercials have a product Identity Gate before
+- Legacy Seedance 2.0 accounts are used only when the user names them, and
+  their keys are never mixed: `--provider byteplus` (company ModelArk) and
+  `--provider kuaipao` (the user's personal gifted relay). Everything below
+  about three-clip, single-10s, opening frames, and handoffs applies only to
+  those legacy routes.
+- Legacy three-clip product/cooking commercials have a product Identity Gate before
   Seedance: generate clip 1's opening frame with OpenRouter Image API model
   `openai/gpt-image-2` at high quality, pass the supplied product image as an
   actual image reference, and verify the runner reports non-empty `references`.
@@ -204,6 +213,24 @@ Load `references/fixed-brand-scenes.md` only when a warehouse scene is required.
 When the API is available, generate the assets; do not stop at prompts.
 
 ## Original product/cooking commercial
+
+Default (2026-10-10): NewB Seedance 2.5, route `newb-30s`, with the user's
+reference images:
+
+1. `scripts/run_pipeline.py prepare-original-video --brief ...
+   --image-reference <opening-state image> --image-reference ...`
+2. Rewrite `analysis/newb-prompt.md` for the dish:
+   - ordered shots (先/接着/然后/最后), never timestamps;
+   - `@图N` for each user reference;
+   - no face, text, logo, or sign;
+   - end with the `soundscape:` line.
+3. Run `scripts/run_newb_video.py --run <run> --quota`, then
+   `scripts/run_newb_video.py --run <run>`. The images come from the manifest.
+   Never resubmit a slow job; use `--resume auto`. Use `--label take-02` for a
+   reroll.
+4. While it generates, write `analysis/caption-cues/newb-video.json`.
+5. Accept the take, run `scripts/qa_decision_sheet.py`, then do the Opue
+   finish below.
 
 Load `references/cooking-video-workflow.md` as the single production authority.
 It already includes the Seedance workshop rules needed for food/product

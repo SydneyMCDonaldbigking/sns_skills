@@ -185,6 +185,30 @@ def recommend_single_10s(
     return finish(run_dir, states, manifest)
 
 
+def recommend_newb(
+    run_dir: Path, states: dict[str, bool], manifest: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    takes = (manifest or {}).get("newb_video_generation") or {}
+    if not any(isinstance(t, dict) and t.get("status") == "succeeded" for t in takes.values()):
+        pending = [label for label, t in takes.items() if isinstance(t, dict) and t.get("task_id")
+                   and t.get("status") not in {"succeeded", "failed"}]
+        if pending:
+            return {
+                "stage": "newb-resume",
+                "action": f"keep polling NewB take {pending[0]}; do not resubmit",
+                "command": f"python scripts/run_newb_video.py --run {run_dir} --label {pending[0]} --resume auto",
+            }
+        return {
+            "stage": "newb",
+            "action": (
+                "rewrite analysis/newb-prompt.md for this dish (ordered shots, no timestamps, "
+                "soundscape line), check quota, then submit one 30s take"
+            ),
+            "command": f"python scripts/run_newb_video.py --run {run_dir}",
+        }
+    return finish(run_dir, states, manifest)
+
+
 def recommend(args: argparse.Namespace) -> int:
     run_dir = Path(args.run_dir)
     manifest = load_json(run_dir / "analysis" / "manifest.json")
@@ -197,7 +221,9 @@ def recommend(args: argparse.Namespace) -> int:
         }
     else:
         mode = video_mode(manifest)
-        if mode == "director-first-frame-three-clips":
+        if mode == "newb-single-30s":
+            result = recommend_newb(run_dir, states, manifest)
+        elif mode == "director-first-frame-three-clips":
             result = recommend_three_clip(run_dir, states, manifest)
         elif mode == "single-10s-commercial":
             result = recommend_single_10s(run_dir, states, manifest)

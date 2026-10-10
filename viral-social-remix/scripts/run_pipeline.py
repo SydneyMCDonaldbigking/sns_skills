@@ -26,7 +26,8 @@ import validate_output
 
 VIDEO_PLATFORMS = {"video", "vertical-video"}
 PLATFORMS = {"xiaohongshu", "instagram-facebook"} | VIDEO_PLATFORMS
-COMMERCIAL_ROUTES = {"three-clip", "single-10s"}
+COMMERCIAL_ROUTES = {"newb-30s", "three-clip", "single-10s"}
+DEFAULT_COMMERCIAL_ROUTE = "newb-30s"
 VIDEO_REFERENCE_EXTENSIONS = {
     "image": {".jpg", ".jpeg", ".png", ".webp", ".heic"},
     "video": {".mp4", ".mov", ".webm", ".m4v"},
@@ -686,12 +687,92 @@ def _read_brief(brief: str | None, brief_file: str | Path | None) -> tuple[str, 
     raise ValueError("Original video preparation requires --brief or --brief-file")
 
 
+def newb_prompt_template(brief_text: str, references: list[dict]) -> str:
+    """Draft prompt for NewB Seedance 2.5. Lines starting with '#' are director notes and are
+    not sent; the agent replaces the body with the real shot order before submitting."""
+    images = [item for item in references if item.get("type") == "image"]
+    mapping = "\n".join(
+        f"# @图{index} = {Path(item.get('path') or item.get('url') or '').name}  (say what it shows)"
+        for index, item in enumerate(images, start=1)
+    )
+    return (
+        "# NewB Seedance 2.5 prompt (fixed 30s, 720p, 9:16). Lines starting with # are not sent.\n"
+        "# Rules: keep it simple (subject, action, camera, light); ordered shots with\n"
+        "# 先/接着/然后/最后, never timestamps; name references as @图N; no face, no text, no logo,\n"
+        "# no sign; end with the soundscape line. Avoid violent words (血, 砍).\n"
+        "# A lone reference image is used as the first frame: put the opening state first.\n"
+        f"# Brief: {' '.join(brief_text.split())[:300]}\n"
+        f"{mapping}\n"
+        "@图1 是开场画面：[真实食材/产品 + 厨房台面]。写实高级感美食短片，竖屏，暖色侧光，"
+        "同一个厨房、同一口锅、同一种色调，无人脸只出现手。\n"
+        "先 [备料动作，近景俯拍，镜头缓慢推近]。\n"
+        "接着 [下锅：热油、爆香，锅铲翻炒，特写油花和蒸汽]。\n"
+        "然后 [主料下锅大火翻炒，颠锅，酱汁裹匀，特写光泽]。\n"
+        "最后 [出锅装盘，筷子夹起，成品主镜头缓慢拉远，只露出已出现过的厨房]。\n"
+        "食材和成品外形全程保持一致。不要字幕、文字叠加、水印、logo、招牌。\n"
+        "soundscape: 热油滋滋声、锅铲碰锅、翻炒声。No dialogue, no music.\n"
+    )
+
+
+def _mark_newb_mode(manifest_path: Path, references: list[dict]) -> None:
+    data = manifest.load(manifest_path)
+    data["schema_version"] = 2
+    data["video_mode"] = "newb-single-30s"
+    data["storyboard_references"] = references
+    data["assets"] = {}
+    data["video"] = {
+        "mode": "newb-single-30s",
+        "provider": "newb-seedance-2.5",
+        "references": references,
+        "generation": {
+            "ratio": "9:16",
+            "duration": 30,
+            "resolution": "720p",
+            "generate_audio": True,
+            "return_last_frame": False,
+            "watermark": False,
+        },
+        "delivery": {
+            "ratio": "9:16",
+            "resolution": "1080x1920 Opue canvas from 720p source",
+            "target_duration": None,
+            "duration_policy": "one 30s NewB take; trim to a natural length in Opue_video_add",
+            "expect_audio": True,
+            "audio_policy": "native ambient cooking sound from generation only; no BGM, dialogue, or voiceover",
+            "text_policy": "draft clip-relative caption cues in analysis/caption-cues/<label>.json while NewB is generating and check them with scripts/caption_cues.py; scripts/opue_project.py turns them into Opue step captions",
+            "edit_policy": "run scripts/opue_project.py, then engine.pick, engine.preview, and engine.render --sheet in Opue_video_add",
+            "qa_policy": "run scripts/qa_decision_sheet.py before the Opue finish",
+        },
+        "brand": {
+            "strategy": "opue-post-production",
+            "brands": ["umall", "asian_grocer"],
+            "visible_text": "none-in-generated-frames",
+        },
+        "budget": {"retry_limit": 1, "stop_before_final": False},
+    }
+    data["video_workflow"] = {
+        "status": "prepared",
+        "visual_qa": "not_started",
+        "finish": "not_started",
+        "export_qa": "user_acceptance",
+        "history": [],
+        "clips": {"newb-video": {"status": "prepared", "duration": 30}},
+    }
+    data.setdefault("assumptions", []).append(
+        {
+            "inferred": True,
+            "value": "NewB Seedance 2.5 route (company default): user-supplied reference images go straight to one 30s 720p take; no image-API first frame; Opue finishes logo, captions, and end card.",
+        }
+    )
+    manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def prepare_original_video_run(
     *,
     brief: str | None = None,
     brief_file: str | Path | None = None,
     platform: str = "vertical-video",
-    commercial_route: str = "three-clip",
+    commercial_route: str = DEFAULT_COMMERCIAL_ROUTE,
     output_root: str | Path = "output",
     task_name: str | None = None,
     caption_language: str | None = None,
@@ -706,7 +787,14 @@ def prepare_original_video_run(
             f"Commercial route must be one of: {', '.join(sorted(COMMERCIAL_ROUTES))}"
         )
     if platform != "vertical-video" and commercial_route != "three-clip":
-        raise ValueError("single-10s commercial route is only supported for vertical-video")
+        raise ValueError(f"{commercial_route} commercial route is only supported for vertical-video")
+    if commercial_route == "newb-30s" and not [
+        item for item in image_references or [] if item
+    ]:
+        raise ValueError(
+            "newb-30s route needs at least one user-supplied --image-reference "
+            "(the first one is the opening state)"
+        )
     brief_text, brief_source = _read_brief(brief, brief_file)
     name = task_name or _safe_stem(brief_text.splitlines()[0][:48])
     run_dir = create_run_dir.create(output_root, name)
@@ -722,7 +810,12 @@ def prepare_original_video_run(
         video_references=video_references,
         audio_references=audio_references,
     )
-    if platform == "vertical-video" and commercial_route == "single-10s":
+    if platform == "vertical-video" and commercial_route == "newb-30s":
+        (run_dir / "analysis" / "newb-prompt.md").write_text(
+            newb_prompt_template(brief_text, video_references_prepared),
+            encoding="utf-8",
+        )
+    elif platform == "vertical-video" and commercial_route == "single-10s":
         (run_dir / "analysis" / "shot-list.md").write_text(
             fixed_single_10s_shot_list(),
             encoding="utf-8",
@@ -915,7 +1008,9 @@ def prepare_original_video_run(
         },
         provider=image_provider.resolve(),
     )
-    if platform == "vertical-video" and commercial_route == "single-10s":
+    if platform == "vertical-video" and commercial_route == "newb-30s":
+        _mark_newb_mode(manifest_path, video_references_prepared)
+    elif platform == "vertical-video" and commercial_route == "single-10s":
         _mark_single_10s_mode(manifest_path, video_references_prepared)
     elif platform == "vertical-video":
         _mark_director_three_clip_mode(
@@ -1078,7 +1173,7 @@ def build_parser() -> argparse.ArgumentParser:
     original.add_argument("--brief")
     original.add_argument("--brief-file")
     original.add_argument("--platform", choices=sorted(VIDEO_PLATFORMS), default="vertical-video")
-    original.add_argument("--commercial-route", choices=sorted(COMMERCIAL_ROUTES), default="three-clip")
+    original.add_argument("--commercial-route", choices=sorted(COMMERCIAL_ROUTES), default=DEFAULT_COMMERCIAL_ROUTE)
     original.add_argument("--output-root", default="output")
     original.add_argument("--task-name")
     original.add_argument("--caption-language", choices=["zh", "en"])
