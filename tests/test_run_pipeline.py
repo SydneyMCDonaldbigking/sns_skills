@@ -475,3 +475,28 @@ def test_newb_default_nine_images_make_five_segments():
     newb = load_script("run_newb_video")
     body = chr(10).join(line for line in prompt.splitlines() if not line.startswith("#"))
     assert newb.unreferenced_images(body, 9) == []
+
+
+def test_newb_product_route_designs_a_story_from_few_references(tmp_path: Path):
+    product = tmp_path / "tea.png"
+    Image.new("RGB", (800, 800), "white").save(product)
+    run_dir = pipeline.prepare_original_video_run(
+        brief="Product: longan red date tea sachets.",
+        commercial_route="newb-product",
+        output_root=tmp_path / "output",
+        task_name="tea-newb",
+        image_references=[str(product)],
+    )
+    data = json.loads((run_dir / "analysis" / "manifest.json").read_text(encoding="utf-8"))
+    assert data["video_mode"] == "newb-product-30s"
+    assert data["video"]["segments"] == []
+    assert data["video"]["generation"]["resolution"] == "720p"
+    prompt = (run_dir / "analysis" / "newb-prompt.md").read_text(encoding="utf-8")
+    assert "# @图1 = tea.png" in prompt
+    assert "designer" in prompt
+    newb = load_script("run_newb_video")
+    body = chr(10).join(line for line in prompt.splitlines() if not line.startswith("#"))
+    assert newb.lint_prompt(body) == []
+    assert newb.unreferenced_images(body, 1) == []
+    next_step = load_script("next_step")
+    assert next_step.recommend_newb(run_dir, next_step.file_state(run_dir), data)["stage"] == "newb"

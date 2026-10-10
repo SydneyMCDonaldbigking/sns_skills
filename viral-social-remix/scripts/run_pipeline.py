@@ -26,7 +26,8 @@ import validate_output
 
 VIDEO_PLATFORMS = {"video", "vertical-video"}
 PLATFORMS = {"xiaohongshu", "instagram-facebook"} | VIDEO_PLATFORMS
-COMMERCIAL_ROUTES = {"newb-30s", "three-clip", "single-10s"}
+COMMERCIAL_ROUTES = {"newb-30s", "newb-product", "three-clip", "single-10s"}
+NEWB_ROUTES = {"newb-30s": "newb-single-30s", "newb-product": "newb-product-30s"}
 DEFAULT_COMMERCIAL_ROUTE = "newb-30s"
 VIDEO_REFERENCE_EXTENSIONS = {
     "image": {".jpg", ".jpeg", ".png", ".webp", ".heic"},
@@ -757,17 +758,49 @@ def newb_prompt_template(brief_text: str, references: list[dict]) -> str:
     )
 
 
-def _mark_newb_mode(manifest_path: Path, references: list[dict]) -> None:
+def newb_product_prompt_template(brief_text: str, references: list[dict]) -> str:
+    """Draft for a single-product NewB commercial: a few references, and the agent designs a
+    30s story around the product. Lines starting with '#' are notes and are not sent."""
+    images = [item for item in references if item.get("type") == "image"]
+    mapping = "\n".join(
+        f"# @图{index} = {Path(item.get('path') or item.get('url') or '').name}  (product / scene / mood: say which)"
+        for index, item in enumerate(images, start=1)
+    )
+    return (
+        "# NewB single-product commercial (fixed 30s, 720p, 9:16). Lines starting with # are not sent.\n"
+        "# You are the designer: invent one coherent 30s story that gives a buying reason. Pick ONE\n"
+        "# setting and occasion (who uses it, when, why), 4-6 scenes in order with order words only\n"
+        "# (开场/接着/然后/最后, never timestamps), visible proof (open, pour, bite, steam, texture),\n"
+        "# one purposeful camera move per scene, and a final product hero. Keep the product identical\n"
+        "# to @图1 in every scene. No face (hands, back or far figures only), no text, logo, sign,\n"
+        "# price or claims; end with the soundscape line. Opue adds logo and captions later.\n"
+        f"# Brief: {' '.join(brief_text.split())[:300]}\n"
+        f"{mapping}\n"
+        "@图1 是产品本身，全片产品外形、包装颜色和图案保持一致。写实高级感商品广告，竖屏，"
+        "[一个场景：地点 + 时间 + 光线]，同一种色调，镜头稳定。\n"
+        "开场：[产品在场景里的第一眼：景别、机位、运镜]。\n"
+        "接着：[手拿起 / 打开产品，近景，证明方便]。\n"
+        "然后：[使用或制作过程：倒、冲、煮、拌、咬，特写质感和蒸汽]。\n"
+        "然后：[生活场景里的回报时刻：放松、分享、满足，用动作表现，不出人脸]。\n"
+        "最后：[产品和成品同框的主镜头，缓慢推近或拉远，画面停稳]。\n"
+        "不要字幕、文字叠加、水印、logo、招牌、价格。\n"
+        "soundscape: [这个场景的环境声和动作声]。No dialogue, no music.\n"
+    )
+
+
+def _mark_newb_mode(manifest_path: Path, references: list[dict], route: str = "newb-30s") -> None:
+    mode = NEWB_ROUTES[route]
+    image_count = len([item for item in references if item.get("type") == "image"])
     data = manifest.load(manifest_path)
     data["schema_version"] = 2
-    data["video_mode"] = "newb-single-30s"
+    data["video_mode"] = mode
     data["storyboard_references"] = references
     data["assets"] = {}
     data["video"] = {
-        "mode": "newb-single-30s",
+        "mode": mode,
         "provider": "newb-seedance-2.5",
         "references": references,
-        "segments": newb_segments(len([item for item in references if item.get("type") == "image"])),
+        "segments": newb_segments(image_count) if route == "newb-30s" else [],
         "generation": {
             "ratio": "9:16",
             "duration": 30,
@@ -805,7 +838,11 @@ def _mark_newb_mode(manifest_path: Path, references: list[dict]) -> None:
     data.setdefault("assumptions", []).append(
         {
             "inferred": True,
-            "value": "NewB Seedance 2.5 route (company default): user-supplied reference images, two per segment (start state, end state), go straight to one 30s 720p take; no image-API first frame; Opue finishes logo, captions, and end card.",
+            "value": (
+                "NewB Seedance 2.5 route (company default): user-supplied reference images, two per segment (start state, end state), go straight to one 30s 720p take; no image-API first frame; Opue finishes logo, captions, and end card."
+                if route == "newb-30s"
+                else "NewB single-product commercial: a few user references; the agent designs one coherent 30s story around the product; no image-API first frame; Opue finishes logo, captions, and end card."
+            ),
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -834,6 +871,12 @@ def prepare_original_video_run(
         raise ValueError(f"{commercial_route} commercial route is only supported for vertical-video")
     if commercial_route == "newb-30s":
         newb_segments(len([item for item in image_references or [] if item]))
+    if commercial_route == "newb-product" and not (
+        1 <= len([item for item in image_references or [] if item]) <= NEWB_MAX_IMAGES
+    ):
+        raise ValueError(
+            f"newb-product needs 1-{NEWB_MAX_IMAGES} reference images; @图1 must be the product"
+        )
     brief_text, brief_source = _read_brief(brief, brief_file)
     name = task_name or _safe_stem(brief_text.splitlines()[0][:48])
     run_dir = create_run_dir.create(output_root, name)
@@ -849,9 +892,10 @@ def prepare_original_video_run(
         video_references=video_references,
         audio_references=audio_references,
     )
-    if platform == "vertical-video" and commercial_route == "newb-30s":
+    if platform == "vertical-video" and commercial_route in NEWB_ROUTES:
+        template = newb_prompt_template if commercial_route == "newb-30s" else newb_product_prompt_template
         (run_dir / "analysis" / "newb-prompt.md").write_text(
-            newb_prompt_template(brief_text, video_references_prepared),
+            template(brief_text, video_references_prepared),
             encoding="utf-8",
         )
     elif platform == "vertical-video" and commercial_route == "single-10s":
@@ -1047,8 +1091,8 @@ def prepare_original_video_run(
         },
         provider=image_provider.resolve(),
     )
-    if platform == "vertical-video" and commercial_route == "newb-30s":
-        _mark_newb_mode(manifest_path, video_references_prepared)
+    if platform == "vertical-video" and commercial_route in NEWB_ROUTES:
+        _mark_newb_mode(manifest_path, video_references_prepared, commercial_route)
     elif platform == "vertical-video" and commercial_route == "single-10s":
         _mark_single_10s_mode(manifest_path, video_references_prepared)
     elif platform == "vertical-video":

@@ -201,8 +201,9 @@ def recommend_newb(
         return {
             "stage": "newb",
             "action": (
-                "rewrite analysis/newb-prompt.md for this dish (ordered shots, no timestamps, "
-                "soundscape line), check quota, then submit one 30s take"
+                "rewrite analysis/newb-prompt.md (stir-fry: one paragraph per reference pair; "
+                "single product: design the 30s story), no timestamps, soundscape line; "
+                "check quota, then submit one 30s take"
             ),
             "command": f"python scripts/run_newb_video.py --run {run_dir}",
         }
@@ -221,7 +222,7 @@ def recommend(args: argparse.Namespace) -> int:
         }
     else:
         mode = video_mode(manifest)
-        if mode == "newb-single-30s":
+        if mode in {"newb-single-30s", "newb-product-30s"}:
             result = recommend_newb(run_dir, states, manifest)
         elif mode == "director-first-frame-three-clips":
             result = recommend_three_clip(run_dir, states, manifest)

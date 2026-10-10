@@ -85,6 +85,35 @@ All segments share one take, so fix the smallest thing first:
 3. **Reroll the whole take** (`--label take-02`) only when several segments
    are broken or the dish identity drifts throughout.
 
+## Single-product commercial: the agent designs the story (user rule, 2026-10-10)
+
+For a single product (sauce, tea, snack, frozen item), the user sends only a few
+references: the product, sometimes a scene or mood image. The agent acts as the
+designer and writes one coherent 30s story. There is no segment pairing.
+
+- Prepare it with `prepare-original-video --commercial-route newb-product
+  --image-reference <product> [--image-reference <scene/mood> ...]`.
+  `@图1` must be the product.
+- **Design before writing.**
+  - Pick one occasion that gives a buying reason: who uses it, when, and why.
+    Office tea break, late-night snack, family dinner, and lunchbox prep are
+    examples; the setting doesn't have to be breakfast.
+  - Then lay out 4-6 scenes in order: first look in the setting -> hand
+    opens or picks it up (convenience) -> use or preparation with texture
+    proof (pour, steam, bite, sauce) -> payoff moment shown through action,
+    not faces -> final product hero.
+  - Use one setting, one light logic, one purposeful camera move per scene,
+    and order words only.
+  - Reuse the approved patterns in `cooking-video-workflow.md`, such as the
+    office-beverage chain for drinks.
+- **Product identity.** Keep the product identical to `@图1` in every scene. A
+  lone image is usually taken as the first frame, so with only a square
+  product shot the film may open on it. To open on the setting instead,
+  ask for or use a scene image too. No face, text, logo, sign, price, or
+  claim; end with the soundscape line.
+- **Captions.** Write 3-5 action captions (no claims). Opue adds the logo,
+  product sticker, and end card.
+
 ## Route mapping for company commercials
 
 A 30s request is long enough for a whole commercial. Default to one request per

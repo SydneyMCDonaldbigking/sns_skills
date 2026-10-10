@@ -53,6 +53,10 @@ Never load the whole vault.
   API to design first frames for video. Look at the user's references, name
   each one as `@图N` in the prompt, and check product/food identity in the
   generated take instead.
+- **Single-product commercials** use route `newb-product`. The user gives a
+  few references (`@图1` = the product) and the agent is the designer: it
+  invents one coherent 30s story around a buying occasion and writes the
+  prompt. There are no segment pairs; see `references/newb-seedance25.md`.
 - Generated clips keep native ambient sound only (sizzle, wok, utensils):
   every video prompt ends with
   `soundscape: <ambient sounds>. No dialogue, no music.` No BGM, voiceover,

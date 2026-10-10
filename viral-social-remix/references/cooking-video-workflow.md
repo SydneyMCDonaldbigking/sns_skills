@@ -45,6 +45,12 @@ This is the company API; the work is mostly stir-fry and wok cooking.
 - Then caption cues -> `qa_decision_sheet.py` -> `opue_project.py` -> Opue
   pick/preview/render, as in the Opue finish section below.
 
+**Single-product commercials** (not stir-fry) use the NewB route
+`newb-product`. The user sends a few references and you design one coherent 30s
+story around a buying occasion. The approved patterns below (e.g. the office
+beverage chain) are still the taste anchors. See
+`references/newb-seedance25.md`.
+
 The routes below are **legacy Seedance 2.0** routes (BytePlus or kuaipao). Use
 them only when the user explicitly asks. Choose one before paid generation:
 
