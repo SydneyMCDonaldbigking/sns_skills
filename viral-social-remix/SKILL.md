@@ -39,6 +39,12 @@ Never load the whole vault.
   Default actual cooking to the three-clip 6s director route; use single-10s
   only for simple one-setting product rituals. Seedance cooking clips are
   silent, no subtitles/overlays, no cooking SFX, and use accepted MP4s only.
+- Seedance billing accounts are separate and never mix keys: `--provider
+  byteplus` is the company ModelArk account (default), `--provider kuaipao` is
+  the user's personal gifted relay, and NewB is the user's Seedance 2.5
+  membership quota through `scripts/run_newb_video.py` (fixed 30s/720p, no
+  timeline prompts; read `references/newb-seedance25.md`). Ask which account to
+  bill when the user has not said.
 - Three-clip product/cooking commercials have an Identity Gate before Seedance:
   generate clip 1's opening frame with OpenRouter Image API model
   `openai/gpt-image-2` at high quality, pass the supplied product image and
@@ -236,7 +242,8 @@ For the three-clip route:
 - Include real cooking-film grammar when the product requires heat: move from
   prep counter to stove, show active flame/heat/steamer or cooking appliance,
   cut into food texture, and use steam/lid/pour/object occlusion as transitions.
-- Generate the clip 1 exact `1080x1920` first frame first. Use
+- Generate the clip 1 `1080x1920` first frame first, and require that delivered
+  frame to be exact `1080x1920`. Use
   `scripts/run_openrouter_carousel.py --api-only --asset-id 01` so provider-safe
   OpenRouter sizes are locally reframed before Seedance. For clips 2 and 3,
   inspect the accepted prior clip's returned last frame before choosing the next
@@ -296,6 +303,13 @@ with `scripts/run_seedance_video.py --profile single-10s-final`.
 
 Use `scripts/run_openrouter_video.py` and `references/openrouter-video.md` only
 for an explicitly selected Grok route.
+
+When the user selects Seedance 2.5 / NewB, keep the route choice, action chain,
+Identity Gate, and logo policy from `references/cooking-video-workflow.md`, but
+follow `references/newb-seedance25.md` for generation: one 30s take per
+commercial by default, the gate-approved opening frame as the sole `@图1`, ordered
+shots without timestamps, `--quota` before batches, and `--resume` instead of
+resubmitting slow jobs.
 
 ## Finish
 
