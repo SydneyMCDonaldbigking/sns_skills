@@ -217,7 +217,7 @@ def plan_shots(
                 warnings.append(f"{clip['name']}: cue {steps[-1]['text']!r} was covered by the hook and dropped")
                 steps.pop()
             steps.append({"at_s": round(at, 3), "text": cue.text})
-        if body_end - body_start >= MIN_SHOT_SECONDS:
+        if body_end - body_start >= MIN_SHOT_SECONDS - 1e-6:
             shots.append({"id": clip["name"], "role": "step", "take": clip["take"], "in": body_start,
                           "seconds": body_end - body_start, "steps": steps, "source": clip.get("path")})
         elif steps:

@@ -24,10 +24,14 @@ This is the company API; the work is mostly stir-fry and wok cooking.
 - One fixed `30s`, `720p`, `9:16` take with ambient sound carries the whole
   action chain:
   `ingredients -> hot oil/aromatics -> main ingredient into the wok -> toss and sauce gloss -> plate -> chopstick lift / final hero`.
-- **The user supplies the reference images.** The first is the opening state;
-  others can be the ingredients, a key step, or the finished dish. Do not
-  generate first frames with the image API. Name every image as `@图N` in the
-  prompt and say what it is for.
+- **The user supplies the reference images, two per segment**: `@图(2k-1)`
+  is where segment k starts and `@图(2k)` is where it ends. The default is 3
+  segments, adding a pair when needed (max 9 images); the segments share the
+  30s. Do not generate first frames with the image API. Write one prompt
+  paragraph per segment that names both images and says what they show.
+- If one segment breaks, fix it in this order: trim it in Opue; reroll only
+  that segment as its own take and splice it in; reroll the whole take. The
+  details are in `references/newb-seedance25.md#segments-two-references-each-user-rule-2026-10-10`.
 - Prompt rules (from NewB):
   - simple subject/action/camera/light;
   - ordered shots, never timestamps;

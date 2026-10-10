@@ -442,7 +442,23 @@ def test_prepare_original_video_defaults_to_newb_with_user_references(tmp_path: 
 def test_newb_route_requires_user_reference(tmp_path: Path):
     import pytest
 
-    with pytest.raises(ValueError, match="image-reference"):
+    with pytest.raises(ValueError, match="2-9 reference images"):
         pipeline.prepare_original_video_run(
             brief="Dish: fried rice.", output_root=tmp_path / "output", task_name="rice"
         )
+
+
+def test_newb_segments_pair_references_and_split_30s():
+    segments = pipeline.newb_segments(6)
+    assert [(seg["start_ref"], seg["end_ref"]) for seg in segments] == [(1, 2), (3, 4), (5, 6)]
+    assert segments[1]["approx_seconds"] == [10.0, 20.0]
+    odd = pipeline.newb_segments(7)
+    assert odd[-1] == {"segment": 4, "start_ref": 7, "end_ref": None, "approx_seconds": [22.5, 30.0]}
+    refs = [{"type": "image", "path": f"references/inputs/s{i}.jpg", "order": i} for i in range(1, 7)]
+    prompt = pipeline.newb_prompt_template("tomato egg", refs)
+    assert "第三段" in prompt and "@图5" in prompt and "@图6" in prompt
+    newb = load_script("run_newb_video")
+    body = chr(10).join(line for line in prompt.splitlines() if not line.startswith("#"))
+    assert newb.lint_prompt(body) == []
+    assert newb.unreferenced_images(body, 6) == []
+    assert newb.unreferenced_images("@图1 then @图12", 2) == ["@图2"]

@@ -43,8 +43,12 @@ Never load the whole vault.
   `scripts/run_pipeline.py prepare-original-video` (route `newb-30s` is the
   default) and submit it with `scripts/run_newb_video.py`. Read
   `references/newb-seedance25.md`. Don't ask which account to bill.
-- **The user supplies the reference images.** Pass them as `--image-reference`
-  in order; the first is the opening state. Do not call the OpenRouter image
+- **The user supplies the reference images, two per segment** (start state,
+  end state). The default is 3 segments (6 images); add a pair when the steps
+  don't fit (max 9 images). Pass them as `--image-reference` in order. One
+  NewB request carries all segments. If one segment breaks, trim it in Opue
+  first, then reroll only that segment as its own take, and reroll the whole
+  take last. Do not call the OpenRouter image
   API to design first frames for video. Look at the user's references, name
   each one as `@图N` in the prompt, and check product/food identity in the
   generated take instead.
@@ -220,8 +224,9 @@ reference images:
 1. `scripts/run_pipeline.py prepare-original-video --brief ...
    --image-reference <opening-state image> --image-reference ...`
 2. Rewrite `analysis/newb-prompt.md` for the dish:
-   - ordered shots (先/接着/然后/最后), never timestamps;
-   - `@图N` for each user reference;
+   - one paragraph per segment (第N段：从 @图(2k-1) 到 @图(2k)), never
+     timestamps;
+   - name every `@图N` the user supplied;
    - no face, text, logo, or sign;
    - end with the `soundscape:` line.
 3. Run `scripts/run_newb_video.py --run <run> --quota`, then

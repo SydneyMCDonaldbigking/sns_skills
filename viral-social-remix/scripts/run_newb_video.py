@@ -196,12 +196,18 @@ def validate_images(paths: list[str | Path], run_dir: Path, ratio: str) -> tuple
                 "bytes": size,
             }
         )
-    if len(images) > 1:
+    if len(images) > 1 and len(images) % 2:
         warnings.append(
-            "More than one reference image: NewB only reliably treats a lone image as the "
-            "first frame. Name each image by @图N in the prompt."
+            f"{len(images)} reference images: the last segment has only a start image. "
+            "Segments normally take two (start state, end state)."
         )
     return images, warnings
+
+
+def unreferenced_images(prompt: str, image_count: int) -> list[str]:
+    """@图N labels that were uploaded but never named in the prompt."""
+    return [f"@图{n}" for n in range(1, image_count + 1)
+            if not re.search(rf"@图{n}(?!\d)", prompt)]
 
 
 def encode_multipart(
@@ -512,6 +518,12 @@ def run_newb_video(
                 "Pass --allow-timeline to submit anyway."
             )
         image_specs, warnings = validate_images(images or _manifest_reference_images(run), run, ratio)
+        missing = unreferenced_images(prompt_text, len(image_specs))
+        if missing:
+            warnings.append(
+                f"Uploaded but never named in the prompt: {', '.join(missing)}; say what "
+                "each segment's start/end image shows"
+            )
         if not NO_MUSIC_RE.search(prompt_text):
             warnings.append(
                 "Prompt does not rule out music: end it with "

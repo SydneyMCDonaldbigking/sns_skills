@@ -687,29 +687,71 @@ def _read_brief(brief: str | None, brief_file: str | Path | None) -> tuple[str, 
     raise ValueError("Original video preparation requires --brief or --brief-file")
 
 
+CN_ORDINALS = "一二三四五"
+NEWB_MAX_IMAGES = 9
+NEWB_DURATION = 30.0
+
+
+def newb_segments(image_count: int) -> list[dict]:
+    """Two references per segment: @图(2k-1) is where segment k starts, @图(2k) where it
+    ends. An odd last image is a start-only segment. Segments share the 30s evenly."""
+    if image_count < 2 or image_count > NEWB_MAX_IMAGES:
+        raise ValueError(
+            f"newb-30s needs 2-{NEWB_MAX_IMAGES} reference images "
+            "(two per segment: start state, end state), got {image_count}"
+        )
+    count = (image_count + 1) // 2
+    length = NEWB_DURATION / count
+    segments = []
+    for k in range(count):
+        start_ref = 2 * k + 1
+        end_ref = start_ref + 1 if start_ref + 1 <= image_count else None
+        segments.append({
+            "segment": k + 1,
+            "start_ref": start_ref,
+            "end_ref": end_ref,
+            "approx_seconds": [round(k * length, 2), round((k + 1) * length, 2)],
+        })
+    return segments
+
+
 def newb_prompt_template(brief_text: str, references: list[dict]) -> str:
     """Draft prompt for NewB Seedance 2.5. Lines starting with '#' are director notes and are
-    not sent; the agent replaces the body with the real shot order before submitting."""
+    not sent; the agent replaces every [bracket] with what the references actually show."""
     images = [item for item in references if item.get("type") == "image"]
+    segments = newb_segments(len(images))
     mapping = "\n".join(
         f"# @图{index} = {Path(item.get('path') or item.get('url') or '').name}  (say what it shows)"
         for index, item in enumerate(images, start=1)
     )
+    body = []
+    for seg in segments:
+        ordinal = CN_ORDINALS[seg["segment"] - 1]
+        lead = "开场" if seg["segment"] == 1 else "接着"
+        if seg["end_ref"]:
+            body.append(
+                f"第{ordinal}段：{lead}从 @图{seg['start_ref']} 的画面开始（[这张图里是什么]），"
+                f"[手的动作 + 镜头：景别、机位、推拉摇]，"
+                f"结束时到达 @图{seg['end_ref']} 的状态（[这张图里是什么]）。"
+            )
+        else:
+            body.append(
+                f"第{ordinal}段：{lead}从 @图{seg['start_ref']} 的画面开始（[这张图里是什么]），"
+                "[手的动作 + 镜头]，最后成品主镜头缓慢拉远。"
+            )
     return (
         "# NewB Seedance 2.5 prompt (fixed 30s, 720p, 9:16). Lines starting with # are not sent.\n"
-        "# Rules: keep it simple (subject, action, camera, light); ordered shots with\n"
-        "# 先/接着/然后/最后, never timestamps; name references as @图N; no face, no text, no logo,\n"
-        "# no sign; end with the soundscape line. Avoid violent words (血, 砍).\n"
-        "# A lone reference image is used as the first frame: put the opening state first.\n"
+        f"# {len(segments)} segments, two references each: segment k goes from @图(2k-1) to @图(2k),\n"
+        f"# about {NEWB_DURATION / len(segments):.0f}s each. Need more steps? Add another pair of "
+        f"--image-reference (max {NEWB_MAX_IMAGES} images).\n"
+        "# Rules: simple subject/action/camera/light per segment; order words only (第一段/接着), never\n"
+        "# timestamps; no face, no text, no logo, no sign; end with the soundscape line; avoid 血/砍.\n"
         f"# Brief: {' '.join(brief_text.split())[:300]}\n"
         f"{mapping}\n"
-        "@图1 是开场画面：[真实食材/产品 + 厨房台面]。写实高级感美食短片，竖屏，暖色侧光，"
-        "同一个厨房、同一口锅、同一种色调，无人脸只出现手。\n"
-        "先 [备料动作，近景俯拍，镜头缓慢推近]。\n"
-        "接着 [下锅：热油、爆香，锅铲翻炒，特写油花和蒸汽]。\n"
-        "然后 [主料下锅大火翻炒，颠锅，酱汁裹匀，特写光泽]。\n"
-        "最后 [出锅装盘，筷子夹起，成品主镜头缓慢拉远，只露出已出现过的厨房]。\n"
-        "食材和成品外形全程保持一致。不要字幕、文字叠加、水印、logo、招牌。\n"
+        "写实高级感炒菜短片，竖屏，同一个厨房、同一口锅、同一种暖色侧光和色调，无人脸只出现手，"
+        "每段时长大致相等，段与段之间动作连贯。\n"
+        + "\n".join(body)
+        + "\n食材和成品外形与参考图保持一致。不要字幕、文字叠加、水印、logo、招牌。\n"
         "soundscape: 热油滋滋声、锅铲碰锅、翻炒声。No dialogue, no music.\n"
     )
 
@@ -724,6 +766,7 @@ def _mark_newb_mode(manifest_path: Path, references: list[dict]) -> None:
         "mode": "newb-single-30s",
         "provider": "newb-seedance-2.5",
         "references": references,
+        "segments": newb_segments(len([item for item in references if item.get("type") == "image"])),
         "generation": {
             "ratio": "9:16",
             "duration": 30,
@@ -761,7 +804,7 @@ def _mark_newb_mode(manifest_path: Path, references: list[dict]) -> None:
     data.setdefault("assumptions", []).append(
         {
             "inferred": True,
-            "value": "NewB Seedance 2.5 route (company default): user-supplied reference images go straight to one 30s 720p take; no image-API first frame; Opue finishes logo, captions, and end card.",
+            "value": "NewB Seedance 2.5 route (company default): user-supplied reference images, two per segment (start state, end state), go straight to one 30s 720p take; no image-API first frame; Opue finishes logo, captions, and end card.",
         }
     )
     manifest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -788,13 +831,8 @@ def prepare_original_video_run(
         )
     if platform != "vertical-video" and commercial_route != "three-clip":
         raise ValueError(f"{commercial_route} commercial route is only supported for vertical-video")
-    if commercial_route == "newb-30s" and not [
-        item for item in image_references or [] if item
-    ]:
-        raise ValueError(
-            "newb-30s route needs at least one user-supplied --image-reference "
-            "(the first one is the opening state)"
-        )
+    if commercial_route == "newb-30s":
+        newb_segments(len([item for item in image_references or [] if item]))
     brief_text, brief_source = _read_brief(brief, brief_file)
     name = task_name or _safe_stem(brief_text.splitlines()[0][:48])
     run_dir = create_run_dir.create(output_root, name)

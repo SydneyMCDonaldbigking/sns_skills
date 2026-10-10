@@ -37,6 +37,48 @@ supplies the reference images, so no image-API first frames are made. Source con
 - Signed `video_url` links last 6 hours and are not stored. Files are deleted
   from NewB after 7 days, so the runner downloads the result immediately.
 
+## Segments: two references each (user rule, 2026-10-10)
+
+One NewB request carries every segment of the dish:
+
+- **Pair the references.** Segment k goes from `@图(2k-1)` (start state) to
+  `@图(2k)` (end state). The default is 3 segments (6 images). If the steps
+  don't fit, the user adds another pair, up to 9 images: 4 full segments plus
+  an optional start-only 5th.
+- **Timing.** The segments share the 30s evenly: about 10s each for 3
+  segments, 7.5s for 4.
+- **Prompt.** Write one paragraph per segment:
+  `第N段：从 @图(2k-1) 的画面开始（它是什么），[手的动作 + 镜头]，结束时到达 @图(2k) 的状态（它是什么）。`
+  - Use order words only, never timestamps.
+  - Name every uploaded image; the runner warns about any `@图N` the prompt
+    never mentions.
+- **Manifest.** `prepare-original-video` writes `video.segments`
+  (start_ref, end_ref, approx_seconds) and a prompt draft in this shape.
+- **Captions.** Write at least one caption cue per segment, starting just
+  after each segment's approximate start.
+
+### When one segment breaks (穿帮)
+
+All segments share one take, so fix the smallest thing first:
+
+1. **Trim it out in Opue.** Each segment is about 10s and the cut needs about
+   5s per step, so a 1-2s glitch can be trimmed with `--trim`. This costs no
+   quota.
+2. **Reroll only that segment.** Submit one more NewB request with just that
+   segment's two images and a one-segment prompt:
+   ```bash
+   run_newb_video.py --label seg-02-fix --image <start> --image <end> --prompt-file <one-segment prompt>
+   ```
+   Then splice it in Opue by listing the pieces in edit order. The same take
+   may appear twice under different names:
+   ```bash
+   --clip a=generated/newb-video.mp4 --clip b=generated/seg-02-fix.mp4 --clip c=generated/newb-video.mp4
+   ```
+   Give each piece its own `--trim`, and write cue files `a.json`, `b.json`,
+   and `c.json`. This costs 1 quota.
+3. **Reroll the whole take** (`--label take-02`) only when several segments
+   are broken or the dish identity drifts throughout.
+
 ## Route mapping for company commercials
 
 A 30s request is long enough for a whole commercial. Default to one request per
@@ -50,9 +92,8 @@ commercial, then trim to a natural length in the Opue finish
     --image-reference` copies them into the run in order, and
     `run_newb_video.py` uploads them in that order when `--image` is not
     given.
-  - Put the opening state first. With one image, NewB treats it as the first
-    frame. With several, say in the prompt what each `@图N` is (ingredients,
-    a key step, the finished dish) and what to keep from it.
+  - References come in pairs per segment (start state, end state); see
+    "Segments" above. A single image alone is treated as the first frame.
   - Do not generate first frames with the image API.
 - **Chained takes**: only when one 30s take cannot carry the story. The local
   `generated/<label>-last-frame.png` is the handoff candidate. It is 720p, so
