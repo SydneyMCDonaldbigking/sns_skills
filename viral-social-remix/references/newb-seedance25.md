@@ -12,7 +12,7 @@ supplies the reference images, so no image-API first frames are made. Source con
 | | BytePlus / kuaipao Seedance 2.0 | NewB Seedance 2.5 |
 |---|---|---|
 | Runner | `scripts/run_seedance_video.py` | `scripts/run_newb_video.py` |
-| Duration / resolution | chosen per request (`6s`, `10s`, `1080p`) | fixed `30s`, `720p` (720x1280 at 9:16) |
+| Duration / resolution | chosen per request (`6s`, `10s`, `1080p`) | `30s` (default) or `15s` (`--duration 15`), always `720p` (720x1280 at 9:16) |
 | Ratio | any provider ratio | `9:16`, `16:9`, `1:1` only |
 | References | URLs / data URLs, roles | up to 9 local JPG/PNG/WebP files, each <= 15 MB, uploaded as multipart |
 | Reference naming | `[Image 1]` | `@图1`, `@图2` in upload order |
@@ -20,8 +20,8 @@ supplies the reference images, so no image-API first frames are made. Source con
 | Last frame | `return_last_frame: true` | not returned; the runner extracts it locally with ffmpeg |
 | Audio | `generate_audio: true` on final profiles, ambient only | native audio always generated; kept by default (house audio is ambient only), `--strip-audio` removes it |
 | Timing in prompt | timed beats work | do not write timelines; the runner rejects timestamps |
-| Billing | per-request API spend | membership quota shared with the NewB web app; failed jobs are refunded automatically |
-| Speed | minutes | usually 7-20 min, longer at peak |
+| Billing | per-request API spend | quota shared with the NewB web app: 30s costs 1, 15s costs 0.5; failed jobs are refunded automatically |
+| Speed | minutes | 30s usually 7-20 min, 15s 6-10 min once started; may queue up to 4h, then fails and refunds |
 
 ## Key and quota
 
@@ -29,6 +29,11 @@ supplies the reference images, so no image-API first frames are made. Source con
   URL, prompt, doc, or log.
 - Check quota before a batch: `python scripts/run_newb_video.py --quota`.
   `quota_used` counts web and API together; `active` is the current job count.
+- Quota comes in 0.5 units (API doc v1, 2026-10-10). Remaining finite quota
+  does not expire and stays usable after the membership lapses
+  (`membership_active: false`); renewals add to it. The runner only blocks a
+  submit when `quota_remaining` is below the take's cost (402); `null` means
+  unlimited. With 0.5 left, only a 15s take fits.
 - Max 5 jobs in flight per key; max 60 requests/min across all endpoints.
 - Never resubmit because a job is slow. There is no idempotency key and no
   cancel. If a submit times out, the runner compares `active` before and after
@@ -67,13 +72,13 @@ One NewB request carries every segment of the dish:
 
 All segments share one take, so fix the smallest thing first:
 
-1. **Trim it out in Opue.** Each segment is about 10s and the cut needs about
-   5s per step, so a 1-2s glitch can be trimmed with `--trim`. This costs no
+1. **Trim it out in Opue.** Each segment is about 6s and the cut needs about
+   5s per step, so a 1s glitch can be trimmed with `--trim`. This costs no
    quota.
 2. **Reroll only that segment.** Submit one more NewB request with just that
    segment's two images and a one-segment prompt:
    ```bash
-   run_newb_video.py --label seg-02-fix --image <start> --image <end> --prompt-file <one-segment prompt>
+   run_newb_video.py --label seg-02-fix --duration 15 --image <start> --image <end> --prompt-file <one-segment prompt>
    ```
    Then splice it in Opue by listing the pieces in edit order. The same take
    may appear twice under different names:
@@ -81,7 +86,8 @@ All segments share one take, so fix the smallest thing first:
    --clip a=generated/newb-video.mp4 --clip b=generated/seg-02-fix.mp4 --clip c=generated/newb-video.mp4
    ```
    Give each piece its own `--trim`, and write cue files `a.json`, `b.json`,
-   and `c.json`. This costs 1 quota.
+   and `c.json`. A 15s repair take costs 0.5 quota and is plenty for one
+   segment.
 3. **Reroll the whole take** (`--label take-02`) only when several segments
    are broken or the dish identity drifts throughout.
 

@@ -1,9 +1,10 @@
 """Submit a Seedance 2.5 job through the NewB video membership API.
 
 This runner is separate from the BytePlus/kuaipao Seedance 2.0 runner. NewB
-uses a different contract: multipart uploads of local image files, fixed 30s
-720p output with native audio, no last-frame return, and a membership quota
-shared with the NewB web app. Keys are loaded from the ignored `.env.local` or
+uses a different contract: multipart uploads of local image files, 15s or 30s
+720p output with native audio, no last-frame return, and a quota shared with
+the NewB web app (30s costs 1, 15s costs 0.5; finite quota survives an expired
+membership). Keys are loaded from the ignored `.env.local` or
 the local environment and are never written to disk.
 """
 
@@ -40,12 +41,15 @@ LOCAL_ENV = ROOT / ".env.local"
 DEFAULT_BASE_URL = "https://video.haoniubi.cloud"
 KEY_ENV_NAMES = ["NEWB_API_KEY", "VSR_NEWB_API_KEY"]
 MODEL = "seedance-2.5"
-FIXED_DURATION_SECONDS = 30
+DEFAULT_DURATION_SECONDS = 30
+# Quota units per take (API doc v1, 2026-10-10): 15s costs 0.5, 30s costs 1.
+DURATION_QUOTA_COST = {15: 0.5, 30: 1.0}
 FIXED_RESOLUTION = "720p"
 RATIOS = ("9:16", "16:9", "1:1")
 DEFAULT_RATIOS = {"vertical-video": "9:16", "video": "16:9"}
 MAX_IMAGES = 9
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
+MAX_TOTAL_IMAGE_BYTES = 50 * 1024 * 1024  # larger requests get a non-JSON 413
 IMAGE_TYPES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -56,7 +60,8 @@ MAX_PROMPT_CHARS = 6000
 DEFAULT_LABEL = "newb-video"
 DEFAULT_PROMPT_FILE = "analysis/newb-prompt.md"
 DEFAULT_POLL_INTERVAL = 15
-DEFAULT_TIMEOUT = 60 * 60
+# Jobs may queue upstream for up to 4h before NewB fails and refunds them.
+DEFAULT_TIMEOUT = 4.5 * 60 * 60
 REQUEST_TIMEOUT = 180
 SIGNED_URL_PLACEHOLDER = "<signed-url-redacted>"
 # NewB: "别写时间轴" - the model does not follow per-second timelines.
@@ -196,6 +201,9 @@ def validate_images(paths: list[str | Path], run_dir: Path, ratio: str) -> tuple
                 "bytes": size,
             }
         )
+    total = sum(image["bytes"] for image in images)
+    if total > MAX_TOTAL_IMAGE_BYTES:
+        raise NewBRunnerError(f"Reference images total {total} bytes; NewB accepts about 50 MB per request")
     return images, warnings
 
 
@@ -366,14 +374,20 @@ def submit_task(
     ratio: str,
     images: list[dict[str, Any]],
     *,
+    duration: int = DEFAULT_DURATION_SECONDS,
     request_fn=None,
 ) -> dict[str, Any]:
     request_fn = request_fn or request_json
     quota_before = get_quota(config, request_fn=request_fn)
-    if quota_before.get("membership_active") is False:
-        raise NewBRunnerError("NewB membership is inactive; renew before submitting (would return 402)")
-    if quota_before.get("quota_remaining", 1) <= 0:
-        raise NewBRunnerError("NewB membership quota for this period is used up")
+    # An expired membership still spends the remaining finite quota; only the balance matters.
+    # quota_remaining is null for unlimited members.
+    remaining = quota_before.get("quota_remaining")
+    cost = DURATION_QUOTA_COST[duration]
+    if remaining is not None and remaining < cost:
+        hint = " Submit a 15s take instead (--duration 15)." if remaining >= DURATION_QUOTA_COST[15] else ""
+        raise NewBRunnerError(
+            f"NewB quota remaining is {remaining}; a {duration}s take needs {cost} (would return 402).{hint}"
+        )
     if quota_before.get("active", 0) >= quota_before.get("max_concurrent", 5):
         raise NewBRunnerError(
             f"NewB already has {quota_before.get('active')} active jobs (max "
@@ -383,7 +397,9 @@ def submit_task(
         ("images[]", image["filename"], image["content_type"], Path(image["path"]).read_bytes())
         for image in images
     ]
-    body, content_type = encode_multipart([("prompt", prompt), ("ratio", ratio)], files)
+    body, content_type = encode_multipart(
+        [("prompt", prompt), ("ratio", ratio), ("duration", str(duration))], files
+    )
     try:
         status, _, response = request_fn(
             "POST", f"{config['base_url']}/api/v1/videos", config["api_key"],
@@ -457,6 +473,7 @@ def run_newb_video(
     prompt_file: str | Path | None = None,
     images: list[str | Path] | None = None,
     ratio: str | None = None,
+    duration: int = DEFAULT_DURATION_SECONDS,
     label: str = DEFAULT_LABEL,
     strip_audio: bool = False,
     allow_timeline: bool = False,
@@ -498,6 +515,8 @@ def run_newb_video(
     ratio = ratio or _default_ratio(run)
     if ratio not in RATIOS:
         raise NewBRunnerError(f"ratio must be one of {', '.join(RATIOS)}")
+    if duration not in DURATION_QUOTA_COST:
+        raise NewBRunnerError("duration must be 15 or 30 seconds")
     if not resume_task_id:
         if output_path.exists() and not overwrite:
             raise NewBRunnerError(
@@ -532,7 +551,8 @@ def run_newb_video(
         "api_key_set": bool(config["api_key"]),
         "label": label,
         "ratio": ratio,
-        "duration_seconds": FIXED_DURATION_SECONDS,
+        "duration_seconds": duration,
+        "quota_cost": DURATION_QUOTA_COST[duration],
         "resolution": FIXED_RESOLUTION,
         "prompt_source": prompt_source,
         "prompt_chars": len(prompt_text) if prompt_text else None,
@@ -552,7 +572,9 @@ def run_newb_video(
         task_id = resume_task_id
         _update_manifest(run, label, {"status": "polling", "task_id": task_id})
     else:
-        create = submit_task(config, prompt_text, ratio, image_specs, request_fn=request_fn)
+        create = submit_task(
+            config, prompt_text, ratio, image_specs, duration=duration, request_fn=request_fn
+        )
         task_id = create["id"]
         _write_json(raw_dir / f"{label}-create-response.json", _redact(create))
         _update_manifest(
@@ -564,6 +586,7 @@ def run_newb_video(
                 "provider": config["provider"],
                 "model": MODEL,
                 "ratio": ratio,
+                "duration_seconds": duration,
                 "prompt_source": prompt_source,
                 "image_count": len(image_specs),
                 "quota_remaining": create.get("quota_remaining"),
@@ -637,7 +660,7 @@ def run_newb_video(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a fixed 30s/720p Seedance 2.5 video through the NewB membership API."
+        description="Generate a 15s or 30s 720p Seedance 2.5 video through the NewB membership API."
     )
     parser.add_argument("--run", help="Run directory (outputs go to generated/, raw/, qa/).")
     parser.add_argument("--quota", action="store_true", help="Only print the NewB membership quota.")
@@ -648,6 +671,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local JPG/PNG/WebP reference. Repeat; order defines @图1, @图2, ... (max 9).",
     )
     parser.add_argument("--ratio", choices=RATIOS, help="Default: from the manifest platform, else 9:16.")
+    parser.add_argument(
+        "--duration", type=int, choices=sorted(DURATION_QUOTA_COST), default=DEFAULT_DURATION_SECONDS,
+        help="Seconds: 30 (1 quota, default) or 15 (0.5 quota, e.g. a one-segment repair).",
+    )
     parser.add_argument("--label", default=DEFAULT_LABEL, help="Output name; use take-02 etc. for rerolls.")
     parser.add_argument(
         "--strip-audio", action="store_true",
@@ -683,6 +710,7 @@ def main(argv: list[str] | None = None) -> int:
                 prompt_file=args.prompt_file,
                 images=args.image,
                 ratio=args.ratio,
+                duration=args.duration,
                 label=args.label,
                 strip_audio=args.strip_audio,
                 allow_timeline=args.allow_timeline,

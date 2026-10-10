@@ -194,7 +194,7 @@ def test_preflight_blocks_exhausted_quota_and_full_concurrency(tmp_path, monkeyp
     monkeypatch.setenv("NEWB_API_KEY", "wfv_test")
     run_dir = _run(tmp_path)
     for quota, message in [
-        ({"quota_remaining": 0, "membership_active": True, "active": 0}, "used up"),
+        ({"quota_remaining": 0, "membership_active": True, "active": 0}, "needs 1.0"),
         ({"quota_remaining": 3, "membership_active": True, "active": 5, "max_concurrent": 5}, "active jobs"),
     ]:
         api = FakeApi([], quota=quota)
@@ -238,3 +238,45 @@ def test_existing_output_requires_new_label(tmp_path):
     with pytest.raises(runner.NewBRunnerError, match="new --label"):
         runner.run_newb_video(run_dir, dry_run=True)
     assert runner.run_newb_video(run_dir, label="take-02", dry_run=True)["label"] == "take-02"
+
+
+def _submit_only(tmp_path, monkeypatch, quota, **kwargs):
+    monkeypatch.setenv("NEWB_API_KEY", "wfv_test")
+    run_dir = _run(tmp_path)
+    api = FakeApi([_succeeded()], quota=quota)
+    runner.run_newb_video(
+        run_dir, request_fn=api,
+        download_fn=lambda url, output: output.write_bytes(b"mp4"),
+        extract_frame_fn=lambda source, output: False,
+        sleep_fn=lambda seconds: None,
+        **kwargs,
+    )
+    return run_dir, api
+
+
+def test_expired_membership_still_spends_remaining_quota(tmp_path, monkeypatch):
+    # API doc v1 (2026-10-10): membership_active false keeps the finite remaining quota.
+    quota = {"quota_remaining": 4, "membership_active": False, "active": 0, "max_concurrent": 5}
+    run_dir, api = _submit_only(tmp_path, monkeypatch, quota)
+    post = next(call for call in api.calls if call["method"] == "POST")
+    assert b"30" in post["body"].split(b'name="duration"', 1)[1][:12]
+    data = manifest.load(run_dir / "analysis" / "manifest.json")
+    assert data["newb_video_generation"]["newb-video"]["duration_seconds"] == 30
+
+
+def test_fifteen_second_take_costs_half_quota(tmp_path, monkeypatch):
+    quota = {"quota_remaining": 0.5, "membership_active": False, "active": 0, "max_concurrent": 5}
+    run_dir, api = _submit_only(tmp_path, monkeypatch, quota, duration=15)
+    post = next(call for call in api.calls if call["method"] == "POST")
+    assert b"15" in post["body"].split(b'name="duration"', 1)[1][:12]
+    with pytest.raises(runner.NewBRunnerError, match="--duration 15"):
+        runner.run_newb_video(run_dir, label="take-02", request_fn=FakeApi([], quota=quota))
+    with pytest.raises(runner.NewBRunnerError, match="15 or 30"):
+        runner.run_newb_video(run_dir, label="take-03", duration=20, dry_run=True)
+    assert runner.run_newb_video(run_dir, label="take-04", duration=15, dry_run=True)["quota_cost"] == 0.5
+
+
+def test_unlimited_member_has_null_quota(tmp_path, monkeypatch):
+    quota = {"quota_remaining": None, "membership_active": True, "active": 0, "max_concurrent": 5}
+    _, api = _submit_only(tmp_path, monkeypatch, quota)
+    assert any(call["method"] == "POST" for call in api.calls)
