@@ -138,6 +138,9 @@ product; copy the route choice, action chain, and prompt structure.
   it is finished. Final pull-backs must reveal only the established window,
   shelf, pan, counter, and light direction.
 
+- **MiniMax H3 local multi-reference production pattern**: use this when the user selects local ComfyUI / MiniMax H3 R2V instead of Seedance. Prefer the native `3 x 5s` route for 1080x1920 production on A100-class GPUs: generate or collect reference images first, then run each 5s clip with 4-step Turbo LoRA, previous-last-frame continuity, no native audio, and exact per-clip crop from 1088x1920 to 1080x1920. The current user's preferred handoff is separate reviewed clips for manual editing; do not concatenate by default unless explicitly requested. H3 can preserve fictional people from references, so do not default to hands-only when the brief needs family, actor, cook, model, or product spokesperson continuity. Build a deliberate reference stack before video: fictional character/person reference, action hands/tool reference, fixed scene reference, product/package reference, process-state reference, mid-state reference, final hero reference, and official English-region logo/brand prop where relevant. Keep the stack under H3's 9-image limit, counting any previous last frame inserted as a reference.
+  For family heat-and-serve products such as egg tarts, do not start from the finished afternoon-tea table unless the user explicitly asks for only a serving moment. The default commercial chain is `fridge/freezer take-out -> package/tray close-up -> oven/preheat/tray-in -> oven glow and baking macro -> mitt pulls hot tray out -> plating close-up -> parent/child afternoon-tea hero`. Generate specific Image2/Seedream references for `fridge-to-oven` and `oven-baking`; keep children safely away from heat, usually behind the counter or softly in the background. Each 5s H3 prompt should use exactly three stable shots by default: establish/action, one close-up proof insert, and endpoint/handoff. Choose close-up subjects such as package peel, foil cup, custard shine, crust layers, oven glow, mitt action, steam, plating, and final product hero, but do not cram all of them into the same 5s clip. Do not waste a whole clip on a single table arrival.
+  For real cooking dishes such as old duck soup, give H3 the missing process knowledge with references and prompt beats. The approved old-duck-soup chain is `fictional cook character -> cutting board -> daikon/duck/ginger/scallion close-ups -> ingredients into pot -> visible blue flame -> lid/steam bridge -> clear broth simmer macro -> ladle stir/lift -> bowl pour -> garnish -> finished table hero`. Always include prep/cut-state and cooked/final-state references, or H3 may skip cutting, keep ingredients raw, or make the final dish muddy. Prompts must name the physical action, shot size, angle, lens/focus, camera move, endpoint, and handoff for every shot. Use the fixed three-shot H3 rhythm for stability: `0.0-1.6s establish`, `1.6-3.4s close-up proof`, `3.4-5.0s endpoint/handoff`. Use close framing inside those three shots instead of adding extra cuts. Favor locked-off, tiny push-in, short tilt, gentle pull-back, or one rack focus; avoid continuous drifting, stacked camera moves, or too many simultaneous actions. For this user, a successful H3 handoff is often three exact 1080x1920 clips rather than an agent-made final edit.
 Reusable lesson: user approval came from route fit and physical commercial
 logic, not from generic "cinematic" styling. Good outputs had visible cause and
 effect, controlled hand/tool/liquid/steam motion, restrained logo use, macro
@@ -324,11 +327,12 @@ appliance, and make steam, lid movement, or cookware occlusion part of the
 transition language. Do not keep the whole commercial on one tabletop unless the
 brief explicitly asks for no cooking process.
 
-Generate the clip 1 exact `1080x1920` opening frame first with the configured
-image API, preferably through `scripts/run_openrouter_carousel.py --api-only
+Generate the clip 1 `1080x1920` opening frame first with the configured image
+API, and require the delivered frame to be exact `1080x1920`, preferably through
+`scripts/run_openrouter_carousel.py --api-only
 --asset-id 01` so OpenRouter's provider-safe request size is reframed locally
-before Seedance. The prepared `page-02.md` and `page-03.md` files are on-demand
-opening slots, not permission to pre-generate all three opening frames.
+before Seedance. The prepared `page-02.md` and `page-03.md` files are on-demand opening
+slots, not permission to pre-generate all three opening frames.
 
 After each accepted clip, inspect its returned last frame before choosing the
 next opening reference. Also inspect the last 8-12 frames when possible so the

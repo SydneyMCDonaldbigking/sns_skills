@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from viral_social_test_loader import load_script
@@ -12,9 +13,12 @@ runner = load_script("run_seedance_video")
 
 def _isolated_seedance_env(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(runner, "LOCAL_ENV", tmp_path / ".env.local")
-    for name in runner.KEY_ENV_NAMES + [
+    for name in runner.KEY_ENV_NAMES + runner.KUAIPAO_KEY_ENV_NAMES + [
+        "VSR_SEEDANCE_PROVIDER",
         "VSR_SEEDANCE_ENDPOINT",
         "VSR_SEEDANCE_MODEL",
+        "VSR_KUAIPAO_ENDPOINT",
+        "VSR_KUAIPAO_MODEL",
         "VSR_SEEDANCE_RATIO",
         "VSR_SEEDANCE_DURATION",
         "VSR_SEEDANCE_RESOLUTION",
@@ -297,6 +301,50 @@ def test_resolve_config_uses_byteplus_modelark_defaults_and_key_priority(
     assert config["endpoint"] == runner.DEFAULT_ENDPOINT
     assert config["model"] == "dreamina-seedance-2-0-260128"
     assert config["api_key"] == "byteplus-key"
+
+
+def test_resolve_config_kuaipao_provider_uses_separate_key_and_endpoint(
+    tmp_path,
+    monkeypatch,
+):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    monkeypatch.setenv("SEEDANCE_API_KEY", "company-key")
+    monkeypatch.setenv("KUAIPAO_API_KEY", "personal-key")
+
+    config = runner.resolve_config(provider="kuaipao")
+
+    assert config["provider_id"] == "kuaipao"
+    assert config["provider"] == "kuaipao-relay"
+    assert config["endpoint"] == runner.KUAIPAO_ENDPOINT
+    assert config["model"] == runner.KUAIPAO_MODEL
+    assert config["api_key"] == "personal-key"
+
+
+def test_resolve_config_provider_selected_by_env(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    monkeypatch.setenv("VSR_SEEDANCE_PROVIDER", "kuaipao")
+    monkeypatch.setenv("KUAIPAO_API_KEY", "personal-key")
+
+    config = runner.resolve_config()
+
+    assert config["provider_id"] == "kuaipao"
+    assert config["endpoint"] == runner.KUAIPAO_ENDPOINT
+
+
+def test_resolve_config_company_key_is_not_used_for_kuaipao(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+    monkeypatch.setenv("BYTEPLUS_ARK_API_KEY", "company-key")
+
+    config = runner.resolve_config(provider="kuaipao")
+
+    assert config["api_key"] is None
+
+
+def test_resolve_config_rejects_unknown_provider(tmp_path, monkeypatch):
+    _isolated_seedance_env(tmp_path, monkeypatch)
+
+    with pytest.raises(runner.SeedanceRunnerError):
+        runner.resolve_config(provider="nope")
 
 
 def test_run_seedance_video_dry_run_uses_manifest_storyboard_url(tmp_path, monkeypatch):

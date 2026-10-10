@@ -1,12 +1,22 @@
+# Python and local development state
 .worktrees/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 .venv/
+*.egg-info/
+
+# Local source material, run outputs, and scratch work
 output/
 new_base/
-tmp/
-*.tmp
 samples/
+claude_only/
+tmp/
+.tmp/
+*.tmp
 data/product-cache/
 data/material-index*.jsonl
 

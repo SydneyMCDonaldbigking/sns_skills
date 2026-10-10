@@ -138,15 +138,21 @@ def test_prepare_original_video_run_creates_director_first_frame_skeleton(tmp_pa
     assert data["video"]["generation"]["generate_audio"] is False
     assert data["video"]["generation"]["return_last_frame"] is True
     assert "transition opening anchor" in data["video"]["continuity"]["handoff_policy"]
-    assert data["video"]["delivery"] == {
+    delivery = data["video"]["delivery"]
+    expected_delivery = {
         "ratio": "9:16",
         "resolution": "1080p",
         "target_duration": None,
         "duration_policy": "natural edit duration; do not force a fixed final length; use ChatCut as a second editing pass with split/trim, punch-in, reframe, subtle digital camera moves, and motivated short transitions",
         "expect_audio": True,
         "audio_policy": "user voiceover plus agent-generated BGM only; do not generate or place cooking SFX",
-        "text_policy": "editable white centered current-step captions in ChatCut",
     }
+    for key, value in expected_delivery.items():
+        assert delivery[key] == value
+    assert "caption_cues.py" in delivery["text_policy"]
+    assert "editable white centered current-step captions" in delivery["text_policy"]
+    assert "edit_plan.py" in delivery["edit_policy"]
+    assert "qa_decision_sheet.py" in delivery["qa_policy"]
     assert data["storyboard_references"] == []
     assert data["video_workflow"]["status"] == "prepared"
     assert data["source"]["kind"] == "original_brief"

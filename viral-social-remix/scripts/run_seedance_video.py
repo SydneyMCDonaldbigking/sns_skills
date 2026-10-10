@@ -39,6 +39,8 @@ ROOT = Path(__file__).parents[2]
 LOCAL_ENV = ROOT / ".env.local"
 DEFAULT_ENDPOINT = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks"
 DEFAULT_MODEL = "dreamina-seedance-2-0-260128"
+KUAIPAO_ENDPOINT = "https://kuaipao.pro/api/v3/contents/generations/tasks"
+KUAIPAO_MODEL = "doubao-seedance-2.0-1080p"
 DEFAULT_RATIO = "9:16"
 DEFAULT_RATIOS = {
     "vertical-video": "9:16",
@@ -76,6 +78,27 @@ KEY_ENV_NAMES = [
     "ARK_API_KEY",
     "SEEDANCE_API_KEY",
 ]
+KUAIPAO_KEY_ENV_NAMES = [
+    "KUAIPAO_ARK_API_KEY",
+    "KUAIPAO_API_KEY",
+]
+DEFAULT_PROVIDER = "byteplus"
+PROVIDERS: dict[str, dict[str, Any]] = {
+    "byteplus": {
+        "name": "byteplus-modelark",
+        "endpoint": DEFAULT_ENDPOINT,
+        "model": DEFAULT_MODEL,
+        "env_prefix": "VSR_SEEDANCE_",
+        "key_env_names": KEY_ENV_NAMES,
+    },
+    "kuaipao": {
+        "name": "kuaipao-relay",
+        "endpoint": KUAIPAO_ENDPOINT,
+        "model": KUAIPAO_MODEL,
+        "env_prefix": "VSR_KUAIPAO_",
+        "key_env_names": KUAIPAO_KEY_ENV_NAMES,
+    },
+}
 TRUTHY = {"1", "true", "yes", "y", "on"}
 FALSY = {"0", "false", "no", "n", "off"}
 
@@ -108,8 +131,8 @@ def _load_env_file(path: Path | None = None) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def _api_key() -> str | None:
-    for name in KEY_ENV_NAMES:
+def _api_key(key_env_names: list[str] | None = None) -> str | None:
+    for name in key_env_names or KEY_ENV_NAMES:
         value = os.environ.get(name)
         if value:
             return value
@@ -120,13 +143,32 @@ def _supports_seed(model: str) -> bool:
     return "seedance-2-0" not in model.lower()
 
 
-def resolve_config(*, model: str | None = None, endpoint: str | None = None) -> dict[str, Any]:
+def _resolve_provider(provider: str | None) -> tuple[str, dict[str, Any]]:
+    provider_id = (provider or os.environ.get("VSR_SEEDANCE_PROVIDER") or DEFAULT_PROVIDER).strip()
+    if provider_id not in PROVIDERS:
+        raise SeedanceRunnerError(
+            f"Unknown Seedance provider {provider_id!r}; choose one of "
+            f"{', '.join(sorted(PROVIDERS))}"
+        )
+    return provider_id, PROVIDERS[provider_id]
+
+
+def resolve_config(
+    *,
+    model: str | None = None,
+    endpoint: str | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
     _load_env_file()
+    provider_id, spec = _resolve_provider(provider)
+    prefix = spec["env_prefix"]
     return {
-        "provider": "byteplus-modelark",
-        "model": model or os.environ.get("VSR_SEEDANCE_MODEL", DEFAULT_MODEL),
-        "endpoint": endpoint or os.environ.get("VSR_SEEDANCE_ENDPOINT", DEFAULT_ENDPOINT),
-        "api_key": _api_key(),
+        "provider_id": provider_id,
+        "provider": spec["name"],
+        "model": model or os.environ.get(f"{prefix}MODEL", spec["model"]),
+        "endpoint": endpoint or os.environ.get(f"{prefix}ENDPOINT", spec["endpoint"]),
+        "api_key": _api_key(spec["key_env_names"]),
+        "key_env_names": list(spec["key_env_names"]),
     }
 
 
@@ -855,6 +897,7 @@ def run_seedance_video(
     allow_data_url: bool = False,
     model: str | None = None,
     endpoint: str | None = None,
+    provider: str | None = None,
     profile: str | None = None,
     ratio: str | None = None,
     duration: str | None = None,
@@ -938,7 +981,7 @@ def run_seedance_video(
             "prepared three-frame group anchors."
         )
 
-    config = resolve_config(model=model, endpoint=endpoint)
+    config = resolve_config(model=model, endpoint=endpoint, provider=provider)
     try:
         defaults = video_job.generation_defaults(job_data, str(platform))
     except video_job.VideoJobError as exc:
@@ -1145,6 +1188,8 @@ def run_seedance_video(
     }
     if dry_run:
         return {
+            "provider": config["provider_id"],
+            "model": config["model"],
             "endpoint": config["endpoint"],
             "api_key_set": bool(config.get("api_key")),
             "image_count": counts["image"],
@@ -1163,8 +1208,8 @@ def run_seedance_video(
     api_key = config.get("api_key")
     if not api_key:
         raise SeedanceRunnerError(
-            "Set BYTEPLUS_ARK_API_KEY, BYTEPLUS_API_KEY, VSR_SEEDANCE_API_KEY, "
-            "ARK_API_KEY, or SEEDANCE_API_KEY in .env.local or the local environment"
+            f"Provider {config['provider_id']} has no API key; set "
+            f"{' or '.join(config['key_env_names'])} in .env.local or the local environment"
         )
     try:
         submission = video_job.authorize_submission(
@@ -1298,6 +1343,7 @@ def run_seedance_video(
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provider": {
+            "id": config["provider_id"],
             "name": config["provider"],
             "model": config["model"],
             "endpoint": config["endpoint"],
@@ -1404,6 +1450,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model")
     parser.add_argument("--endpoint")
     parser.add_argument(
+        "--provider",
+        choices=sorted(PROVIDERS),
+        help=(
+            "Seedance API account. 'byteplus' is the company ModelArk account; "
+            "'kuaipao' is the personal kuaipao.pro relay. "
+            "Defaults to VSR_SEEDANCE_PROVIDER or byteplus."
+        ),
+    )
+    parser.add_argument(
         "--profile",
         choices=sorted(video_job.PROFILE_DEFAULTS),
         help="Generation profile; explicit CLI options still take precedence.",
@@ -1473,6 +1528,7 @@ def main(argv: list[str] | None = None) -> int:
             allow_data_url=args.allow_data_url,
             model=args.model,
             endpoint=args.endpoint,
+            provider=args.provider,
             profile=args.profile,
             ratio=args.ratio,
             duration=args.duration,

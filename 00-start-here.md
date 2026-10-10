@@ -47,6 +47,7 @@ If two notes disagree, trust the higher layer and update the lower memory note.
 - ChatCut finishing: [[docs/memory/viral-social-remix/chatcut/README|ChatCut Editing Memory]]
 - Visual taste: [[docs/memory/viral-social-remix/aesthetic-library/README|Aesthetic Library]]
 - Source/material indexing: [[docs/workflows/local-material-index]]
+- Repository hygiene: [[docs/workflows/repository-hygiene]]
 - Memory hygiene: [[docs/memory/viral-social-remix/self-distillation]]
 
 ## Teaching Materials

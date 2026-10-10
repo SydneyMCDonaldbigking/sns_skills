@@ -250,6 +250,14 @@ def test_run_openrouter_carousel_director_defaults_to_first_opening_frame(
             for index in range(1, 4)
         }
     }
+    reference_dir = run_dir / "references" / "inputs"
+    reference_dir.mkdir(parents=True)
+    Image.new("RGB", (16, 16), "green").save(reference_dir / "product.png")
+    Image.new("RGB", (16, 16), "black").save(reference_dir / "logo.png")
+    data["assets"]["01"]["reference_paths"] = [
+        "references/inputs/product.png",
+        "references/inputs/logo.png",
+    ]
     manifest_path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8",

@@ -27,13 +27,67 @@ spent.
 
 ## Provider Contract
 
-Default provider: BytePlus ModelArk, model
-`dreamina-seedance-2-0-260128`.
+Two named accounts exist. Select with `--provider` or `VSR_SEEDANCE_PROVIDER`;
+the default stays `byteplus` so no existing command changes billing.
 
-- API key priority: `BYTEPLUS_ARK_API_KEY`, `BYTEPLUS_API_KEY`,
-  `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, `SEEDANCE_API_KEY`.
-- Default endpoint:
-  `https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks`.
+| Provider | Account | Endpoint | Default model | Key env |
+|---|---|---|---|---|
+| `byteplus` | company ModelArk (reimbursed) | `https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks` | `dreamina-seedance-2-0-260128` | `BYTEPLUS_ARK_API_KEY`, `BYTEPLUS_API_KEY`, `VSR_SEEDANCE_API_KEY`, `ARK_API_KEY`, `SEEDANCE_API_KEY` |
+| `kuaipao` | personal kuaipao.pro relay (gifted) | `https://kuaipao.pro/api/v3/contents/generations/tasks` | `doubao-seedance-2.0-1080p` | `KUAIPAO_ARK_API_KEY`, `KUAIPAO_API_KEY` |
+
+Keys never cross providers: a `kuaipao` run will not fall back to the company
+ModelArk key, and vice versa. Per-provider overrides are `VSR_SEEDANCE_ENDPOINT`
+/ `VSR_SEEDANCE_MODEL` for `byteplus` and `VSR_KUAIPAO_ENDPOINT` /
+`VSR_KUAIPAO_MODEL` for `kuaipao`. Ask which account to bill when the user has
+not said; do not silently spend company budget on personal work or the gifted
+credit on company deliverables.
+
+kuaipao notes (probed 2026-08-10, docs were wrong):
+
+- Two hosts serve the same API: `kuaipao.ai` (international) and `kuaipao.pro`
+  (domestic). They are not equally reliable — `kuaipao.pro` timed out entirely
+  during testing while `kuaipao.ai` answered in about a second. Prefer
+  `kuaipao.ai` and treat a hang as a host problem before debugging the payload.
+
+- The published Ark path `POST /api/v3/contents/generations/tasks` does **not**
+  exist on the relay; it returns
+  `404 Invalid URL (POST /api/v3/contents/generations/tasks)`. The real video
+  route is `POST /v1/videos`, a new-api OpenAI-style video
+  endpoint taking `model`, `prompt`, `size`, `seconds`, `input_reference` —
+  not the Ark `content` array. **The runner has no adapter for this shape yet**,
+  so `--provider kuaipao` cannot submit video until one is written.
+- Token access is per group. Check with
+  `GET /v1/models`: a `default (distributor)` token exposes only chat and image
+  models, and seedance requests fail with
+  `503 No available channel for model ... under group default`. The token must
+  be moved to the `视频` group in the kuaipao console. The groups are exclusive:
+  a `视频` token drops `gpt-image-2` and the chat models, so keep image
+  generation on OpenRouter.
+- Video jobs are pre-authorized against the account balance before the payload
+  is even validated. The hold is a flat per-model figure, independent of the
+  requested duration and size, and a request under it fails with
+  `403 insufficient_user_quota` naming the balance and the required hold:
+
+  | Model | Hold |
+  |---|---:|
+  | `doubao-seedance-2.0-mini-720p` | $15.94 |
+  | `doubao-seedance-2.0-mini-480p` | $17.34 |
+  | `doubao-seedance-2.0-fast-720p` | $17.50 |
+  | `doubao-seedance-2.0-fast-480p` | $27.75 |
+  | `doubao-seedance-2.0-720p` | $31.00 |
+  | `doubao-seedance-2.0-480p` | $34.69 |
+  | `doubao-seedance-2.0-1080p` | $45.00 |
+
+  Settlement is far lower than the hold — a 6s 1080x1920 clip bills roughly
+  ¥21 — but the balance must clear the hold at every submit, so budget for the
+  hold, not the invoice.
+- Resolution is baked into the model name (`doubao-seedance-2.0-1080p`,
+  `-720p`, `-480p`, `-fast-720p`, `-mini-480p`), so a separate `resolution`
+  control is redundant there.
+- Still unverified because no token has had video access yet:
+  `return_last_frame` support, image reference passing, and request body size
+  limits. Smoke-test those on `doubao-seedance-2.0-fast-720p` before trusting
+  the three-clip handoff route.
 - Supported local controls for Seedance 2.0: duration 4-15 seconds; ratio
   `21:9`, `16:9`, `4:3`, `1:1`, `3:4`, `9:16`, or `adaptive`; resolution
   `480p`, `720p`, or `1080p`.
@@ -464,6 +518,10 @@ Production:
   --profile visual-preview
 ```
 
+Bill the personal kuaipao account instead by adding
+`--provider kuaipao`; the dry run reports the resolved provider, model, and
+endpoint before anything is spent.
+
 CLI reference overrides are available as repeatable `--image-ref`,
 `--video-ref`, and `--audio-ref`. An explicit CLI list replaces manifest
 references of the same media type but preserves the other types.
@@ -587,4 +645,5 @@ Recommended local key format:
 
 ```dotenv
 BYTEPLUS_ARK_API_KEY=...
+KUAIPAO_API_KEY=...
 ```
